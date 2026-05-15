@@ -110,7 +110,12 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                     if e_temel > Decimal('0.0'):
                         pn += katsayilar.get(k, Decimal('0.0')) * (e_gecerli / e_temel)
                 
-                ff_dilim_yuvarlanmis = (kullanilan_tutar * b_kat * (pn - Decimal('1.0'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                # 🛠️ KİK 6 HANE YUVARLAMA KURALI BURADA DEVREYE GİRİYOR 🛠️
+                pn_yuvarlanmis = pn.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+                
+                ff_dilim = kullanilan_tutar * b_kat * (pn_yuvarlanmis - Decimal('1.0'))
+                ff_dilim_yuvarlanmis = ff_dilim.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
                 toplam_ff_aylik += ff_dilim_yuvarlanmis
                 kova['kapasite'] -= kullanilan_tutar
                 kalan_para -= kullanilan_tutar
