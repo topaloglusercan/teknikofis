@@ -4,8 +4,6 @@ import warnings
 import json
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 
-# Python'un ondalık hassasiyetini Excel'in maksimum hassasiyeti olan 15'e (veya güvenli pay için 28'e) ayarlayabiliriz.
-# Biz tam Excel mantığı için virgülden sonraki işlemlerde Float (IEEE 754) davranışını taklit edeceğiz.
 getcontext().prec = 28 
 
 warnings.filterwarnings("ignore")
@@ -29,9 +27,33 @@ def parse_turkish_date(date_str):
 
 def clean_decimal(val):
     if pd.isna(val) or str(val).strip() == '': return Decimal('0.0')
+    
+    # Eğer doğrudan Streamlit'ten float/int geldiyse dokunma
+    if isinstance(val, (int, float)):
+        return Decimal(str(val))
+        
+    val_str = str(val).strip()
+    val_str = val_str.replace('TL', '').replace('%', '').strip()
+    
+    # AKILLI FORMAT TANIYICI
+    if '.' in val_str and ',' in val_str:
+        if val_str.rfind(',') > val_str.rfind('.'):
+            # Türk formatı (Örn: 1.234.567,89)
+            val_str = val_str.replace('.', '').replace(',', '.')
+        else:
+            # İngiliz formatı (Örn: 1,234,567.89)
+            val_str = val_str.replace(',', '')
+    else:
+        # Sadece virgül varsa ondalıktır (Örn: 123,45)
+        if ',' in val_str:
+            val_str = val_str.replace(',', '.')
+        # Sadece nokta varsa ve birden fazlaysa binliktir (1.234.567)
+        elif val_str.count('.') > 1:
+            val_str = val_str.replace('.', '')
+        # Tek nokta varsa ve ondalık ayraçsa öyle kalır (Örn: 125.45)
+            
     try:
-        clean_str = str(val).replace('.', '').replace(',', '.')
-        return Decimal(clean_str)
+        return Decimal(val_str)
     except:
         return Decimal('0.0')
 
@@ -103,7 +125,6 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                 gecikme = kova['ay'] < uyg_ayi
                 endeks_prog = df_endeks.loc[gercek_prog_ayi] if gecikme and gercek_prog_ayi in df_endeks.index else endeks_uyg
                 
-                # Excel'deki mantıkla oranları hesapla
                 pn = Decimal('0.0')
                 for k, sutun in endeks_haritasi.items():
                     e_temel = temel_endeksler.get(k, Decimal('0.0'))
@@ -113,15 +134,11 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                     katsayi = katsayilar.get(k, Decimal('0.0'))
                     
                     if e_temel > Decimal('0.0'):
-                        # Endeksleri bölerken Excel gibi tam hassasiyetle tut
                         pn += katsayi * (e_gecerli / e_temel)
                     elif katsayi > Decimal('0.0'):
                         pn += katsayi
                 
-                # Excel'in formül çubuğundaki işlemi taklit ediyoruz: Pn yuvarlanmaz, direkt parayla çarpılır
                 ff_dilim = kullanilan_tutar * b_kat * (pn - Decimal('1.0'))
-                
-                # Sadece çıkan nihai Fiyat Farkı Parası kuruş hanesine (2 Hane) yuvarlanır
                 ff_dilim_yuvarlanmis = ff_dilim.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
                 matris_verileri.append({
@@ -215,8 +232,6 @@ if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
         df_detay_gosterim = df_detay.copy()
         df_detay_gosterim['Kullanılan Tutar'] = df_detay_gosterim['Kullanılan Tutar'].apply(tr_format)
         df_detay_gosterim['Fiyat Farkı Tutarı'] = df_detay_gosterim['Fiyat Farkı Tutarı'].apply(tr_format)
-        
-        # Pn'i Excel tarzında (15 hane olarak) virgüllü göstermesini sağlıyoruz
         df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'] = df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'].apply(lambda x: "{:.15f}".format(x).rstrip('0').rstrip('.').replace('.', ','))
         
         st.dataframe(df_detay_gosterim, use_container_width=True)
