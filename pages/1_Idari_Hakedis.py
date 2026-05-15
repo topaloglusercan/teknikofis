@@ -2,7 +2,11 @@ import streamlit as st
 import pandas as pd
 import warnings
 import json
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, getcontext
+
+# Python'un ondalık hassasiyetini Excel'in maksimum hassasiyeti olan 15'e (veya güvenli pay için 28'e) ayarlayabiliriz.
+# Biz tam Excel mantığı için virgülden sonraki işlemlerde Float (IEEE 754) davranışını taklit edeceğiz.
+getcontext().prec = 28 
 
 warnings.filterwarnings("ignore")
 
@@ -94,27 +98,39 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
             if kalan_para <= Decimal('0.0'): break 
             if kova['kapasite'] > Decimal('0.0'):
                 kullanilan_tutar = min(kalan_para, kova['kapasite'])
-                matris_verileri.append({
-                    'Hakediş Ayı': str(uyg_ayi),
-                    'İş Programı (Ödenek) Ayı': str(kova['ay']),
-                    'Kullanılan Tutar': float(kullanilan_tutar)
-                })
                 
                 gercek_prog_ayi = min(kova['ay'], son_endeks_ayi)
-                endeks_prog = df_endeks.loc[gercek_prog_ayi] if kova['ay'] < uyg_ayi and gercek_prog_ayi in df_endeks.index else endeks_uyg
+                gecikme = kova['ay'] < uyg_ayi
+                endeks_prog = df_endeks.loc[gercek_prog_ayi] if gecikme and gercek_prog_ayi in df_endeks.index else endeks_uyg
                 
+                # Excel'deki mantıkla oranları hesapla
                 pn = Decimal('0.0')
                 for k, sutun in endeks_haritasi.items():
                     e_temel = temel_endeksler.get(k, Decimal('0.0'))
-                    e_gecerli = min(clean_decimal(endeks_uyg.get(sutun, 0)), clean_decimal(endeks_prog.get(sutun, 0))) if kova['ay'] < uyg_ayi else clean_decimal(endeks_uyg.get(sutun, 0))
+                    e_uyg = clean_decimal(endeks_uyg.get(sutun, 0))
+                    e_prog = clean_decimal(endeks_prog.get(sutun, 0))
+                    e_gecerli = min(e_uyg, e_prog) if gecikme else e_uyg
+                    katsayi = katsayilar.get(k, Decimal('0.0'))
+                    
                     if e_temel > Decimal('0.0'):
-                        pn += katsayilar.get(k, Decimal('0.0')) * (e_gecerli / e_temel)
+                        # Endeksleri bölerken Excel gibi tam hassasiyetle tut
+                        pn += katsayi * (e_gecerli / e_temel)
+                    elif katsayi > Decimal('0.0'):
+                        pn += katsayi
                 
-                # 🛠️ KİK 6 HANE YUVARLAMA KURALI BURADA DEVREYE GİRİYOR 🛠️
-                pn_yuvarlanmis = pn.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+                # Excel'in formül çubuğundaki işlemi taklit ediyoruz: Pn yuvarlanmaz, direkt parayla çarpılır
+                ff_dilim = kullanilan_tutar * b_kat * (pn - Decimal('1.0'))
                 
-                ff_dilim = kullanilan_tutar * b_kat * (pn_yuvarlanmis - Decimal('1.0'))
+                # Sadece çıkan nihai Fiyat Farkı Parası kuruş hanesine (2 Hane) yuvarlanır
                 ff_dilim_yuvarlanmis = ff_dilim.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
+                matris_verileri.append({
+                    'Hakediş Ayı': str(uyg_ayi),
+                    'İş Programı (Ödenek) Ayı': str(kova['ay']),
+                    'Kullanılan Tutar': float(kullanilan_tutar),
+                    'Uygulanan Pn (Excel - 15 Hane)': float(pn),
+                    'Fiyat Farkı Tutarı': float(ff_dilim_yuvarlanmis)
+                })
                 
                 toplam_ff_aylik += ff_dilim_yuvarlanmis
                 kova['kapasite'] -= kullanilan_tutar
@@ -126,14 +142,15 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
 
     df_sonuc = df_prog.copy()
     df_sonuc['KÜMÜLATİF FİYAT FARKI'] = final_ff_listesi
-    df_matris_ham = pd.DataFrame(matris_verileri)
-    if not df_matris_ham.empty:
-        df_pivot = df_matris_ham.pivot_table(index='Hakediş Ayı', columns='İş Programı (Ödenek) Ayı', values='Kullanılan Tutar', aggfunc='sum', fill_value=0)
+    df_detay = pd.DataFrame(matris_verileri)
+    
+    if not df_detay.empty:
+        df_pivot = df_detay.pivot_table(index='Hakediş Ayı', columns='İş Programı (Ödenek) Ayı', values='Kullanılan Tutar', aggfunc='sum', fill_value=0)
         df_pivot['HAKEDİŞ TUTARI (Toplam)'] = df_pivot.sum(axis=1)
         df_pivot.loc['ÖDENEK MİKTARI (Kullanılan Toplam)'] = df_pivot.sum()
     else: df_pivot = pd.DataFrame()
 
-    return df_sonuc, df_pivot
+    return df_sonuc, df_pivot, df_detay
 
 # --- ARAYÜZ (UI) ---
 if 'prog_df' not in st.session_state:
@@ -190,7 +207,19 @@ if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
         a = edited_alt[edited_alt.iloc[:,0].astype(str).str.strip() != '']
         b = edited_b[edited_b.iloc[:,0].astype(str).str.strip() != '']
         
-        df_sonuc, df_pivot = hesapla(p, e, a, b)
+        df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
+        
+        st.subheader("🔍 Detaylı Fiyat Farkı Analizi (Dilim Bazlı)")
+        st.markdown("Her bir ödenek dilimi için **Excel'in arka planda kullandığı tam hassasiyetli Pn Katsayısı (15+ Hane)** ve o dilimden elde edilip **2 haneye yuvarlanmış Fiyat Farkı** tutarları aşağıdadır:")
+        
+        df_detay_gosterim = df_detay.copy()
+        df_detay_gosterim['Kullanılan Tutar'] = df_detay_gosterim['Kullanılan Tutar'].apply(tr_format)
+        df_detay_gosterim['Fiyat Farkı Tutarı'] = df_detay_gosterim['Fiyat Farkı Tutarı'].apply(tr_format)
+        
+        # Pn'i Excel tarzında (15 hane olarak) virgüllü göstermesini sağlıyoruz
+        df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'] = df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'].apply(lambda x: "{:.15f}".format(x).rstrip('0').rstrip('.').replace('.', ','))
+        
+        st.dataframe(df_detay_gosterim, use_container_width=True)
         
         st.subheader("📊 Ödenek Dilimlerinin Hakedişlere Göre Kullanılması (Teyit Matrisi)")
         df_pivot_tr = df_pivot.map(tr_format)
