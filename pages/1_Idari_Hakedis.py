@@ -5,7 +5,6 @@ import json
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 
 getcontext().prec = 28 
-
 warnings.filterwarnings("ignore")
 
 st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_icon="📂")
@@ -14,6 +13,7 @@ st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_ic
 def parse_turkish_date(date_str):
     if pd.isna(date_str) or str(date_str).strip() == '': return pd.NaT
     date_str = str(date_str).strip().replace('.', ' ').lower()
+    if date_str in ['none', 'nan', 'nat', '<na>']: return pd.NaT
     months = {'oca': '01', 'ocak': '01', 'şub': '02', 'şubat': '02', 'mar': '03', 'mart': '03',
               'nis': '04', 'nisan': '04', 'may': '05', 'mayıs': '05', 'haz': '06', 'haziran': '06',
               'tem': '07', 'temmuz': '07', 'ağu': '08', 'ağustos': '08', 'eyl': '09', 'eylül': '09',
@@ -26,11 +26,10 @@ def parse_turkish_date(date_str):
     return pd.NaT
 
 def clean_decimal(val):
-    if pd.isna(val) or str(val).strip() == '': return Decimal('0.0')
-    if isinstance(val, (int, float)):
-        return Decimal(str(val))
-        
+    if pd.isna(val): return Decimal('0.0')
     val_str = str(val).strip()
+    if val_str.lower() in ['', 'none', 'nan', 'nat', '<na>']: return Decimal('0.0')
+    
     val_str = val_str.replace('TL', '').replace('%', '').strip()
     
     if '.' in val_str and ',' in val_str:
@@ -45,7 +44,9 @@ def clean_decimal(val):
             val_str = val_str.replace('.', '')
             
     try:
-        return Decimal(val_str)
+        d = Decimal(val_str)
+        if d.is_nan(): return Decimal('0.0')
+        return d
     except:
         return Decimal('0.0')
 
@@ -57,18 +58,35 @@ def tr_format(val):
     except:
         return val
 
+def filter_empty_rows(df):
+    if df.empty: return df
+    mask = df.iloc[:, 0].astype(str).str.strip().str.lower().isin(['', 'none', 'nan', 'nat', '<na>'])
+    return df[~mask]
+
 # --- ANA HESAPLAMA MOTORU ---
 def hesapla(df_prog, df_endeks, df_alt, df_b):
+    df_prog = filter_empty_rows(df_prog.copy())
+    df_endeks = filter_empty_rows(df_endeks.copy())
+    df_alt = filter_empty_rows(df_alt.copy())
+    df_b = filter_empty_rows(df_b.copy())
+    
+    if df_prog.empty or df_endeks.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
     df_prog.columns = df_prog.columns.str.strip()
     
     end_col = 'AYLAR' if 'AYLAR' in df_endeks.columns else 'Aylar'
     df_endeks['AyKodu'] = pd.to_datetime(df_endeks[end_col].apply(parse_turkish_date)).dt.to_period('M')
-    df_endeks = df_endeks.drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
+    df_endeks = df_endeks.dropna(subset=['AyKodu']).drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
     
     df_b['AyKodu'] = pd.to_datetime(df_b['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
-    df_b = df_b.drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
+    df_b = df_b.dropna(subset=['AyKodu']).drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
     
     df_prog['AyKodu'] = pd.to_datetime(df_prog['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
+    df_prog = df_prog.dropna(subset=['AyKodu'])
+
+    if df_endeks.empty or df_prog.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     son_endeks_ayi = df_endeks.index.max()
     
@@ -96,7 +114,7 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
         aylik_imalat = guncel_imalat_kum - onceki_imalat_kum
         
         if aylik_imalat <= Decimal('0.0'):
-            final_ff_listesi.append(float(kümülatif_toplam_ff) if guncel_imalat_kum > Decimal('0.0') else 0.0)
+            final_ff_listesi.append(float(kümülatif_toplam_ff))
             if guncel_imalat_kum > Decimal('0.0'): onceki_imalat_kum = guncel_imalat_kum
             continue
             
@@ -104,7 +122,10 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
         b_kat = clean_decimal(b_val) if clean_decimal(b_val) > Decimal('0.0') else Decimal('1.0')
         
         gercek_endeks_ayi = min(uyg_ayi, son_endeks_ayi)
-        endeks_uyg = df_endeks.loc[gercek_endeks_ayi] if gercek_endeks_ayi in df_endeks.index else pd.Series(dtype=float)
+        if gercek_endeks_ayi in df_endeks.index:
+            endeks_uyg = df_endeks.loc[gercek_endeks_ayi]
+        else:
+            endeks_uyg = df_endeks.iloc[-1]
             
         toplam_ff_aylik, kalan_para = Decimal('0.0'), aylik_imalat
         
@@ -115,7 +136,12 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                 
                 gercek_prog_ayi = min(kova['ay'], son_endeks_ayi)
                 gecikme = kova['ay'] < uyg_ayi
-                endeks_prog = df_endeks.loc[gercek_prog_ayi] if gecikme and gercek_prog_ayi in df_endeks.index else endeks_uyg
+                
+                if gecikme:
+                    comp_ayi = min(gercek_endeks_ayi, gercek_prog_ayi)
+                    endeks_prog = df_endeks.loc[comp_ayi] if comp_ayi in df_endeks.index else endeks_uyg
+                else:
+                    endeks_prog = endeks_uyg
                 
                 pn = Decimal('0.0')
                 for k, sutun in endeks_haritasi.items():
@@ -157,7 +183,8 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
         df_pivot = df_detay.pivot_table(index='Hakediş Ayı', columns='İş Programı (Ödenek) Ayı', values='Kullanılan Tutar', aggfunc='sum', fill_value=0)
         df_pivot['HAKEDİŞ TUTARI (Toplam)'] = df_pivot.sum(axis=1)
         df_pivot.loc['ÖDENEK MİKTARI (Kullanılan Toplam)'] = df_pivot.sum()
-    else: df_pivot = pd.DataFrame()
+    else: 
+        df_pivot = pd.DataFrame()
 
     return df_sonuc, df_pivot, df_detay
 
@@ -189,7 +216,6 @@ if uploaded_file is not None:
     st.session_state.load_count += 1
     st.sidebar.success("Proje başarıyla yüklendi!")
 
-# Suffix yardımıyla editörlerin önbelleğini sıfırlıyoruz
 suffix = st.session_state.load_count
 
 col1, col2 = st.columns(2)
@@ -221,28 +247,31 @@ st.sidebar.download_button(
 st.markdown("---")
 if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
     try:
-        p = edited_prog[edited_prog.iloc[:,0].astype(str).str.strip() != '']
-        e = edited_endeks[edited_endeks.iloc[:,0].astype(str).str.strip() != '']
-        a = edited_alt[edited_alt.iloc[:,0].astype(str).str.strip() != '']
-        b = edited_b[edited_b.iloc[:,0].astype(str).str.strip() != '']
+        p = edited_prog.copy()
+        e = edited_endeks.copy()
+        a = edited_alt.copy()
+        b = edited_b.copy()
         
         df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
         
-        st.subheader("🔍 Detaylı Fiyat Farkı Analizi (Dilim Bazlı)")
-        df_detay_gosterim = df_detay.copy()
-        df_detay_gosterim['Kullanılan Tutar'] = df_detay_gosterim['Kullanılan Tutar'].apply(tr_format)
-        df_detay_gosterim['Fiyat Farkı Tutarı'] = df_detay_gosterim['Fiyat Farkı Tutarı'].apply(tr_format)
-        df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'] = df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'].apply(lambda x: "{:.15f}".format(x).rstrip('0').rstrip('.').replace('.', ','))
-        st.dataframe(df_detay_gosterim, use_container_width=True)
-        
-        st.subheader("📊 Ödenek Dilimlerinin Hakedişlere Göre Kullanılması (Teyit Matrisi)")
-        df_pivot_tr = df_pivot.map(tr_format)
-        st.dataframe(df_pivot_tr.style.set_properties(subset=['HAKEDİŞ TUTARI (Toplam)'], **{'font-weight': 'bold', 'background-color': '#e6f2ff'}), use_container_width=True)
-        
-        st.subheader("📑 Kümülatif Fiyat Farkı Sonuçları")
-        for col in df_sonuc.columns:
-            if any(x in col.upper() for x in ['TUTAR', 'PROGRAM', 'FARKI']):
-                df_sonuc[col] = df_sonuc[col].apply(tr_format)
-        st.dataframe(df_sonuc, use_container_width=True)
+        if df_sonuc.empty:
+            st.warning("⚠️ Lütfen tablolara geçerli hakediş ve endeks verilerini giriniz.")
+        else:
+            st.subheader("🔍 Detaylı Fiyat Farkı Analizi (Dilim Bazlı)")
+            df_detay_gosterim = df_detay.copy()
+            df_detay_gosterim['Kullanılan Tutar'] = df_detay_gosterim['Kullanılan Tutar'].apply(tr_format)
+            df_detay_gosterim['Fiyat Farkı Tutarı'] = df_detay_gosterim['Fiyat Farkı Tutarı'].apply(tr_format)
+            df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'] = df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'].apply(lambda x: "{:.15f}".format(x).rstrip('0').rstrip('.').replace('.', ','))
+            st.dataframe(df_detay_gosterim, use_container_width=True)
+            
+            st.subheader("📊 Ödenek Dilimlerinin Hakedişlere Göre Kullanılması (Teyit Matrisi)")
+            df_pivot_tr = df_pivot.map(tr_format)
+            st.dataframe(df_pivot_tr.style.set_properties(subset=['HAKEDİŞ TUTARI (Toplam)'], **{'font-weight': 'bold', 'background-color': '#e6f2ff'}), use_container_width=True)
+            
+            st.subheader("📑 Kümülatif Fiyat Farkı Sonuçları")
+            for col in df_sonuc.columns:
+                if any(x in col.upper() for x in ['TUTAR', 'PROGRAM', 'FARKI']):
+                    df_sonuc[col] = df_sonuc[col].apply(tr_format)
+            st.dataframe(df_sonuc, use_container_width=True)
     except Exception as ex:
-        st.error(f"🚨 Hata: {ex}")
+        st.error(f"🚨 Hesaplama Sırasında Hata Oluştu: {ex}")
