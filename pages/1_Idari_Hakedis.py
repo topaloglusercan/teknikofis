@@ -27,30 +27,22 @@ def parse_turkish_date(date_str):
 
 def clean_decimal(val):
     if pd.isna(val) or str(val).strip() == '': return Decimal('0.0')
-    
-    # Eğer doğrudan Streamlit'ten float/int geldiyse dokunma
     if isinstance(val, (int, float)):
         return Decimal(str(val))
         
     val_str = str(val).strip()
     val_str = val_str.replace('TL', '').replace('%', '').strip()
     
-    # AKILLI FORMAT TANIYICI
     if '.' in val_str and ',' in val_str:
         if val_str.rfind(',') > val_str.rfind('.'):
-            # Türk formatı (Örn: 1.234.567,89)
             val_str = val_str.replace('.', '').replace(',', '.')
         else:
-            # İngiliz formatı (Örn: 1,234,567.89)
             val_str = val_str.replace(',', '')
     else:
-        # Sadece virgül varsa ondalıktır (Örn: 123,45)
         if ',' in val_str:
             val_str = val_str.replace(',', '.')
-        # Sadece nokta varsa ve birden fazlaysa binliktir (1.234.567)
         elif val_str.count('.') > 1:
             val_str = val_str.replace('.', '')
-        # Tek nokta varsa ve ondalık ayraçsa öyle kalır (Örn: 125.45)
             
     try:
         return Decimal(val_str)
@@ -92,7 +84,7 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     for _, row in df_prog.iterrows():
         kum = clean_decimal(row[prog_kum_col])
         kapasite = kum - onceki_kum
-        kovalar.append({'ay': row['AyKodu'], 'kapasite': kapasite})
+        kovalar.append({'ay': row['AyKodu'], 'kapasite': capacity if (capacity := kum - onceki_kum) > Decimal('0.0') else Decimal('0.0')})
         onceki_kum = kum
 
     final_ff_listesi, matris_verileri = [], []
@@ -169,12 +161,16 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
 
     return df_sonuc, df_pivot, df_detay
 
-# --- ARAYÜZ (UI) ---
+# --- ARAYÜZ VE HAFIZA YÖNETİMİ ---
+# 🛠️ GÜNCELLEME: Streamlit Hücre Tipleri Gerçek Sayı (Float) Yapıldı 🛠️
 if 'prog_df' not in st.session_state:
-    st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": [""], "İMALAT TUTARI KÜMÜLATİF": [""]})
-    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": [""], "Ç o": [""], "D o": [""], "Y o": [""], "K o": [""], "G o": [""], "M o": [""]})
-    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00"], "Temel Endeks": ["", "", "", "", "", "", ""]})
-    st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
+    st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": [0.0], "İMALAT TUTARI KÜMÜLATİF": [0.0]})
+if 'endeks_df' not in st.session_state:
+    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": [0.0], "Ç o": [0.0], "D o": [0.0], "Y o": [0.0], "K o": [0.0], "G o": [0.0], "M o": [0.0]})
+if 'alt_df' not in st.session_state:
+    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Temel Endeks": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]})
+if 'b_df' not in st.session_state:
+    st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": [1.0]})
 
 st.title("📂 İdari Hakediş & Teyit Matrisi")
 
@@ -184,10 +180,28 @@ uploaded_file = st.sidebar.file_uploader("Önceki Projeyi Yükle (.json)", type=
 
 if uploaded_file is not None:
     data = json.load(uploaded_file)
-    st.session_state.prog_df = pd.DataFrame(data['prog'])
-    st.session_state.endeks_df = pd.DataFrame(data['endeks'])
-    st.session_state.alt_df = pd.DataFrame(data['alt'])
-    st.session_state.b_df = pd.DataFrame(data['b'])
+    
+    # JSON'dan gelen veriler de otomatik sayısal tipe zorlanıyor
+    df_p = pd.DataFrame(data['prog'])
+    for c in df_p.columns:
+        if c != "AYLAR": df_p[c] = df_p[c].apply(lambda x: float(clean_decimal(x)))
+        
+    df_e = pd.DataFrame(data['endeks'])
+    end_col = 'AYLAR' if 'AYLAR' in df_e.columns else 'Aylar'
+    for c in df_e.columns:
+        if c != end_col: df_e[c] = df_e[c].apply(lambda x: float(clean_decimal(x)))
+        
+    df_a = pd.DataFrame(data['alt'])
+    df_a['Katsayı'] = df_a['Katsayı'].apply(lambda x: float(clean_decimal(x)))
+    df_a['Temel Endeks'] = df_a['Temel Endeks'].apply(lambda x: float(clean_decimal(x)))
+    
+    df_b = pd.DataFrame(data['b'])
+    df_b['B'] = df_b['B'].apply(lambda x: float(clean_decimal(x)))
+    
+    st.session_state.prog_df = df_p
+    st.session_state.endeks_df = df_e
+    st.session_state.alt_df = df_a
+    st.session_state.b_df = df_b
     st.sidebar.success("Proje başarıyla yüklendi!")
 
 col1, col2 = st.columns(2)
@@ -198,7 +212,7 @@ with col1:
     edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True)
 with col2:
     st.subheader("2. Endeks Tablosu")
-    edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True)
+    edited_endeks = st.data_editor(st.session_state.edited_endeks if 'edited_endeks' in st.session_state else st.session_state.endeks_df, num_rows="dynamic", use_container_width=True)
     st.subheader("4. B Katsayısı Tablosu")
     edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True)
 
@@ -227,13 +241,10 @@ if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
         df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
         
         st.subheader("🔍 Detaylı Fiyat Farkı Analizi (Dilim Bazlı)")
-        st.markdown("Her bir ödenek dilimi için **Excel'in arka planda kullandığı tam hassasiyetli Pn Katsayısı (15+ Hane)** ve o dilimden elde edilip **2 haneye yuvarlanmış Fiyat Farkı** tutarları aşağıdadır:")
-        
         df_detay_gosterim = df_detay.copy()
         df_detay_gosterim['Kullanılan Tutar'] = df_detay_gosterim['Kullanılan Tutar'].apply(tr_format)
         df_detay_gosterim['Fiyat Farkı Tutarı'] = df_detay_gosterim['Fiyat Farkı Tutarı'].apply(tr_format)
         df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'] = df_detay_gosterim['Uygulanan Pn (Excel - 15 Hane)'].apply(lambda x: "{:.15f}".format(x).rstrip('0').rstrip('.').replace('.', ','))
-        
         st.dataframe(df_detay_gosterim, use_container_width=True)
         
         st.subheader("📊 Ödenek Dilimlerinin Hakedişlere Göre Kullanılması (Teyit Matrisi)")
