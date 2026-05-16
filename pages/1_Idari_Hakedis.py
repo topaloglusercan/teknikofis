@@ -83,8 +83,8 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     onceki_kum = Decimal('0.0')
     for _, row in df_prog.iterrows():
         kum = clean_decimal(row[prog_kum_col])
-        kapasite = kum - onceki_kum
-        kovalar.append({'ay': row['AyKodu'], 'kapasite': capacity if (capacity := kum - onceki_kum) > Decimal('0.0') else Decimal('0.0')})
+        capacity = kum - onceki_kum
+        kovalar.append({'ay': row['AyKodu'], 'kapasite': capacity if capacity > Decimal('0.0') else Decimal('0.0')})
         onceki_kum = kum
 
     final_ff_listesi, matris_verileri = [], []
@@ -162,15 +162,17 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     return df_sonuc, df_pivot, df_detay
 
 # --- ARAYÜZ VE HAFIZA YÖNETİMİ ---
-# 🛠️ GÜNCELLEME: Streamlit Hücre Tipleri Gerçek Sayı (Float) Yapıldı 🛠️
+if 'load_count' not in st.session_state:
+    st.session_state.load_count = 0
+
 if 'prog_df' not in st.session_state:
-    st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": [0.0], "İMALAT TUTARI KÜMÜLATİF": [0.0]})
+    st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": ["0,00"], "İMALAT TUTARI KÜMÜLATİF": ["0,00"]})
 if 'endeks_df' not in st.session_state:
-    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": [0.0], "Ç o": [0.0], "D o": [0.0], "Y o": [0.0], "K o": [0.0], "G o": [0.0], "M o": [0.0]})
+    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": ["0,00"], "Ç o": ["0,00"], "D o": ["0,00"], "Y o": ["0,00"], "K o": ["0,00"], "G o": ["0,00"], "M o": ["0,00"]})
 if 'alt_df' not in st.session_state:
-    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "Temel Endeks": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]})
+    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00"], "Temel Endeks": ["0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00"]})
 if 'b_df' not in st.session_state:
-    st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": [1.0]})
+    st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 
 st.title("📂 İdari Hakediş & Teyit Matrisi")
 
@@ -180,41 +182,27 @@ uploaded_file = st.sidebar.file_uploader("Önceki Projeyi Yükle (.json)", type=
 
 if uploaded_file is not None:
     data = json.load(uploaded_file)
-    
-    # JSON'dan gelen veriler de otomatik sayısal tipe zorlanıyor
-    df_p = pd.DataFrame(data['prog'])
-    for c in df_p.columns:
-        if c != "AYLAR": df_p[c] = df_p[c].apply(lambda x: float(clean_decimal(x)))
-        
-    df_e = pd.DataFrame(data['endeks'])
-    end_col = 'AYLAR' if 'AYLAR' in df_e.columns else 'Aylar'
-    for c in df_e.columns:
-        if c != end_col: df_e[c] = df_e[c].apply(lambda x: float(clean_decimal(x)))
-        
-    df_a = pd.DataFrame(data['alt'])
-    df_a['Katsayı'] = df_a['Katsayı'].apply(lambda x: float(clean_decimal(x)))
-    df_a['Temel Endeks'] = df_a['Temel Endeks'].apply(lambda x: float(clean_decimal(x)))
-    
-    df_b = pd.DataFrame(data['b'])
-    df_b['B'] = df_b['B'].apply(lambda x: float(clean_decimal(x)))
-    
-    st.session_state.prog_df = df_p
-    st.session_state.endeks_df = df_e
-    st.session_state.alt_df = df_a
-    st.session_state.b_df = df_b
+    st.session_state.prog_df = pd.DataFrame(data['prog']).map(str)
+    st.session_state.endeks_df = pd.DataFrame(data['endeks']).map(str)
+    st.session_state.alt_df = pd.DataFrame(data['alt']).map(str)
+    st.session_state.b_df = pd.DataFrame(data['b']).map(str)
+    st.session_state.load_count += 1
     st.sidebar.success("Proje başarıyla yüklendi!")
+
+# Suffix yardımıyla editörlerin önbelleğini sıfırlıyoruz
+suffix = st.session_state.load_count
 
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True)
+    edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
     st.subheader("3. Alt Endeks Ağırlıkları")
-    edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True)
+    edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
 with col2:
     st.subheader("2. Endeks Tablosu")
-    edited_endeks = st.data_editor(st.session_state.edited_endeks if 'edited_endeks' in st.session_state else st.session_state.endeks_df, num_rows="dynamic", use_container_width=True)
+    edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
     st.subheader("4. B Katsayısı Tablosu")
-    edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True)
+    edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
 
 project_data = {
     'prog': edited_prog.to_dict(orient='records'),
