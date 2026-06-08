@@ -11,6 +11,7 @@ Bu portal şantiye ve teknik ofis süreçlerinizi dijitalleştirmek için tasarl
 Sol taraftaki menüyü kullanarak modüller arasında geçiş yapabilirsiniz:
 * 📂 **İdari Hakediş:** İdari Hakediş sayısal kontrol sistem aracıdır. 
 * 📂 **Pursantaj:** Pursantaj Yönetim Sistemi, inşaat projelerinde sözleşme bedelinin iş kalemlerine göre dağılımını planlayan, izleyen ve analiz eden bütünleşik bir dijital araçtır.
+* 📂 **Şantiye Tutanak:** İnşaat projelerinde eklenti ve kesinti tutankları hazırlayıp, pdf dosyası indirebileceğiniz, filtre yapabileceğiniz bir dijital araçtır.
 
 *Not: Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz, yan menüden projelerinizi kendi bilgisayarınıza indirebilir ve yükleyebilirsiniz.*
 """)
