@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Şantiye Tutanak Sistemi</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232636;
+      --border: #2e3347;
+      --accent-blue: #3b82f6;
+      --accent-red: #ef4444;
+      --accent-green: #22c55e;
+      --accent-yellow: #f59e0b;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --font: 'IBM Plex Sans', sans-serif;
+      --mono: 'IBM Plex Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+    /* NAV */
+    .nav { display: flex; align-items: center; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; position: sticky; top: 0; z-index: 100; }
+    .nav-brand { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent-blue); letter-spacing: 0.05em; margin-right: 32px; }
+    .nav-tab { padding: 0 16px; height: 52px; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; gap: 7px; white-space: nowrap; }
+    .nav-tab:hover { color: var(--text-dim); }
+    .nav-tab.active { color: var(--text); border-bottom-color: var(--accent-blue); }
+    .nav-tab .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .nav-spacer { flex: 1; }
+    .nav-count { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+
+    /* LAYOUT */
+    .page { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    /* SECTION HEADER */
+    .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .sec-title { font-size: 18px; font-weight: 600; color: var(--text); }
+    .sec-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-family: var(--mono); }
+
+    /* CARDS / TABLE */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 13px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-dim); }
+    .card-body { padding: 18px; }
+
+    .table { width: 100%; border-collapse: collapse; }
+    .table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg); }
+    .table td { padding: 11px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-dim); vertical-align: middle; }
+    .table tr:last-child td { border-bottom: none; }
+    .table tr:hover td { background: rgba(59,130,246,0.04); color: var(--text); }
+
+    /* FORMS */
+    .grid { display: grid; gap: 14px; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+    input, select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; color: var(--text); font-family: var(--font); font-size: 13px; width: 100%; transition: border-color 0.15s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-blue); }
+    textarea { resize: vertical; min-height: 80px; }
+    select option { background: var(--surface); }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font); }
+    .btn-primary { background: var(--accent-blue); color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: var(--accent-red); color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+    .btn-green { background: var(--accent-green); color: #fff; }
+    .btn-green:hover { background: #16a34a; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-icon { padding: 6px 8px; }
+
+    /* BADGES */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+    .badge-blue { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .badge-red { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .badge-green { background: rgba(34,197,94,0.15); color: #86efac; }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: #fcd34d; }
+
+    /* KALEMLER */
+    .kalem-table { width: 100%; border-collapse: collapse; }
+    .kalem-table th { text-align: left; padding: 9px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+    .kalem-table th.right { text-align: right; }
+    .kalem-table th.center { text-align: center; }
+    .kalem-table td { padding: 7px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .kalem-table tr:last-child td { border-bottom: none; }
+    .kalem-table select, .kalem-table input { width: 100%; }
+    .kalem-table .col-grup { width: 155px; }
+    .kalem-table .col-tanim { min-width: 200px; }
+    .kalem-table .col-miktar { width: 100px; }
+    .kalem-table .col-birim { width: 120px; }
+    .kalem-table .col-fiyat { width: 140px; }
+    .kalem-table .col-toplam { width: 130px; text-align: right; }
+    .kalem-table .col-sil { width: 36px; }
+    .kalem-table input[type=text] { text-align: right; font-family: var(--mono); font-size: 13px; }
+    .kalem-total { text-align: right; padding: 12px 6px 0; font-size: 15px; font-weight: 600; color: var(--text); border-top: 1px solid var(--border); margin-top: 8px; }
+    .kalem-total span { color: var(--accent-blue); font-family: var(--mono); }
+
+    .del-btn { background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 16px; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.15s; }
+    .del-btn:hover { color: var(--accent-red); background: rgba(239,68,68,0.1); }
+
+    /* EMPTY STATE */
+    .empty { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; }
+
+    /* MODAL */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; min-width: 380px; max-width: 520px; width: 90vw; }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; }
+    .toast-msg { background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--accent-green); padding: 12px 18px; border-radius: 8px; font-size: 13px; color: var(--text); box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: fadeIn 0.2s ease; }
+    .toast-msg.error { border-left-color: var(--accent-red); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* TUTANAK FORM */
+    .form-section { margin-bottom: 20px; }
+    .form-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-blue); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+    /* PDF PREVIEW */
+    .pdf-preview { background: #ffffff; color: #1f2937; padding: 32px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .kalem-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-2 { gap: 8px; }
+    .gap-3 { gap: 12px; }
+    .ml-auto { margin-left: auto; }
+    .mb-4 { margin-bottom: 16px; }
+    .mb-2 { margin-bottom: 8px; }
+    .text-right { text-align: right; }
+    .text-muted { color: var(--text-muted); font-size: 12px; }
+    .font-mono { font-family: var(--mono); }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <span class="nav-brand">⬛ ŞANTİYE</span>
+  <div class="nav-tab active" onclick="showPage('tutanak')" id="tab-tutanak">
+    <span class="dot" style="background:#3b82f6"></span> Tutanak Oluştur
+  </div>
+  <div class="nav-tab" onclick="showPage('arsiv')" id="tab-arsiv">
+    <span class="dot" style="background:#f59e0b"></span> Arşiv
+  </div>
+  <div class="nav-tab" onclick="showPage('firmalar')" id="tab-firmalar">
+    <span class="dot" style="background:#22c55e"></span> Firmalar
+  </div>
+  <div class="nav-tab" onclick="showPage('projeler')" id="tab-projeler">
+    <span class="dot" style="background:#a78bfa"></span> Projeler
+  </div>
+  <div class="nav-tab" onclick="showPage('ayarlar')" id="tab-ayarlar">
+    ⚙ Ayarlar
+  </div>
+  <div class="nav-spacer"></div>
+  <span class="nav-count font-mono" id="nav-count"></span>
+</nav>
+
+<!-- ======================== TUTANAK SAYFASI ======================== -->
+<div class="page active" id="page-tutanak">
+  <div class="sec-header">
+    <div>
+      <div class="sec-title">Yeni Tutanak</div>
+      <div class="sec-sub">Şantiye eklenti / kesinti tutanağı oluştur → kaydet veya PDF al</div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost btn-sm" onclick="tutanakTemizle()">↺ Temizle</button>
+      <button class="btn btn-primary" onclick="tutanakKaydet()" id="kaydet-btn">
+        💾 Kaydet
+      </button>
+      <button class="btn btn-green" onclick="pdfIndir()" id="pdf-btn">
+        ⬇ PDF İndir
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="gap:18px">
+    <!-- SOL: FORM -->
+    <div>
+      <!-- Genel Bilgiler -->
+      <div class="card mb-4">
+        <div class="card-header"><span class="card-title">Genel Bilgiler</span></div>
+        <div class="card-body">
+          <div class="grid grid-2 mb-4">
+            <div class="form-group">
+              <label>Tutanak Türü</label>
+              <select id="f-cins" onchange="updatePreview()">
+                <option value="EKLENTİ">➕ EKLENTİ</option>
+                <option value="KESİNTİ">➖ KESİNTİ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tarih</label>
+              <input type="date" id="f-tarih" onchange="updatePreview()" />
+            </div>
+          </div>
+          <div class="grid grid-2 mb-4">
+            <div class="form-group">
+              <label>Proje / İş</label>
+              <select id="f-proje" onchange="updatePreview()">
+                <option value="">— Seçiniz —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Konum / Blok / Kat</label>
+              <input type="text" id="f-konum" placeholder="örn: A Blok - 3. Kat" onchange="updatePreview()" oninput="updatePreview()" />
+            </div>
+          </div>
+          <div class="grid grid-2 mb-4">
+            <div class="form-group">
+              <label>Taşeron (Teslim Eden)</label>
+              <select id="f-taseron" onchange="updatePreview()">
+                <option value="">— Seçiniz —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>İşveren (Teslim Alan)</label>
+              <select id="f-isveren" onchange="updatePreview()">
+                <option value="">— Seçiniz —</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Açıklama / Notlar</label>
+            <textarea id="f-aciklama" placeholder="Saha bilgileri, özel notlar..." rows="3" onchange="updatePreview()" oninput="updatePreview()"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fotoğraflar -->
+      <div class="card mb-4">
+        <div class="card-header"><span class="card-title">Saha Kanıtları (Fotoğraflar)</span></div>
+        <div class="card-body">
+          <div class="grid grid-2">
+            <div class="form-group">
+              <label>Fotoğraf 1</label>
+              <div id="foto1-preview" style="display:none;position:relative;margin-bottom:8px">
+                <img id="foto1-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+                <button onclick="fotoSil(1)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
+              </div>
+              <input type="file" id="foto1-input" accept="image/*" onchange="fotoYukle(1, event)" style="cursor:pointer" />
+            </div>
+            <div class="form-group">
+              <label>Fotoğraf 2</label>
+              <div id="foto2-preview" style="display:none;position:relative;margin-bottom:8px">
+                <img id="foto2-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+                <button onclick="fotoSil(2)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
+              </div>
+              <input type="file" id="foto2-input" accept="image/*" onchange="fotoYukle(2, event)" style="cursor:pointer" />
+            </div>
+          </div>
+          <div class="grid grid-2" style="margin-top:14px">
+            <div class="form-group">
+              <label>Fotoğraf 3 (opsiyonel)</label>
+              <div id="foto3-preview" style="display:none;position:relative;margin-bottom:8px">
+                <img id="foto3-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+                <button onclick="fotoSil(3)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
+              </div>
+              <input type="file" id="foto3-input" accept="image/*" onchange="fotoYukle(3, event)" style="cursor:pointer" />
+            </div>
+            <div class="form-group">
+              <label>Fotoğraf 4 (opsiyonel)</label>
+              <div id="foto4-preview" style="display:none;position:relative;margin-bottom:8px">
+                <img id="foto4-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+                <button onclick="fotoSil(4)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
+              </div>
+              <input type="file" id="foto4-input" accept="image/*" onchange="fotoYukle(4, event)" style="cursor:pointer" />
+            </div>
+          </div>
+          <div class="text-muted" style="margin-top:10px">📌 PDF'e otomatik eklenir. 2 fotoğraf yan yana, 3-4 ise alt satırda görünür.</div>
+        </div>
+      </div>
+
+      <!-- Kalemler -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">İş Kalemleri</span>
+          <button class="btn btn-ghost btn-sm" onclick="kalemEkle()">+ Kalem Ekle</button>
+        </div>
+        <div class="card-body" style="overflow-x:auto">
+          <table class="kalem-table">
+            <thead>
+              <tr>
+                <th class="col-grup">Grup</th>
+                <th class="col-tanim">Kısa Tanım</th>
+                <th class="col-miktar center">Miktar</th>
+                <th class="col-birim">Birim</th>
+                <th class="col-fiyat right">Birim Fiyat (TL)</th>
+                <th class="col-toplam right">Toplam</th>
+                <th class="col-sil"></th>
+              </tr>
+            </thead>
+            <tbody id="kalemler-container"></tbody>
+          </table>
+          <div class="kalem-total">GENEL TOPLAM: <span id="genel-toplam">0,00 TL</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SAĞ: ÖNIZLEME -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">PDF Önizleme</span>
+          <span class="text-muted font-mono">Canlı güncellenir</span>
+        </div>
+        <div class="card-body" style="padding:12px">
+          <div id="pdf-preview-area" style="transform-origin:top left; transform:scale(0.75); width:133%; margin-bottom:-25%">
+            <!-- Preview injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== ARŞİV SAYFASI ======================== -->
+<div class="page" id="page-arsiv">
+  <div class="sec-header">
+    <div>
+      <div class="sec-title">Tutanak Arşivi</div>
+      <div class="sec-sub" id="arsiv-sonuc-bilgi">Kaydedilen tüm tutanaklar</div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost btn-sm" onclick="arsivExcelIndir()">⬇ Excel</button>
+      <button class="btn btn-ghost btn-sm" onclick="arsivTemizle()" style="color:var(--accent-red)">🗑 Arşivi Temizle</button>
+    </div>
+  </div>
+
+  <!-- FİLTRE PANEL -->
+  <div class="card mb-4">
+    <div class="card-body" style="padding:14px 18px">
+      <div class="grid grid-4" style="gap:12px;margin-bottom:12px">
+        <div class="form-group">
+          <label>🔍 Serbest Arama</label>
+          <input type="text" id="f-ara-metin" placeholder="Evrak no, konum, açıklama..." oninput="arsivFiltrele()" />
+        </div>
+        <div class="form-group">
+          <label>Tür</label>
+          <select id="f-ara-cins" onchange="arsivFiltrele()">
+            <option value="">Tümü</option>
+            <option value="EKLENTİ">EKLENTİ</option>
+            <option value="KESİNTİ">KESİNTİ</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Proje</label>
+          <select id="f-ara-proje" onchange="arsivFiltrele()">
+            <option value="">Tümü</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Firma (Taşeron / İşveren)</label>
+          <select id="f-ara-firma" onchange="arsivFiltrele()">
+            <option value="">Tümü</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-4" style="gap:12px;align-items:flex-end">
+        <div class="form-group">
+          <label>Tarih Başlangıç</label>
+          <input type="date" id="f-ara-tarih1" onchange="arsivFiltrele()" />
+        </div>
+        <div class="form-group">
+          <label>Tarih Bitiş</label>
+          <input type="date" id="f-ara-tarih2" onchange="arsivFiltrele()" />
+        </div>
+        <div class="form-group">
+          <label>Min Tutar (TL)</label>
+          <input type="text" inputmode="numeric" id="f-ara-min" placeholder="0" oninput="arsivFiltrele()" />
+        </div>
+        <div style="display:flex;gap:8px;padding-bottom:1px">
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="arsivFiltreTemizle()">↺ Sıfırla</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="arsivFiltrele()">Ara</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SONUÇ TABLOSU -->
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Evrak No</th>
+          <th>Tür</th>
+          <th>Proje</th>
+          <th>Taşeron</th>
+          <th>İşveren</th>
+          <th>Konum</th>
+          <th>Tarih</th>
+          <th>Toplam</th>
+          <th>İşlem</th>
+        </tr>
+      </thead>
+      <tbody id="arsiv-tbody">
+        <tr><td colspan="9"><div class="empty"><div class="empty-icon">📂</div><div class="empty-text">Henüz tutanak kaydedilmedi.</div></div></td></tr>
+      </tbody>
+    </table>
+    <div id="arsiv-toplam-bar" style="display:none;padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:24px;font-size:13px">
+      <span style="color:var(--text-muted)">Filtrelenen kayıt: <b id="arsiv-kayit-say" style="color:var(--text)">0</b></span>
+      <span style="color:var(--text-muted)">Toplam Tutar: <b id="arsiv-toplam-tutar" style="color:var(--accent-blue);font-family:var(--mono)">0,00 TL</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== FİRMALAR SAYFASI ======================== -->
+<div class="page" id="page-firmalar">
+  <div class="sec-header">
+    <div>
+      <div class="sec-title">Firma Veritabanı</div>
+      <div class="sec-sub">Taşeron ve işveren firmaları tanımlayın</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="firmaModalAc()">+ Firma Ekle</button>
+  </div>
+  <div class="card">
+    <table class="table">
+      <thead><tr><th>#</th><th>Firma Adı</th><th>Tür</th><th>Vergi No</th><th>Yetkili</th><th>Telefon</th><th></th></tr></thead>
+      <tbody id="firmalar-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======================== PROJELER SAYFASI ======================== -->
+<div class="page" id="page-projeler">
+  <div class="sec-header">
+    <div>
+      <div class="sec-title">Proje / İş Listesi</div>
+      <div class="sec-sub">Şantiye projelerini ve işleri tanımlayın</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="projeModalAc()">+ Proje Ekle</button>
+  </div>
+  <div class="card">
+    <table class="table">
+      <thead><tr><th>#</th><th>İş / Proje Adı</th><th>Lokasyon</th><th>Durum</th><th></th></tr></thead>
+      <tbody id="projeler-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======================== AYARLAR SAYFASI ======================== -->
+<div class="page" id="page-ayarlar">
+  <div class="sec-header">
+    <div>
+      <div class="sec-title">Uygulama Ayarları</div>
+      <div class="sec-sub">Başlık bilgileri ve şirket bilgileri</div>
+    </div>
+  </div>
+  <div class="grid grid-2" style="gap:18px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Şirket Bilgileri</span></div>
+      <div class="card-body">
+        <div class="grid" style="gap:14px">
+          <div class="form-group">
+            <label>Şirket / Yetkili Adı</label>
+            <input type="text" id="s-sirket" placeholder="örn: ABC İnşaat A.Ş." oninput="ayarlariKaydet()" />
+          </div>
+          <div class="form-group">
+            <label>Başlık Logosu</label>
+            <div id="logo-preview-wrap" style="display:none;margin-bottom:8px;position:relative">
+              <img id="logo-preview-img" style="max-height:60px;max-width:100%;border-radius:6px;border:1px solid var(--border);background:#fff;padding:4px" />
+              <button onclick="logoSil()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:2px 7px;font-size:12px">✕ Kaldır</button>
+            </div>
+            <input type="file" id="s-logo-dosya" accept="image/*" onchange="logoYukle(event)" style="cursor:pointer" />
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">PNG/JPG/SVG — PDF'in sağ üst köşesinde görünür. Önerilen: yatay format, max 300×80 px.</div>
+          </div>
+          <div class="form-group">
+            <label>Evrak No Öneki</label>
+            <input type="text" id="s-evrakno-prefix" placeholder="örn: ABC-2025" oninput="ayarlariKaydet()" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Veri Yönetimi</span></div>
+      <div class="card-body">
+        <div class="grid" style="gap:12px">
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:4px">💾 Depolama (IndexedDB)</div>
+            <div id="idb-boyut" style="font-family:var(--mono);font-size:12px;color:var(--accent-green)">Hesaplanıyor...</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Fotoğraflar dahil tüm veri tarayıcıda saklanır. Kapasite genellikle 1–10 GB'tır.</div>
+          </div>
+          <button class="btn btn-ghost" onclick="veriIndir()">⬇ Tam Yedek İndir (JSON — fotoğraflar dahil)</button>
+          <div class="form-group">
+            <label>Yedeği Geri Yükle</label>
+            <input type="file" id="veri-yukle" accept=".json" onchange="veriYukle(event)" style="cursor:pointer" />
+          </div>
+          <div class="divider"></div>
+          <button class="btn btn-danger btn-sm" onclick="tumVeriyiSil()" style="align-self:flex-start">⚠ Tüm Veriyi Sıfırla</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== MODALS ======================== -->
+<!-- Firma Modal -->
+<div class="modal-overlay" id="firma-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title" id="firma-modal-title">Firma Ekle</div>
+    <div class="grid" style="gap:12px">
+      <div class="form-group">
+        <label>Firma Adı *</label>
+        <input type="text" id="m-firma-adi" placeholder="örn: XYZ Alüminyum Ltd. Şti." />
+      </div>
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label>Firma Türü</label>
+          <select id="m-firma-tur">
+            <option value="TAŞERON">Taşeron</option>
+            <option value="İŞVEREN">İşveren</option>
+            <option value="HER İKİSİ">Her İkisi</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Vergi No</label>
+          <input type="text" id="m-firma-vergi" placeholder="1234567890" />
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label>Yetkili Adı</label>
+          <input type="text" id="m-firma-yetkili" placeholder="Ad Soyad" />
+        </div>
+        <div class="form-group">
+          <label>Telefon</label>
+          <input type="text" id="m-firma-tel" placeholder="0532 xxx xx xx" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="modalKapat('firma-modal')">İptal</button>
+      <button class="btn btn-primary" onclick="firmaKaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proje Modal -->
+<div class="modal-overlay" id="proje-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title" id="proje-modal-title">Proje Ekle</div>
+    <div class="grid" style="gap:12px">
+      <div class="form-group">
+        <label>Proje / İş Adı *</label>
+        <input type="text" id="m-proje-adi" placeholder="örn: Merkez Ofis Tadilat İşi" />
+      </div>
+      <div class="form-group">
+        <label>Lokasyon / Adres</label>
+        <input type="text" id="m-proje-lokasyon" placeholder="örn: Kadıköy, İstanbul" />
+      </div>
+      <div class="form-group">
+        <label>Durum</label>
+        <select id="m-proje-durum">
+          <option value="AKTİF">Aktif</option>
+          <option value="TAMAMLANDI">Tamamlandı</option>
+          <option value="BEKLEMEDE">Beklemede</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="modalKapat('proje-modal')">İptal</button>
+      <button class="btn btn-primary" onclick="projeKaydet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast" id="toast-container"></div>
+
+<script>
+// ============================================================
+// ZAMAN MÜHRÜ  →  202606081404  (YYYYMMDDHHmm)
+// ============================================================
+function zamanMuhrU(d) {
+  d = d || new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
+function evrakNoUret(prefix) {
+  return `${prefix || 'SNT'}-${zamanMuhrU()}`;
+}
+
+// ============================================================
+// INDEXEDDB  —  2 store: 'meta' (metin) + 'fotolar' (binary)
+// ============================================================
+const IDB_NAME    = 'SantiyeDB';
+const IDB_VER     = 2;
+const STORE_META  = 'meta';       // firmalar, projeler, ayarlar, evrakSayac
+const STORE_TUT   = 'tutanaklar'; // tutanak metin verisi (fotoğraf yok)
+const STORE_FOTO  = 'fotolar';    // { tutanak_id, no, data } — blob/base64
+
+let idb = null;
+
+function idbAc() {
+  return new Promise((res, rej) => {
+    if (idb) { res(idb); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_META))  db.createObjectStore(STORE_META);
+      if (!db.objectStoreNames.contains(STORE_TUT))   db.createObjectStore(STORE_TUT, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_FOTO)) {
+        const fs = db.createObjectStore(STORE_FOTO, { keyPath: 'key' }); // key = "id_no"
+        fs.createIndex('tutanak_id', 'tutanak_id', { unique: false });
+      }
+    };
+    req.onsuccess = e => { idb = e.target.result; res(idb); };
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+function idbGet(store, key) {
+  return idbAc().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => res(req.result);
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function idbPut(store, key, val) {
+  return idbAc().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    const os = tx.objectStore(store);
+    const req = (key === null) ? os.put(val) : os.put(val, key);
+    req.onsuccess = () => res(req.result);
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function idbDelete(store, key) {
+  return idbAc().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key).onsuccess = () => res();
+  }));
+}
+
+function idbGetAll(store) {
+  return idbAc().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function idbGetByIndex(store, index, val) {
+  return idbAc().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).index(index).getAll(val);
+    req.onsuccess = () => res(req.result || []);
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function idbDeleteByIndex(store, index, val) {
+  return idbAc().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const os  = tx.objectStore(store);
+    const req = os.index(index).getAllKeys(val);
+    req.onsuccess = () => {
+      req.result.forEach(k => os.delete(k));
+      res();
+    };
+    req.onerror = e => rej(e.target.error);
+  }));
+}
+
+// ============================================================
+// db RAM objesi  (firmalar, projeler, ayarlar — fotoğrafsız)
+// ============================================================
+let db = { firmalar: [], projeler: [], tutanaklar: [], ayarlar: { sirket: '', logo: '', evrakNoPrefix: 'SNT' } };
+
+async function dbYukle() {
+  await idbAc();
+  const firmalar  = await idbGet(STORE_META, 'firmalar')  || [];
+  const projeler  = await idbGet(STORE_META, 'projeler')  || [];
+  const ayarlar   = await idbGet(STORE_META, 'ayarlar')   || { sirket: '', logo: '', evrakNoPrefix: 'SNT' };
+  const tutanaklar = await idbGetAll(STORE_TUT);
+  tutanaklar.sort((a,b) => b.id - a.id);
+  db = { firmalar, projeler, tutanaklar, ayarlar };
+}
+
+async function dbMetaKaydet() {
+  await idbPut(STORE_META, 'firmalar', db.firmalar);
+  await idbPut(STORE_META, 'projeler', db.projeler);
+  await idbPut(STORE_META, 'ayarlar',  db.ayarlar);
+}
+
+// ============================================================
+// FOTOĞRAF KAYDET / YÜKLe  (IndexedDB — store: fotolar)
+// ============================================================
+async function fotoKaydet(tutanak_id, no, base64) {
+  if (!base64) return;
+  await idbPut(STORE_FOTO, null, { key: `${tutanak_id}_${no}`, tutanak_id, no, data: base64 });
+}
+
+async function fotolariGetir(tutanak_id) {
+  const kayitlar = await idbGetByIndex(STORE_FOTO, 'tutanak_id', tutanak_id);
+  const sonuc = {};
+  kayitlar.forEach(k => { sonuc[k.no] = k.data; });
+  return sonuc; // { 1: base64, 2: base64, ... }
+}
+
+async function fotolariSil(tutanak_id) {
+  await idbDeleteByIndex(STORE_FOTO, 'tutanak_id', tutanak_id);
+}
+
+// ============================================================
+// NAV / SAYFA GEÇİŞ
+// ============================================================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+  if (id === 'firmalar') renderFirmalar();
+  if (id === 'projeler') renderProjeler();
+  if (id === 'arsiv')    renderArsiv();
+  if (id === 'ayarlar')  ayarlariYukle();
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = 'toast-msg' + (type === 'error' ? ' error' : '');
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ============================================================
+// FORMATLAMA
+// ============================================================
+const BIRIMLER = ['m²','mtul','kg','m','adet','torba','m³','usta yevm.','yard. işçi yevm.','saat','adam saat','gün','ay','takım','%','litre','top','set','götürü'];
+const KALEM_GRUPLARI = ['İşçilik','Malzeme','İSG','Yansıtma (Hasar Bedeli)','Ceza','Nakliye','Makine','Ekipman','Diğer'];
+
+function formatTL(val) {
+  return new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0) + ' TL';
+}
+
+function parseSayi(str) {
+  if (!str && str !== 0) return 0;
+  if (typeof str === 'number') return isNaN(str) ? 0 : str;
+  str = String(str).trim();
+  if (!str) return 0;
+  const noktaVar  = str.includes('.');
+  const virgulVar = str.includes(',');
+  if (noktaVar && virgulVar) {
+    // TR formatı: 1.500,50 → nokta=binlik, virgül=ondalık
+    return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+  } else if (virgulVar) {
+    // Sadece virgül: 1,5 veya 1500,50 → virgül ondalık
+    return parseFloat(str.replace(',', '.')) || 0;
+  } else if (noktaVar) {
+    // Sadece nokta: noktadan sonra tam 3 hane → binlik (1.500→1500), değilse ondalık (1.5)
+    const parcalar = str.split('.');
+    if (parcalar.length === 2 && parcalar[1].length === 3) {
+      return parseFloat(str.replace('.', '')) || 0;
+    }
+    return parseFloat(str) || 0;
+  } else {
+    return parseFloat(str) || 0;
+  }
+}
+
+// ============================================================
+// KALEMLER
+// ============================================================
+let kalemler = [{ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 }];
+
+function kalemEkle() {
+  kalemler.push({ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 });
+  renderKalemler();
+  updatePreview();
+}
+
+function kalemSil(i) {
+  kalemler.splice(i, 1);
+  if (kalemler.length === 0) kalemler.push({ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 });
+  renderKalemler();
+  updatePreview();
+}
+
+function kalemGuncelle(i, field, val) {
+  if (field === 'miktar' || field === 'birim_fiyat') {
+    kalemler[i][field] = parseSayi(val);
+    // Sadece toplam hücresini güncelle — input'a dokunma (focus/cursor korunur)
+    const satirlar = document.getElementById('kalemler-container').querySelectorAll('tr');
+    if (satirlar[i]) {
+      const toplam = (+kalemler[i].miktar||0) * (+kalemler[i].birim_fiyat||0);
+      satirlar[i].querySelector('.kalem-satir-toplam').textContent = formatTL(toplam);
+    }
+    document.getElementById('genel-toplam').textContent = formatTL(toplamHesapla());
+  } else {
+    kalemler[i][field] = val;
+    document.getElementById('genel-toplam').textContent = formatTL(toplamHesapla());
+  }
+  updatePreview();
+}
+
+function toplamHesapla() {
+  return kalemler.reduce((acc, k) => acc + ((+k.miktar||0) * (+k.birim_fiyat||0)), 0);
+}
+
+function formatSayi(val) {
+  // Sayıyı TR formatında göster (binlik nokta, ondalık virgül) — input alanları için
+  if (!val && val !== 0) return '';
+  const n = +val;
+  if (isNaN(n) || n === 0) return '';
+  // Ondalık varsa göster, yoksa gösterme
+  const str = n.toFixed(10).replace(/\.?0+$/, ''); // fazla sıfırları kırp
+  const [tam, ondalik] = str.split('.');
+  const tamStr = parseInt(tam).toLocaleString('tr-TR');
+  return ondalik ? `${tamStr},${ondalik}` : tamStr;
+}
+
+function renderKalemler() {
+  const tbody = document.getElementById('kalemler-container');
+  tbody.innerHTML = kalemler.map((k, i) => `
+    <tr>
+      <td class="col-grup">
+        <select onchange="kalemGuncelle(${i},'grup',this.value)">
+          ${KALEM_GRUPLARI.map(g => `<option ${g===k.grup?'selected':''}>${g}</option>`).join('')}
+        </select>
+      </td>
+      <td class="col-tanim">
+        <input type="text" value="${k.tanim.replace(/"/g,'&quot;')}" placeholder="İş tanımı..."
+          style="text-align:left"
+          oninput="kalemler[${i}].tanim=this.value;updatePreview()" />
+      </td>
+      <td class="col-miktar">
+        <input type="text" inputmode="decimal"
+          value="${formatSayi(k.miktar)}"
+          placeholder="0"
+          oninput="kalemGuncelle(${i},'miktar',this.value)"
+          onblur="this.value=formatSayi(kalemler[${i}].miktar)||''" />
+      </td>
+      <td class="col-birim">
+        <select onchange="kalemGuncelle(${i},'birim',this.value)">
+          ${BIRIMLER.map(b => `<option ${b===k.birim?'selected':''}>${b}</option>`).join('')}
+        </select>
+      </td>
+      <td class="col-fiyat">
+        <input type="text" inputmode="decimal"
+          value="${formatSayi(k.birim_fiyat)}"
+          placeholder="0,00"
+          oninput="kalemGuncelle(${i},'birim_fiyat',this.value)"
+          onblur="this.value=formatSayi(kalemler[${i}].birim_fiyat)||''" />
+      </td>
+      <td class="col-toplam">
+        <span class="kalem-satir-toplam" style="font-family:var(--mono);font-size:12px;color:var(--accent-blue)">${formatTL(k.miktar*k.birim_fiyat)}</span>
+      </td>
+      <td class="col-sil">
+        <button class="del-btn" onclick="kalemSil(${i})">✕</button>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('genel-toplam').textContent = formatTL(toplamHesapla());
+}
+
+// ============================================================
+// SELECT'LERİ DOLDUR
+// ============================================================
+function selectleriDoldur() {
+  const firmaOptions = ['<option value="">— Seçiniz —</option>', ...db.firmalar.map(f => `<option value="${f.id}">${f.adi}</option>`)].join('');
+  const projeOptions = ['<option value="">— Seçiniz —</option>', ...db.projeler.map(p => `<option value="${p.id}">${p.adi}</option>`)].join('');
+  document.getElementById('f-taseron').innerHTML = firmaOptions;
+  document.getElementById('f-isveren').innerHTML = firmaOptions;
+  document.getElementById('f-proje').innerHTML   = projeOptions;
+  arsivFiltreSelectleriDoldur();
+  updateNavCount();
+}
+
+function updateNavCount() {
+  document.getElementById('nav-count').textContent =
+    `${db.firmalar.length} firma · ${db.projeler.length} proje · ${db.tutanaklar.length} tutanak`;
+}
+
+// ============================================================
+// PDF HTML ÜRETİCİ
+// ============================================================
+function buildPdfHtml(data) {
+  const taseron = db.firmalar.find(f => f.id == data.taseron_id)?.adi || '—';
+  const isveren = db.firmalar.find(f => f.id == data.isveren_id)?.adi || '—';
+  const proje   = db.projeler.find(p => p.id == data.proje_id)?.adi  || '—';
+  const isKesinti = data.cins?.toUpperCase() === 'KESİNTİ';
+  const renk    = isKesinti ? '#b91c1c' : '#1d4ed8';
+  const baslik  = isKesinti ? 'ŞANTİYE KESİNTİ TUTANAĞI' : 'ŞANTİYE EKLENTİ TUTANAĞI';
+  const toplam  = new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2}).format(
+    (data.kalemler||[]).reduce((a,k) => a+(+k.miktar||0)*(+k.birim_fiyat||0),0));
+  const sirket  = db.ayarlar.sirket || '';
+  const logo    = db.ayarlar.logo   || ''; // base64
+
+  const kalemRows = (data.kalemler||[]).map(k => `
+    <tr>
+      <td style="padding:8px 10px;border:1px solid #e5e7eb;word-break:break-word">${k.grup||''}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e7eb;word-break:break-word">${k.tanim||''}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:bold">${k.miktar||0}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center">${k.birim||''}</td>
+      <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right">${new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2}).format(k.birim_fiyat||0)} TL</td>
+      <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:bold">${new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2}).format((+k.miktar||0)*(+k.birim_fiyat||0))} TL</td>
+    </tr>`).join('');
+
+  // Zaman mührü gösterimi
+  const zm = data.zaman_muhru || '';
+  const zmGoster = zm.length === 12
+    ? `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`
+    : (data.olusturma ? new Date(data.olusturma).toLocaleString('tr-TR') : '');
+
+  // Başlık alanı: logo varsa solda logo + sağda şirket adı, yoksa sadece şirket adı sağda
+  const headerHTML = (logo || sirket) ? `
+    <div style="display:flex;align-items:center;justify-content:${logo ? 'space-between' : 'flex-end'};margin-bottom:8px">
+      ${logo ? `<img src="${logo}" style="max-height:56px;max-width:180px;object-fit:contain" />` : ''}
+      ${sirket ? `<div style="font-size:11px;color:#6b7280;text-align:right">${sirket}</div>` : ''}
+    </div>` : '';
+
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;line-height:1.5;padding:28px 32px;background:#fff">
+      ${headerHTML}
+      <h1 style="text-align:center;font-size:22px;font-weight:bold;margin-bottom:8px;letter-spacing:0.5px;color:#111827">${baslik}</h1>
+      <div style="border-bottom:3px solid ${renk};margin-bottom:14px"></div>
+      <div style="text-align:center;font-size:11px;color:#4b5563;margin-bottom:24px">
+        <b>Evrak No:</b> ${data.evrak_no||'—'} &nbsp;|&nbsp;
+        <b>Oluşturma:</b> ${zmGoster}
+      </div>
+
+      <table style="width:100%;font-size:13px;margin-bottom:24px;border-collapse:collapse">
+        <colgroup>
+          <col style="width:90px">
+          <col>
+          <col style="width:80px">
+          <col>
+        </colgroup>
+        <tr>
+          <td style="font-weight:bold;padding:5px 8px 5px 0;color:#374151;vertical-align:top;white-space:nowrap">TARİH:</td>
+          <td style="padding:5px 16px 5px 0;vertical-align:top">${data.tarih||'—'}</td>
+          <td style="font-weight:bold;padding:5px 8px;color:#374151;vertical-align:top;white-space:nowrap">KONUM:</td>
+          <td style="padding:5px 0;vertical-align:top">${data.konum||'—'}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold;padding:5px 8px 5px 0;color:#374151;vertical-align:top;white-space:nowrap">PROJE:</td>
+          <td style="padding:5px 16px 5px 0;vertical-align:top">${proje}</td>
+          <td style="font-weight:bold;padding:5px 8px;color:#374151;vertical-align:top;white-space:nowrap">İŞVEREN:</td>
+          <td style="padding:5px 0;vertical-align:top">${isveren}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold;padding:5px 8px 5px 0;color:#374151;vertical-align:top;white-space:nowrap">TAŞERON:</td>
+          <td style="padding:5px 16px 5px 0;vertical-align:top">${taseron}</td>
+          <td style="font-weight:bold;padding:5px 8px;color:#374151;vertical-align:top;white-space:nowrap">TÜR:</td>
+          <td style="padding:5px 0;font-weight:bold;color:${renk};vertical-align:top">${data.cins||'—'}</td>
+        </tr>
+      </table>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+        <colgroup>
+          <col style="width:13%">
+          <col style="width:35%">
+          <col style="width:9%">
+          <col style="width:10%">
+          <col style="width:16%">
+          <col style="width:17%">
+        </colgroup>
+        <thead>
+          <tr style="background:#f3f4f6;color:#111827">
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:left">GRUP</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:left">KISA TANIM</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:center">MİKTAR</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:center">BİRİM</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:right">B. FİYAT</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:right">TOPLAM</th>
+          </tr>
+        </thead>
+        <tbody>${kalemRows}</tbody>
+      </table>
+      <div style="text-align:right;font-size:15px;font-weight:bold;margin-bottom:36px;color:#111827;padding:10px;background:#f9fafb;border:1px solid #e5e7eb">
+        GENEL TOPLAM: ${toplam} TL
+      </div>
+      ${data.aciklama ? `
+        <div style="margin-bottom:36px">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:6px;color:#374151">AÇIKLAMA / NOTLAR:</div>
+          <div style="font-size:13px;color:#4b5563;background:#f9fafb;padding:12px;border-radius:6px;border:1px solid #e5e7eb">${data.aciklama}</div>
+        </div>` : ''}
+      ${(data.foto1||data.foto2||data.foto3||data.foto4) ? `
+        <div style="margin-bottom:40px">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:12px;color:#374151">SAHA KANITLARI:</div>
+          ${(data.foto1||data.foto2) ? `<div style="display:flex;gap:10px;margin-bottom:10px">
+            ${data.foto1?`<img src="${data.foto1}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+            ${data.foto2?`<img src="${data.foto2}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+          </div>`:''}
+          ${(data.foto3||data.foto4) ? `<div style="display:flex;gap:10px">
+            ${data.foto3?`<img src="${data.foto3}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+            ${data.foto4?`<img src="${data.foto4}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+          </div>`:''}
+        </div>` : ''}
+      <div style="margin-top:50px">
+        <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:40px;color:#111827">İMZALAR</div>
+        <table style="width:100%;text-align:center;font-size:12px;table-layout:fixed">
+          <tr>
+            <td style="width:50%;vertical-align:top;padding:0 20px">
+              <div style="border-bottom:2px solid ${renk};width:70%;margin:0 auto 10px"></div>
+              <div style="font-weight:bold;color:#374151">TESLİM EDEN (TAŞERON)</div>
+              <div style="color:#6b7280;margin-top:6px;font-weight:bold">${taseron}</div>
+            </td>
+            <td style="width:50%;vertical-align:top;padding:0 20px">
+              <div style="border-bottom:2px solid ${renk};width:70%;margin:0 auto 10px"></div>
+              <div style="font-weight:bold;color:#374151">TESLİM ALAN (İŞVEREN)</div>
+              <div style="color:#6b7280;margin-top:6px;font-weight:bold">${isveren}</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// FORM VERİSİ
+// ============================================================
+function formVerisi() {
+  const now = new Date();
+  return {
+    cins:        document.getElementById('f-cins').value,
+    tarih:       document.getElementById('f-tarih').value,
+    proje_id:    document.getElementById('f-proje').value,
+    konum:       document.getElementById('f-konum').value,
+    taseron_id:  document.getElementById('f-taseron').value,
+    isveren_id:  document.getElementById('f-isveren').value,
+    aciklama:    document.getElementById('f-aciklama').value,
+    kalemler:    kalemler,
+    foto1: fotografBase64[1] || null,
+    foto2: fotografBase64[2] || null,
+    foto3: fotografBase64[3] || null,
+    foto4: fotografBase64[4] || null,
+    evrak_no:    evrakNoUret(db.ayarlar.evrakNoPrefix),
+    zaman_muhru: zamanMuhrU(now),
+    olusturma:   now.toISOString(),
+  };
+}
+
+function updatePreview() {
+  const data = formVerisi();
+  document.getElementById('pdf-preview-area').innerHTML = buildPdfHtml(data);
+}
+
+// ============================================================
+// ORTAK KAYIT MANTIĞI
+// ============================================================
+function formValidasyonu(data) {
+  if (!data.proje_id && !data.taseron_id && !data.isveren_id) {
+    toast('Lütfen en az proje veya firma seçin.', 'error');
+    return false;
+  }
+  if (!data.tarih) {
+    toast('Tarih seçiniz.', 'error');
+    return false;
+  }
+  if (!data.kalemler || data.kalemler.length === 0 || toplamHesapla() === 0) {
+    // Uyarı ver ama engelleme
+    // toast('Uyarı: Kalem tutarı 0 TL.', 'warn');
+  }
+  return true;
+}
+
+async function tutanakArsivaEkle(data) {
+  // Aynı evrak_no ile daha önce kaydedilmiş mi kontrol et
+  const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
+  if (mevcutMu) {
+    toast('Bu tutanak zaten arşivde kayıtlı.', 'error');
+    return null;
+  }
+  const id = Date.now();
+  const kayit = {
+    id, cins: data.cins, tarih: data.tarih,
+    proje_id: data.proje_id, konum: data.konum,
+    taseron_id: data.taseron_id, isveren_id: data.isveren_id,
+    aciklama: data.aciklama, kalemler: data.kalemler,
+    evrak_no: data.evrak_no, zaman_muhru: data.zaman_muhru,
+    olusturma: data.olusturma,
+    toplam: toplamHesapla(),
+    foto_var: !!(data.foto1||data.foto2||data.foto3||data.foto4)
+  };
+  await idbPut(STORE_TUT, null, kayit);
+  for (const no of [1,2,3,4]) {
+    if (fotografBase64[no]) await fotoKaydet(id, no, fotografBase64[no]);
+  }
+  db.tutanaklar.unshift(kayit);
+  updateNavCount();
+  return kayit;
+}
+
+// Sadece kaydet (PDF yok)
+async function tutanakKaydet() {
+  const btn = document.getElementById('kaydet-btn');
+  btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+  try {
+    const data = formVerisi();
+    if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
+    const kayit = await tutanakArsivaEkle(data);
+    if (!kayit) { btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
+    toast(`✅ ${data.evrak_no} arşive kaydedildi.`);
+    // Forma yeni evrak no ver (bir sonraki tutanak için)
+    // Formu temizlemiyoruz — kullanıcı isterse PDF de alabilir
+  } catch(err) {
+    console.error(err);
+    toast('Kayıt hatası: ' + err.message, 'error');
+  } finally {
+    btn.disabled=false; btn.textContent='💾 Kaydet';
+  }
+}
+
+// ============================================================
+// PDF İNDİR (kaydet + PDF)
+// ============================================================
+async function pdfIndir() {
+  const btn = document.getElementById('pdf-btn');
+  btn.disabled = true; btn.textContent = '⏳ Hazırlanıyor...';
+  try {
+    const data = formVerisi();
+    if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='⬇ PDF İndir'; return; }
+
+    // Arşive ekle (zaten kayıtlıysa atla, yine de PDF üret)
+    const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
+    if (!mevcutMu) {
+      await tutanakArsivaEkle(data);
+    }
+
+    // PDF üret
+    const htmlIcerigi = buildPdfHtml(data);
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+    container.innerHTML = htmlIcerigi;
+    document.body.appendChild(container);
+
+    await new Promise((res, rej) => {
+      if (window.html2canvas) { res(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = res; s.onerror = rej; document.head.appendChild(s);
+    });
+
+    const canvas = await html2canvas(container, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+    document.body.removeChild(container);
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    let fw=pdfW, fh=(canvas.height*fw)/canvas.width, xOff=0;
+    if (fh>pdfH) { const r=pdfH/fh; fh=pdfH; fw=fw*r; xOff=(pdfW-fw)/2; }
+    pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
+    pdf.save(`tutanak_${data.evrak_no}.pdf`);
+
+    toast(`✅ ${data.evrak_no} indirildi${mevcutMu ? '' : ' ve arşive kaydedildi'}.`);
+
+  } catch(err) {
+    console.error(err);
+    toast('Hata: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬇ PDF İndir';
+  }
+}
+
+// ============================================================
+// FORM TEMİZLE
+// ============================================================
+function tutanakTemizle() {
+  document.getElementById('f-cins').value  = 'EKLENTİ';
+  document.getElementById('f-tarih').value = new Date().toISOString().split('T')[0];
+  ['f-proje','f-konum','f-taseron','f-isveren','f-aciklama'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value='';
+  });
+  kalemler = [{ grup: KALEM_GRUPLARI[0], tanim:'', miktar:0, birim:BIRIMLER[0], birim_fiyat:0 }];
+  renderKalemler();
+  fotografBase64 = {1:null,2:null,3:null,4:null};
+  [1,2,3,4].forEach(n => {
+    document.getElementById(`foto${n}-img`).src = '';
+    document.getElementById(`foto${n}-preview`).style.display = 'none';
+    document.getElementById(`foto${n}-input`).value = '';
+  });
+  updatePreview();
+  toast('Form temizlendi.');
+}
+
+// ============================================================
+// ARŞİV + FİLTRELEME
+// ============================================================
+function arsivFiltreSorgusu() {
+  return {
+    metin:   (document.getElementById('f-ara-metin')?.value||'').toLowerCase().trim(),
+    cins:    document.getElementById('f-ara-cins')?.value||'',
+    projeId: document.getElementById('f-ara-proje')?.value||'',
+    firmaId: document.getElementById('f-ara-firma')?.value||'',
+    tarih1:  document.getElementById('f-ara-tarih1')?.value||'',
+    tarih2:  document.getElementById('f-ara-tarih2')?.value||'',
+    minTutar: parseFloat(document.getElementById('f-ara-min')?.value)||0,
+  };
+}
+
+function arsivFiltreTemizle() {
+  ['f-ara-metin','f-ara-tarih1','f-ara-tarih2','f-ara-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-ara-cins','f-ara-proje','f-ara-firma'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  arsivFiltrele();
+}
+
+function arsivFiltreSelectleriDoldur() {
+  const projeEl = document.getElementById('f-ara-proje');
+  const firmaEl = document.getElementById('f-ara-firma');
+  if (!projeEl||!firmaEl) return;
+  const sp=projeEl.value, sf=firmaEl.value;
+  projeEl.innerHTML = '<option value="">Tümü</option>'+db.projeler.map(p=>`<option value="${p.id}"${p.id==sp?' selected':''}>${p.adi}</option>`).join('');
+  firmaEl.innerHTML  = '<option value="">Tümü</option>'+db.firmalar.map(f=>`<option value="${f.id}"${f.id==sf?' selected':''}>${f.adi}</option>`).join('');
+}
+
+function arsivFiltrele() {
+  const q = arsivFiltreSorgusu();
+  const sonuclar = db.tutanaklar.filter(t => {
+    const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'';
+    const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'';
+    const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'';
+    if (q.metin) {
+      const havuz = [t.evrak_no,t.zaman_muhru,t.cins,proje,taseron,isveren,t.konum,t.aciklama,
+        ...(t.kalemler||[]).map(k=>k.tanim+' '+k.grup)].join(' ').toLowerCase();
+      if (!havuz.includes(q.metin)) return false;
+    }
+    if (q.cins    && t.cins!==q.cins) return false;
+    if (q.projeId && String(t.proje_id)!==String(q.projeId)) return false;
+    if (q.firmaId && String(t.taseron_id)!==String(q.firmaId) && String(t.isveren_id)!==String(q.firmaId)) return false;
+    if (q.tarih1  && t.tarih<q.tarih1) return false;
+    if (q.tarih2  && t.tarih>q.tarih2) return false;
+    if (q.minTutar && (t.toplam||0)<q.minTutar) return false;
+    return true;
+  });
+  renderArsivSonuc(sonuclar);
+}
+
+function renderArsiv() {
+  arsivFiltreSelectleriDoldur();
+  arsivFiltrele();
+}
+
+function renderArsivSonuc(liste) {
+  const tbody = document.getElementById('arsiv-tbody');
+  const bar   = document.getElementById('arsiv-toplam-bar');
+  if (!liste.length) {
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-icon">${db.tutanaklar.length?'🔍':'📂'}</div><div class="empty-text">${db.tutanaklar.length?'Arama kriterlerine uyan tutanak bulunamadı.':'Henüz tutanak kaydedilmedi.'}</div></div></td></tr>`;
+    if(bar) bar.style.display='none';
+    document.getElementById('arsiv-sonuc-bilgi').textContent = db.tutanaklar.length?`${db.tutanaklar.length} kayıttan 0 sonuç`:'Kaydedilen tüm tutanaklar';
+    return;
+  }
+  const toplamTutar = liste.reduce((a,t)=>a+(t.toplam||0),0);
+
+  // Zaman mührü okunabilir gösterim
+  function zmGoster(t) {
+    const zm = t.zaman_muhru||'';
+    if (zm.length===12) return `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`;
+    if (t.olusturma) return new Date(t.olusturma).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'});
+    return '—';
+  }
+
+  tbody.innerHTML = liste.map(t => {
+    const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'—';
+    const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'—';
+    const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'—';
+    const isKesinti = t.cins==='KESİNTİ';
+    return `
+      <tr>
+        <td class="font-mono" style="font-size:11px;color:var(--text-dim)">${t.evrak_no||'—'}</td>
+        <td><span class="badge ${isKesinti?'badge-red':'badge-blue'}">${t.cins||'—'}</span></td>
+        <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${proje}">${proje}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${taseron}">${taseron}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${isveren}">${isveren}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${t.konum||'—'}</td>
+        <td class="font-mono" style="font-size:11px;white-space:nowrap">${zmGoster(t)}</td>
+        <td class="font-mono" style="font-size:12px;color:var(--accent-blue);white-space:nowrap">${formatTL(t.toplam)}</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="arsivDetayAc(${t.id})" title="Detay">👁</button>
+            <button class="btn btn-ghost btn-sm" onclick="arsivdenPdfAl(${t.id})" title="PDF İndir">⬇</button>
+            <button class="btn btn-ghost btn-sm" onclick="tutanakSil(${t.id})" title="Sil" style="color:var(--accent-red)">✕</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  if(bar){ bar.style.display='flex';
+    document.getElementById('arsiv-kayit-say').textContent=liste.length;
+    document.getElementById('arsiv-toplam-tutar').textContent=formatTL(toplamTutar);
+  }
+  document.getElementById('arsiv-sonuc-bilgi').textContent=`${db.tutanaklar.length} kayıttan ${liste.length} sonuç`;
+}
+
+// Arşivden tek tutanak sil
+async function tutanakSil(id) {
+  if (!confirm('Bu tutanak silinecek. Fotoğrafları da silinir. Emin misiniz?')) return;
+  await idbDelete(STORE_TUT, id);
+  await fotolariSil(id);
+  db.tutanaklar = db.tutanaklar.filter(t=>t.id!==id);
+  updateNavCount();
+  arsivFiltrele();
+  toast('Tutanak silindi.');
+}
+
+async function arsivDetayAc(id) {
+  const t = db.tutanaklar.find(x=>x.id===id);
+  if (!t) return;
+  const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'—';
+  const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'—';
+  const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'—';
+
+  // Zaman mührü
+  const zm = t.zaman_muhru||'';
+  const zmStr = zm.length===12
+    ? `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`
+    : (t.olusturma?new Date(t.olusturma).toLocaleString('tr-TR'):'—');
+
+  const kalemSatirlar=(t.kalemler||[]).map(k=>`
+    <tr><td style="padding:6px 10px;border:1px solid #e5e7eb">${k.grup}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb">${k.tanim}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center">${k.miktar} ${k.birim}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right">${formatTL(k.birim_fiyat)}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:bold">${formatTL(k.miktar*k.birim_fiyat)}</td></tr>`).join('');
+
+  // Fotoğraf var mı göster
+  let fotoHTML = '';
+  if (t.foto_var) {
+    const fotolar = await fotolariGetir(id);
+    const fotoSrc = Object.values(fotolar).filter(Boolean);
+    if (fotoSrc.length) {
+      fotoHTML = `<div style="margin-top:14px"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Saha Kanıtları</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${fotoSrc.map(s=>`<img src="${s}" style="height:100px;width:auto;border-radius:6px;border:1px solid var(--border);object-fit:cover"/>`).join('')}
+        </div></div>`;
+    }
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className='modal-overlay'; overlay.style.display='flex';
+  overlay.innerHTML=`
+    <div class="modal" style="max-width:700px;max-height:88vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div class="modal-title" style="margin-bottom:2px">📋 ${t.evrak_no||'Tutanak'}</div>
+          <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">🕒 ${zmStr}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="grid grid-2" style="gap:10px;margin-bottom:14px;font-size:13px">
+        <div><span style="color:var(--text-muted)">Tür:</span> <b style="color:${t.cins==='KESİNTİ'?'#ef4444':'#3b82f6'}">${t.cins}</b></div>
+        <div><span style="color:var(--text-muted)">Tarih:</span> ${t.tarih}</div>
+        <div><span style="color:var(--text-muted)">Proje:</span> ${proje}</div>
+        <div><span style="color:var(--text-muted)">Konum:</span> ${t.konum||'—'}</div>
+        <div><span style="color:var(--text-muted)">Taşeron:</span> ${taseron}</div>
+        <div><span style="color:var(--text-muted)">İşveren:</span> ${isveren}</div>
+      </div>
+      ${t.aciklama?`<div style="background:var(--bg);padding:10px;border-radius:6px;font-size:12px;color:var(--text-dim);margin-bottom:14px">${t.aciklama}</div>`:''}
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:left">Grup</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:left">Tanım</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:center">Miktar</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:right">B.Fiyat</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:right">Toplam</th>
+        </tr></thead>
+        <tbody style="color:var(--text-dim)">${kalemSatirlar}</tbody>
+      </table>
+      <div style="text-align:right;font-size:15px;font-weight:700;margin-top:12px;color:var(--accent-blue);font-family:var(--mono)">GENEL TOPLAM: ${formatTL(t.toplam)}</div>
+      ${fotoHTML}
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Kapat</button>
+        <button class="btn btn-primary" onclick="arsivdenPdfAl(${t.id});this.closest('.modal-overlay').remove()">⬇ PDF İndir</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e=>{if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+}
+
+function arsivExcelIndir() {
+  const q = arsivFiltreSorgusu();
+  const liste = db.tutanaklar.filter(t => {
+    const taseron=db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'';
+    const isveren=db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'';
+    const proje  =db.projeler.find(p=>p.id==t.proje_id)?.adi||'';
+    if(q.metin){const h=[t.evrak_no,t.cins,proje,taseron,isveren,t.konum,t.aciklama].join(' ').toLowerCase();if(!h.includes(q.metin))return false;}
+    if(q.cins&&t.cins!==q.cins)return false;
+    if(q.projeId&&String(t.proje_id)!==String(q.projeId))return false;
+    if(q.firmaId&&String(t.taseron_id)!==String(q.firmaId)&&String(t.isveren_id)!==String(q.firmaId))return false;
+    if(q.tarih1&&t.tarih<q.tarih1)return false;
+    if(q.tarih2&&t.tarih>q.tarih2)return false;
+    if(q.minTutar&&(t.toplam||0)<q.minTutar)return false;
+    return true;
+  });
+  const zm = t => { const z=t.zaman_muhru||''; return z.length===12?`${z.slice(6,8)}.${z.slice(4,6)}.${z.slice(0,4)} ${z.slice(8,10)}:${z.slice(10,12)}`:''};
+  const satirlar=[['Evrak No','Zaman Mührü','Tür','Proje','Taşeron','İşveren','Konum','Tarih','Toplam TL','Açıklama']];
+  liste.forEach(t=>satirlar.push([
+    t.evrak_no||'', zm(t), t.cins||'',
+    db.projeler.find(p=>p.id==t.proje_id)?.adi||'',
+    db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'',
+    db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'',
+    t.konum||'', t.tarih||'', (t.toplam||0).toFixed(2), t.aciklama||''
+  ]));
+  const csv=satirlar.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`arsiv_${zamanMuhrU()}.csv`; a.click();
+  toast(`${liste.length} kayıt Excel'e aktarıldı.`);
+}
+
+async function arsivdenPdfAl(id) {
+  const t = db.tutanaklar.find(x=>x.id===id);
+  if (!t) return;
+  toast('PDF hazırlanıyor...');
+  // Fotoğrafları IDB'den çek
+  const fotolar = await fotolariGetir(id);
+  const data = { ...t, foto1:fotolar[1]||null, foto2:fotolar[2]||null, foto3:fotolar[3]||null, foto4:fotolar[4]||null };
+  const htmlIcerigi = buildPdfHtml(data);
+  const container = document.createElement('div');
+  container.style.cssText='position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+  container.innerHTML=htmlIcerigi; document.body.appendChild(container);
+  await new Promise((res,rej)=>{
+    if(window.html2canvas){res();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=res;s.onerror=rej;document.head.appendChild(s);
+  });
+  const canvas=await html2canvas(container,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+  document.body.removeChild(container);
+  const imgData=canvas.toDataURL('image/png');
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF('p','mm','a4');
+  const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight();
+  let fw=pdfW, fh=(canvas.height*fw)/canvas.width, xOff=0;
+  if(fh>pdfH){const r=pdfH/fh;fh=pdfH;fw=fw*r;xOff=(pdfW-fw)/2;}
+  pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
+  pdf.save(`tutanak_${t.evrak_no||id}.pdf`);
+  toast('PDF indirildi.');
+}
+
+function arsivTemizle() {
+  if(!confirm('Tüm arşiv (tutanaklar + fotoğraflar) silinecek. Emin misiniz?')) return;
+  idbAc().then(db2=>{
+    const tx=db2.transaction([STORE_TUT,STORE_FOTO],'readwrite');
+    tx.objectStore(STORE_TUT).clear();
+    tx.objectStore(STORE_FOTO).clear();
+    tx.oncomplete=()=>{
+      db.tutanaklar=[];
+      updateNavCount(); renderArsiv();
+      toast('Arşiv temizlendi.');
+    };
+  });
+}
+
+// ============================================================
+// FİRMALAR
+// ============================================================
+let editFirmaId = null;
+
+function firmaModalAc(id) {
+  editFirmaId=id||null;
+  document.getElementById('firma-modal-title').textContent=id?'Firma Düzenle':'Firma Ekle';
+  if(id){
+    const f=db.firmalar.find(x=>x.id===id);
+    document.getElementById('m-firma-adi').value=f.adi;
+    document.getElementById('m-firma-tur').value=f.tur;
+    document.getElementById('m-firma-vergi').value=f.vergi||'';
+    document.getElementById('m-firma-yetkili').value=f.yetkili||'';
+    document.getElementById('m-firma-tel').value=f.tel||'';
+  } else {
+    ['m-firma-adi','m-firma-vergi','m-firma-yetkili','m-firma-tel'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('m-firma-tur').value='TAŞERON';
+  }
+  document.getElementById('firma-modal').style.display='flex';
+}
+
+async function firmaKaydet() {
+  const adi=document.getElementById('m-firma-adi').value.trim();
+  if(!adi){toast('Firma adı zorunludur.','error');return;}
+  const firma={id:editFirmaId||Date.now(),adi,tur:document.getElementById('m-firma-tur').value,
+    vergi:document.getElementById('m-firma-vergi').value.trim(),
+    yetkili:document.getElementById('m-firma-yetkili').value.trim(),
+    tel:document.getElementById('m-firma-tel').value.trim()};
+  if(editFirmaId){const idx=db.firmalar.findIndex(f=>f.id===editFirmaId);if(idx>=0)db.firmalar[idx]=firma;}
+  else db.firmalar.push(firma);
+  await dbMetaKaydet();
+  modalKapat('firma-modal'); renderFirmalar(); selectleriDoldur();
+  toast(editFirmaId?'Firma güncellendi.':'Firma eklendi.');
+}
+
+async function firmaSil(id) {
+  if(!confirm('Bu firma silinecek?'))return;
+  db.firmalar=db.firmalar.filter(f=>f.id!==id);
+  await dbMetaKaydet(); renderFirmalar(); selectleriDoldur(); toast('Firma silindi.');
+}
+
+function renderFirmalar() {
+  const tbody=document.getElementById('firmalar-tbody');
+  if(!db.firmalar.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">🏢</div><div class="empty-text">Henüz firma eklenmedi.</div></div></td></tr>';return;}
+  tbody.innerHTML=db.firmalar.map((f,i)=>`
+    <tr>
+      <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${i+1}</td>
+      <td style="font-weight:500;color:var(--text)">${f.adi}</td>
+      <td><span class="badge badge-blue">${f.tur}</span></td>
+      <td class="font-mono" style="font-size:12px">${f.vergi||'—'}</td>
+      <td>${f.yetkili||'—'}</td>
+      <td>${f.tel||'—'}</td>
+      <td><div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="firmaModalAc(${f.id})">✏</button>
+        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--accent-red)" onclick="firmaSil(${f.id})">✕</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// PROJELER
+// ============================================================
+let editProjeId = null;
+
+function projeModalAc(id) {
+  editProjeId=id||null;
+  document.getElementById('proje-modal-title').textContent=id?'Proje Düzenle':'Proje Ekle';
+  if(id){
+    const p=db.projeler.find(x=>x.id===id);
+    document.getElementById('m-proje-adi').value=p.adi;
+    document.getElementById('m-proje-lokasyon').value=p.lokasyon||'';
+    document.getElementById('m-proje-durum').value=p.durum;
+  } else {
+    document.getElementById('m-proje-adi').value='';
+    document.getElementById('m-proje-lokasyon').value='';
+    document.getElementById('m-proje-durum').value='AKTİF';
+  }
+  document.getElementById('proje-modal').style.display='flex';
+}
+
+async function projeKaydet() {
+  const adi=document.getElementById('m-proje-adi').value.trim();
+  if(!adi){toast('Proje adı zorunludur.','error');return;}
+  const proje={id:editProjeId||Date.now(),adi,
+    lokasyon:document.getElementById('m-proje-lokasyon').value.trim(),
+    durum:document.getElementById('m-proje-durum').value};
+  if(editProjeId){const idx=db.projeler.findIndex(p=>p.id===editProjeId);if(idx>=0)db.projeler[idx]=proje;}
+  else db.projeler.push(proje);
+  await dbMetaKaydet(); modalKapat('proje-modal'); renderProjeler(); selectleriDoldur();
+  toast(editProjeId?'Proje güncellendi.':'Proje eklendi.');
+}
+
+async function projeSil(id) {
+  if(!confirm('Bu proje silinecek?'))return;
+  db.projeler=db.projeler.filter(p=>p.id!==id);
+  await dbMetaKaydet(); renderProjeler(); selectleriDoldur(); toast('Proje silindi.');
+}
+
+function renderProjeler() {
+  const tbody=document.getElementById('projeler-tbody');
+  if(!db.projeler.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty"><div class="empty-icon">🏗️</div><div class="empty-text">Henüz proje eklenmedi.</div></div></td></tr>';return;}
+  const dr={AKTİF:'badge-green',TAMAMLANDI:'badge-blue',BEKLEMEDE:'badge-yellow'};
+  tbody.innerHTML=db.projeler.map((p,i)=>`
+    <tr>
+      <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${i+1}</td>
+      <td style="font-weight:500;color:var(--text)">${p.adi}</td>
+      <td>${p.lokasyon||'—'}</td>
+      <td><span class="badge ${dr[p.durum]||'badge-blue'}">${p.durum}</span></td>
+      <td><div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="projeModalAc(${p.id})">✏</button>
+        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--accent-red)" onclick="projeSil(${p.id})">✕</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// AYARLAR
+// ============================================================
+function ayarlariYukle() {
+  document.getElementById('s-sirket').value=db.ayarlar.sirket||'';
+  document.getElementById('s-evrakno-prefix').value=db.ayarlar.evrakNoPrefix||'SNT';
+  // Logo önizleme
+  if (db.ayarlar.logo) {
+    document.getElementById('logo-preview-img').src = db.ayarlar.logo;
+    document.getElementById('logo-preview-wrap').style.display = 'block';
+  } else {
+    document.getElementById('logo-preview-wrap').style.display = 'none';
+  }
+  idbBoyutGoster();
+}
+
+function logoYukle(event) {
+  const file = event.target.files[0]; if (!file) return;
+  if (file.size > 2*1024*1024) { toast('Logo 2MB\'dan küçük olmalı.','error'); return; }
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    db.ayarlar.logo = e.target.result;
+    document.getElementById('logo-preview-img').src = e.target.result;
+    document.getElementById('logo-preview-wrap').style.display = 'block';
+    await dbMetaKaydet();
+    updatePreview();
+    toast('Logo kaydedildi.');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function logoSil() {
+  db.ayarlar.logo = '';
+  document.getElementById('logo-preview-img').src = '';
+  document.getElementById('logo-preview-wrap').style.display = 'none';
+  document.getElementById('s-logo-dosya').value = '';
+  await dbMetaKaydet();
+  updatePreview();
+  toast('Logo kaldırıldı.');
+}
+
+async function idbBoyutGoster() {
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      const kullanilan = (est.usage/1024/1024).toFixed(1);
+      const kota = est.quota ? (est.quota/1024/1024/1024).toFixed(1)+'GB' : '—';
+      const el = document.getElementById('idb-boyut');
+      if(el) el.textContent = `Kullanılan: ~${kullanilan} MB / Kota: ${kota}`;
+    }
+  } catch(e){}
+}
+
+async function ayarlariKaydet() {
+  db.ayarlar.sirket=document.getElementById('s-sirket').value;
+  db.ayarlar.evrakNoPrefix=document.getElementById('s-evrakno-prefix').value||'SNT';
+  await dbMetaKaydet();
+  updatePreview();
+}
+
+async function veriIndir() {
+  // Fotoğrafları da JSON'a dahil et (tam yedek)
+  const tumFotolar = await idbGetAll(STORE_FOTO);
+  const yedek = { ...db, fotolar: tumFotolar, yedek_tarihi: new Date().toISOString(), versiyon: 2 };
+  const blob=new Blob([JSON.stringify(yedek,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`santiye_yedek_${zamanMuhrU()}.json`; a.click();
+  toast('Tam yedek (fotoğraflar dahil) indirildi.');
+}
+
+async function veriYukle(event) {
+  const file=event.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    try{
+      const parsed=JSON.parse(e.target.result);
+      if(!parsed.firmalar||!parsed.projeler) throw new Error('Geçersiz format');
+      // Meta kaydet
+      db.firmalar=parsed.firmalar||[];
+      db.projeler=parsed.projeler||[];
+      db.ayarlar=parsed.ayarlar||{sirket:'',logo:'',evrakNoPrefix:'SNT'};
+      await dbMetaKaydet();
+      // Tutanakları kaydet
+      const tx=(await idbAc()).transaction(STORE_TUT,'readwrite');
+      tx.objectStore(STORE_TUT).clear();
+      (parsed.tutanaklar||[]).forEach(t=>tx.objectStore(STORE_TUT).put(t));
+      // Fotoğrafları kaydet
+      if(parsed.fotolar?.length){
+        const tx2=(await idbAc()).transaction(STORE_FOTO,'readwrite');
+        tx2.objectStore(STORE_FOTO).clear();
+        parsed.fotolar.forEach(f=>tx2.objectStore(STORE_FOTO).put(f));
+      }
+      db.tutanaklar=parsed.tutanaklar||[];
+      db.tutanaklar.sort((a,b)=>b.id-a.id);
+      selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv(); ayarlariYukle();
+      toast(`✅ Yedek yüklendi: ${db.tutanaklar.length} tutanak, ${db.firmalar.length} firma.`);
+    }catch(err){toast('Yedek dosyası okunamadı: '+err.message,'error');}
+  };
+  reader.readAsText(file);
+}
+
+async function tumVeriyiSil() {
+  if(!confirm('TÜM VERİ silinecek (tutanaklar, fotoğraflar, firmalar, projeler). Emin misiniz?'))return;
+  const db2=await idbAc();
+  const tx=db2.transaction([STORE_META,STORE_TUT,STORE_FOTO],'readwrite');
+  [STORE_META,STORE_TUT,STORE_FOTO].forEach(s=>tx.objectStore(s).clear());
+  tx.oncomplete=async()=>{
+    db={firmalar:[],projeler:[],tutanaklar:[],ayarlar:{sirket:'',logo:'',evrakNoPrefix:'SNT'}};
+    selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv();
+    toast('Tüm veri sıfırlandı.','error');
+  };
+}
+
+// ============================================================
+// MODAL KAPAT
+// ============================================================
+function modalKapat(id){document.getElementById(id).style.display='none';}
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+});
+
+// ============================================================
+// FOTOĞRAFLAR
+// ============================================================
+let fotografBase64={1:null,2:null,3:null,4:null};
+
+function fotoYukle(no, event) {
+  const file=event.target.files[0]; if(!file)return;
+  if(file.size>15*1024*1024){toast('Fotoğraf 15MB\'dan büyük olamaz.','error');return;}
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    fotografBase64[no]=e.target.result;
+    document.getElementById(`foto${no}-img`).src=e.target.result;
+    document.getElementById(`foto${no}-preview`).style.display='block';
+    updatePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function fotoSil(no) {
+  fotografBase64[no]=null;
+  document.getElementById(`foto${no}-img`).src='';
+  document.getElementById(`foto${no}-preview`).style.display='none';
+  document.getElementById(`foto${no}-input`).value='';
+  updatePreview();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  await dbYukle();
+  document.getElementById('f-tarih').value=new Date().toISOString().split('T')[0];
+  selectleriDoldur();
+  renderKalemler();
+  updatePreview();
+}
+init();
+</script>
+</body>
+</html>
