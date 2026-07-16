@@ -262,15 +262,16 @@ with tab4:
     st.markdown("Kazanılmış Değer Analizi (EVA) ve Kazanılmış Takvim Analizini (ESA) anlamanın en kalıcı yolu **A noktasından B noktasına yapılan bir uçuş senaryosudur.**")
     
     st.info("**Uçuş Planı (Temel Kavramlar)** \n"
-            "• **Toplam Mesafe (Proje Süresi - SAC):** 10 Saat \n"
-            "• **Planlanan Toplam Yakıt (Bütçe - BAC):** 100 Ton (Her saat 10 ton yakıt harcanacak).")
+            "• **Planlanan Süre (SAC):** 10 Saat \n"
+            "• **Toplam Mesafe (Proje Kapsamı):** 10.000 Km \n"
+            "• **Planlanan Toplam Yakıt (Bütçe - BAC):** 100 Ton *(Her saat 10 ton yakıt harcanarak saatte 1.000 km yol katedilecek).*")
 
     # Eğitim için görsel grafik
     fig_edu = go.Figure()
     fig_edu.add_trace(go.Scatter(x=[0, 10], y=[0, 100], mode='lines', name='Planlanan Uçuş (PV)', line=dict(color='#2980b9', width=4, dash='dash')))
     fig_edu.add_trace(go.Scatter(x=[5], y=[40], mode='markers+text', name='Kazanılan Yol (EV)', marker=dict(color='#27ae60', size=16, symbol='star-triangle-up'), text=['Gerçekleşen Konum (EV: 40 Ton)'], textposition='bottom right'))
     fig_edu.add_trace(go.Scatter(x=[5], y=[60], mode='markers+text', name='Harcanan Yakıt (AC)', marker=dict(color='#c0392b', size=14, symbol='x'), text=['Depodan Eksilen (AC: 60 Ton)'], textposition='top left'))
-    fig_edu.update_layout(title="A-B arası Uçuş Senaryosu", xaxis_title="Uçuş Süresi (Saat)", yaxis_title="Kazanılan/Harcanan Yakıt Değeri (Ton)", template="simple_white", hovermode=False)
+    fig_edu.update_layout(title="A-B Arası Uçuş Senaryosu", xaxis_title="Uçuş Süresi (Saat)", yaxis_title="Kazanılan/Harcanan Yakıt Değeri (Ton)", template="simple_white", hovermode=False)
     st.plotly_chart(fig_edu, use_container_width=True)
 
     col_e1, col_e2 = st.columns(2)
@@ -282,21 +283,21 @@ with tab4:
         * 5 saat geçtiğine göre planımız yakıtın yarısını harcamaktı. Karşılığı: **50 Ton yakıt.** (PV = 50)
 
         **2. Kazanılmış Değer (EV):** *Gerçekte ne kadar yol geldik?*
-        * Karşıdan şiddetli rüzgar esmiş ve sadece 4 saatlik yol gelebilmişiz. Bu yolun planımızdaki karşılığı nedir? **40 Ton yakıt.** (EV = 40)
+        * Sadece 4.000 km yol gelebilmişiz. Yani 10.000 km'lik toplam hedefin %40'ı tamamlanmış. Bu ilerlemenin planımızdaki bütçe karşılığı nedir? (100 Ton x %40) = **40 Ton yakıt.** (EV = 40)
 
         **3. Gerçekleşen Maliyet (AC):** *Bu yolu gelirken depodan gerçekten ne kadar yaktık?*
-        * Motorlar rüzgarla mücadele ederken çok zorlanmış. 4 saatlik yol gelmişiz ama depodan **60 Ton yakıt** eksilmiş. (AC = 60)
+        * Motorlar rüzgarla mücadele ederken çok zorlanmış. Göstergeye bakıyoruz, depodan **60 Ton yakıt** eksilmiş. (AC = 60)
         ''')
         
     with col_e2:
         st.markdown('''
         #### Geleneksel EVA'nın Kusuru
-        EVA sisteminde takvim sapması (SV = EV - PV) hesaplandığında sonuç **-10 Ton** çıkar. Zamanın gerisinde kalmayı yakıt (para) cinsinden ölçmek kafa karıştırıcıdır [cite: 1].
+        EVA sisteminde takvim sapması (SV = EV - PV) hesaplandığında sonuç **-10 Ton** çıkar. Zamanın gerisinde kalmayı yakıt (para) cinsinden ölçmek kafa karıştırıcıdır.
 
-        Eğer bu uçak İstanbul'a 10 saatte değil de gecikerek 15 saatte varırsa; proje bittiği için hedef olan 100 tonluk yol tamamlanmış olur. Formül SV = 100 - 100 = 0 sonucunu verir. Yani proje 5 saat gecikmiş olsa bile, bittiği gün EVA metrikleri projeyi "tam zamanında bitmiş" gibi gösterir [cite: 1].
+        Eğer bu uçak hedefe 10 saatte değil de gecikerek 15 saatte varırsa; proje bittiği için 100 tonluk yol (10.000 km) tamamlanmış olur. Formül SV = 100 - 100 = 0 sonucunu verir. Yani proje 5 saat gecikmiş olsa bile, bittiği gün EVA metrikleri projeyi "tam zamanında bitmiş" gibi gösterir.
 
         #### Kazanılmış Takvim (ESA) ile Çözüm
-        ESA, zamanı para ile değil, gerçek zaman birimiyle ölçer [cite: 1].
-        * **Kazanılmış Takvim (ES):** *"Bulunduğumuz yere plana göre ne kadar sürede gelmeliydik?"* 40 tonluk yolu **4 saatte** gelmeliydik [cite: 1].
+        ESA, zamanı para ile değil, gerçek zaman birimiyle ölçer.
+        * **Kazanılmış Takvim (ES):** *"Bulunduğumuz yere plana göre ne kadar sürede gelmeliydik?"* 40 tonluk (4.000 km) yolu **4 saatte** gelmeliydik.
         * **Zaman Sapması:** ES - AT = 4 - 5 = **-1 Saat.** (Uçuşta tam 1 saat gerideyiz). 
         ''')
