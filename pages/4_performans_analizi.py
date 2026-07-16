@@ -259,7 +259,7 @@ with tab3:
 
 with tab4:
     st.markdown("### ✈️ Uçak ve Yakıt Analojisi ile Performans Analizi")
-    st.markdown("Kazanılmış Değer Analizi (EVA) ve Kazanılmış Takvim Analizini (ESA) anlamanın en kalıcı yolu **Trabzon'dan İstanbul'a yapılan bir uçuş senaryosudur.**")
+    st.markdown("Kazanılmış Değer Analizi (EVA) ve Kazanılmış Takvim Analizini (ESA) anlamanın en kalıcı yolu **İstanbul'a yapılan bir uçuş senaryosudur.**")
     
     st.info("**Uçuş Planı (Temel Kavramlar)** \n"
             "• **Toplam Mesafe (Proje Süresi - SAC):** 10 Saat \n"
@@ -270,7 +270,7 @@ with tab4:
     fig_edu.add_trace(go.Scatter(x=[0, 10], y=[0, 100], mode='lines', name='Planlanan Uçuş (PV)', line=dict(color='#2980b9', width=4, dash='dash')))
     fig_edu.add_trace(go.Scatter(x=[5], y=[40], mode='markers+text', name='Kazanılan Yol (EV)', marker=dict(color='#27ae60', size=16, symbol='star-triangle-up'), text=['Gerçekleşen Konum (EV: 40 Ton)'], textposition='bottom right'))
     fig_edu.add_trace(go.Scatter(x=[5], y=[60], mode='markers+text', name='Harcanan Yakıt (AC)', marker=dict(color='#c0392b', size=14, symbol='x'), text=['Depodan Eksilen (AC: 60 Ton)'], textposition='top left'))
-    fig_edu.update_layout(title="Trabzon - İstanbul Uçuş Senaryosu", xaxis_title="Uçuş Süresi (Saat)", yaxis_title="Kazanılan/Harcanan Yakıt Değeri (Ton)", template="simple_white", hovermode=False)
+    fig_edu.update_layout(title="XXX - İstanbul Uçuş Senaryosu", xaxis_title="Uçuş Süresi (Saat)", yaxis_title="Kazanılan/Harcanan Yakıt Değeri (Ton)", template="simple_white", hovermode=False)
     st.plotly_chart(fig_edu, use_container_width=True)
 
     col_e1, col_e2 = st.columns(2)
