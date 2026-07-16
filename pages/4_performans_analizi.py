@@ -282,7 +282,7 @@ with tab4:
         * 5 saat geçtiğine göre planımız yakıtın yarısını harcamaktı. Karşılığı: **50 Ton yakıt.** (PV = 50)
 
         **2. Kazanılmış Değer (EV):** *Gerçekte ne kadar yol geldik?*
-        * Karşıdan şiddetli rüzgar esmiş ve sadece 4 saatlik yol (Kastamonu semaları) gelebilmişiz. Bu yolun planımızdaki karşılığı nedir? **40 Ton yakıt.** (EV = 40)
+        * Karşıdan şiddetli rüzgar esmiş ve sadece 4 saatlik yol gelebilmişiz. Bu yolun planımızdaki karşılığı nedir? **40 Ton yakıt.** (EV = 40)
 
         **3. Gerçekleşen Maliyet (AC):** *Bu yolu gelirken depodan gerçekten ne kadar yaktık?*
         * Motorlar rüzgarla mücadele ederken çok zorlanmış. 4 saatlik yol gelmişiz ama depodan **60 Ton yakıt** eksilmiş. (AC = 60)
