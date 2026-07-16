@@ -5,50 +5,23 @@ import pandas as pd
 import json, copy, io
 from datetime import datetime
 
-st.set_page_config(page_title="Pursantaj Yönetim", layout="wide",
-                   initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Pursantaj Yönetim", layout="wide", initial_sidebar_state="expanded")
 
+# --- KULLANICI ARAYÜZÜ İÇİN ÖZEL CSS (BEYAZ TEMA & DÜZENLEMELER) ---
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-* { font-family:'Inter',sans-serif; }
-[data-testid="stAppViewContainer"] { background:#0d1117; }
-[data-testid="stSidebar"] { display:none; }
-.block-container { padding:1rem 2.5rem 2rem; max-width:1100px; margin:auto; }
-h1 { text-align:center; font-size:1.9rem; font-weight:800; color:#e6edf3; margin:.2rem 0 .8rem; }
-.stTabs [data-baseweb="tab-list"] { background:#161b22; border-radius:8px; padding:3px; gap:4px; border:1px solid #30363d; }
-.stTabs [data-baseweb="tab"] { color:#8b949e; border-radius:6px; padding:.35rem 1.1rem; font-size:.83rem; font-weight:500; }
-.stTabs [aria-selected="true"] { background:#21262d !important; color:#e6edf3 !important; }
-.stTabs [data-baseweb="tab-panel"] { padding-top:.8rem; }
-div[data-testid="stTextInput"] label, div[data-testid="stNumberInput"] label,
-div[data-testid="stSelectbox"] label, div[data-testid="stMultiSelect"] label
-  { color:#8b949e !important; font-size:.75rem !important; }
-div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input {
-  background:#161b22 !important; color:#e6edf3 !important;
-  border:1px solid #30363d !important; border-radius:7px !important; font-size:.9rem !important; }
-.stButton>button { background:#21262d; border:1px solid #30363d; color:#c9d1d9;
-  border-radius:7px; font-size:.82rem; font-weight:500; padding:.4rem .7rem;
-  width:100%; transition:all .15s; }
-.stButton>button:hover { background:#30363d; border-color:#388bfd; color:#e6edf3; }
-.stButton>button[kind="primary"] { background:#1a7f37; border-color:#2ea043; color:#fff; }
-div[data-testid="stDownloadButton"] button { background:#21262d; border:1px solid #30363d;
-  color:#c9d1d9; border-radius:7px; font-size:.82rem; padding:.4rem .7rem; width:100%; }
-.mrow { display:flex; gap:.6rem; margin-bottom:.6rem; }
-.mbox { flex:1; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:.6rem .9rem; }
-.mbox .lbl { font-size:.72rem; color:#8b949e; font-weight:500; }
-.mbox .val { font-size:1.05rem; font-weight:700; color:#58a6ff; margin-top:2px; }
-.mbox .sub { font-size:.72rem; color:#6e7681; }
-.copy-box { background:#161b22; border:1px solid #d29922; border-radius:8px; padding:1rem; margin:.5rem 0; }
-.detect-card { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:1rem 1.2rem; margin:.4rem 0; }
-.detect-card.col-card { border-left:4px solid #388bfd; }
-.detect-card.hier-card { border-left:4px solid #3fb950; }
-.detect-card.weight-card { border-left:4px solid #d29922; }
-.detect-title { font-size:.8rem; font-weight:700; color:#8b949e; text-transform:uppercase; letter-spacing:.5px; margin-bottom:.5rem; }
-.col-row { display:flex; justify-content:space-between; align-items:center; padding:.25rem 0; border-bottom:1px solid #21262d; }
-.col-name { font-weight:600; color:#79c0ff; font-size:.85rem; }
-.col-desc { color:#c9d1d9; font-size:.85rem; }
+/* Ana alan genişliği ve boşlukları */
+.block-container { padding: 2rem 2.5rem 2rem; max-width: 1200px; margin: auto; }
+/* Kutu tasarımları (mrow, mbox vs) açık temaya uyarlandı */
+.mrow { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.mbox { flex: 1; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1rem 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.mbox .lbl { font-size: 0.85rem; color: #6c757d; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.mbox .val { font-size: 1.4rem; font-weight: 700; color: #0056b3; margin-top: 4px; }
+.mbox .sub { font-size: 0.8rem; color: #868e96; margin-top: 2px; }
+.copy-box { background: #fff3cd; border: 1px solid #ffe69c; border-radius: 8px; padding: 1rem; margin: .5rem 0; color: #664d03; }
 </style>
 """, unsafe_allow_html=True)
+
 
 # ── Veri modeli ───────────────────────────────────────────────────────────
 def mk(nid,name,parent,pct):
@@ -275,30 +248,26 @@ def build_figure(tj, sel, bedel):
     for n in tree:
         x,y = pos[n["id"]]; nx.append(x); ny.append(y); cdata.append(n["id"])
         st_ = ns(n["id"])
-        fc.append("#1f6feb" if n["id"]==sel else "#3d1515" if st_!="ok" else "#21262d")
-        bc.append("#58a6ff" if n["id"]==sel else
-                  "#f85149" if st_=="over" else "#d29922" if st_=="under" else "#484f58")
+        # Renkler AÇIK TEMA için revize edildi
+        fc.append("#3498db" if n["id"]==sel else "#e74c3c" if st_!="ok" else "#f8f9fa")
+        bc.append("#2980b9" if n["id"]==sel else "#c0392b" if st_=="over" else "#f39c12" if st_=="under" else "#ced4da")
         short = n["name"] if len(n["name"])<=14 else n["name"][:13]+"…"
         texts.append(f"<b>{short}</b><br>%{n['pct']:.2f}")
         hovers.append(f"<b>{n['name']}</b><br>%{n['pct']:.4f}<br>{gp(n['id'])*bedel:,.2f} TL")
     lc = max(len([n for n in tree if not ch(n["id"])]),1)
-    # Node yazıları: her zaman sağ-orta — üst üste binme yok, başlıkla çakışmaz
+    
     return go.Figure(
-        data=[go.Scatter(x=ex,y=ey,mode="lines",line=dict(color="#30363d",width=2),hoverinfo="none"),
+        data=[go.Scatter(x=ex,y=ey,mode="lines",line=dict(color="#adb5bd",width=2),hoverinfo="none"),
               go.Scatter(x=nx,y=ny,mode="markers+text",text=texts,
                          textposition="middle right",
                          customdata=cdata,hovertext=hovers,hoverinfo="text",
                          marker=dict(size=22,color=fc,line=dict(color=bc,width=2.5)),
-                         textfont=dict(size=11,color="#c9d1d9",family="Inter"))],
-        layout=go.Layout(paper_bgcolor="#0d1117",plot_bgcolor="#0d1117",showlegend=False,
+                         textfont=dict(size=11,color="#212529",family="Inter"))],
+        layout=go.Layout(paper_bgcolor="#ffffff",plot_bgcolor="#ffffff",showlegend=False,
             height=max(260,lc*62+100),
             margin=dict(l=30,r=30,t=20,b=20),
-            xaxis=dict(showgrid=False,zeroline=False,showticklabels=False,
-                       fixedrange=True,
-                       range=[min(nx)-0.5, max(nx)+2.5] if nx else None),
-            yaxis=dict(showgrid=False,zeroline=False,showticklabels=False,
-                       fixedrange=True,
-                       range=[min(ny)-0.8, max(ny)+0.8] if ny else None),
+            xaxis=dict(showgrid=False,zeroline=False,showticklabels=False,fixedrange=True,range=[min(nx)-0.5, max(nx)+2.5] if nx else None),
+            yaxis=dict(showgrid=False,zeroline=False,showticklabels=False,fixedrange=True,range=[min(ny)-0.8, max(ny)+0.8] if ny else None),
             hovermode="closest"))
 
 @st.cache_data(show_spinner=False)
@@ -321,7 +290,7 @@ def build_table_df(tj, bedel):
     def flat(nid, d=0):
         n = id_map.get(nid)
         if not n: return
-        pad="　"*d; icon="🔷" if d==0 else("📁" if ch(nid) else "📄")
+        pad=" "*d; icon="🔷" if d==0 else("📁" if ch(nid) else "📄")
         rows.append({"  Öğe Tanımı":f"{pad}{icon} {n['name']}",
                      "Ağırlık (%)":n["pct"],
                      "Bütçe (TL)":round(gp(nid)*bedel,2),
@@ -385,7 +354,6 @@ def make_template_excel(grup_headers):
 
 # ── Aktivite veri birleştirici (filtre için) ──────────────────────────────
 def get_wbs_levels(nid):
-    """Kökten node'a giden yolu liste olarak döner: [root, l1, l2, ..., node]"""
     parts = []
     cur = nid
     while cur is not None:
@@ -396,42 +364,23 @@ def get_wbs_levels(nid):
     return list(reversed(parts))
 
 def build_act_report(acts, bedel, grup_headers):
-    """
-    Her satır için:
-      - WBS seviye sütunları (L0, L1, L2...): WBS ağacındaki ata adları
-      - Aktivite hiyerarşi sütunları (Ana Grup, Ara Grup 1, Ara Grup 2...):
-          no derinliğine göre dinamik — max derinlik-1 kadar Ara Grup sütunu
-
-    Kural:
-      no="1"     → Ana Grup=boş,    Ara Grup *=boş,  Aktivite Adı=bu satırın adı
-      no="1.5"   → Ana Grup=ata(1), Ara Grup *=boş,  Aktivite Adı=bu satırın adı
-      no="1.5.2" → Ana Grup=ata(1), Ara Grup 1=ata(1.5), Ara Grup 2=boş, Aktivite Adı=bu satırın adı
-      no="2.1.3.1"→ Ana Grup=ata(2), Ara Grup 1=ata(2.1), Ara Grup 2=ata(2.1.3), Aktivite Adı=bu satırın adı
-
-    Returns: (rows_list, max_wbs_depth, max_act_hier_depth)
-    """
     h1,h2,h3 = (grup_headers+["Grup 1","Grup 2","Grup 3"])[:3]
 
-    # ── Pass 1: maksimum derinlikleri hesapla ─────────────────────────
     max_wbs_depth = 1
     for nid in acts.keys():
         d = len(get_wbs_levels(nid))
         if d > max_wbs_depth: max_wbs_depth = d
 
-    max_act_depth = 1   # aktivite no'sunun en fazla kaç nokta içerdiği
+    max_act_depth = 1   
     for act_list in acts.values():
         if not isinstance(act_list, list): continue
         for r in act_list:
             d = len(r.get("no","").split("."))
             if d > max_act_depth: max_act_depth = d
 
-    # Ara Grup sayısı = max_act_depth - 2  (Ana Grup + Ara Gruplar + yaprak)
-    # En az 1 Ara Grup sütunu her zaman çıkar (boş olsa bile)
     n_ara_grp = max(max_act_depth - 2, 1)
-    ara_grp_cols = (["Ana Grup"] +
-                    [f"Ara Grup {i}" if i > 1 else "Ara Grup" for i in range(1, n_ara_grp+1)])
+    ara_grp_cols = (["Ana Grup"] + [f"Ara Grup {i}" if i > 1 else "Ara Grup" for i in range(1, n_ara_grp+1)])
 
-    # ── Pass 2: satırları oluştur ─────────────────────────────────────
     rows = []
     for nid, act_list in acts.items():
         n = get_node(nid)
@@ -445,32 +394,17 @@ def build_act_report(acts, bedel, grup_headers):
             d3     = r.get("d3"); d4 = r.get("d4")
             no     = r.get("no","")
             parts  = no.split(".")
-            depth  = len(parts)   # 1=ana grup, 2=ara veya aktivite, 3+=derin
+            depth  = len(parts)
 
             act_bgt = bgt_map.get(no, 0.0)
-            kind_tr = {"ana_grup":"Ana Grup","ara_grup":"Ara Grup",
-                       "aktivite":"Aktivite"}.get(r["kind"],"—")
+            kind_tr = {"ana_grup":"Ana Grup","ara_grup":"Ara Grup","aktivite":"Aktivite"}.get(r["kind"],"—")
 
-            # Ana Grup = ata(depth=1).adı  → satır depth=1 ise boş
-            # Ara Grup k = ata(depth=k+1).adı → satır depth<=k+1 ise boş
-            # Aktivite Adı = her zaman bu satırın kendi adı
-
-            # Aynı ebeveyn altındaki kardeşlerde ara_grup var mı?
-            # Varsa bu seviye "ara grup seviyesi" sayılır —
-            # çocuksuz aktivite bile olsa Ara Grup sütununda kendi adını gösterir.
-            parent_no = ".".join(parts[:-1])  # "" ise kök
-            siblings  = [x for x in act_list
-                         if x.get("no","") != no
-                         and ".".join(x.get("no","").split(".")[:-1]) == parent_no]
+            parent_no = ".".join(parts[:-1]) 
+            siblings  = [x for x in act_list if x.get("no","") != no and ".".join(x.get("no","").split(".")[:-1]) == parent_no]
             sibling_has_ara = any(x.get("kind") == "ara_grup" for x in siblings)
-            # Bu satır bu seviyede ara_grup gibi davranıyor mu?
-            is_ara_level = (r.get("kind") == "ara_grup" or
-                            (sibling_has_ara and depth >= 2))
+            is_ara_level = (r.get("kind") == "ara_grup" or (sibling_has_ara and depth >= 2))
 
             def ata(target_depth):
-                """target_depth basamaklı ata no'sunun adını döner.
-                   İstisna: satır ara grup seviyesindeyse (is_ara_level)
-                   ve target_depth == depth ise kendi adını döner."""
                 if target_depth > depth: return ""
                 if target_depth == depth:
                     return r.get("name","") if is_ara_level else ""
@@ -479,22 +413,12 @@ def build_act_report(acts, bedel, grup_headers):
                 return anc_r.get("name","") if anc_r else ""
 
             ana_grup = ata(1)
-            # Ara Grup boş kalacaksa → Ana Grup adını kopyala
-            # (filtrede hiçbir satır düşmesin, bütçe tutarlı kalsın)
-
-            # Ara Grup 1, Ara Grup 2, ... → ata(2), ata(3), ...
-            # Ara Grup değerlerini hesapla
-            ara_grups_raw = {
-                ("Ara Grup" if i==1 else f"Ara Grup {i}"): ata(i+1)
-                for i in range(1, n_ara_grp+1)
-            }
-            # Fallback: her Ara Grup sütunu boşsa → Ana Grup adını yaz
+            ara_grups_raw = { ("Ara Grup" if i==1 else f"Ara Grup {i}"): ata(i+1) for i in range(1, n_ara_grp+1) }
             ara_grups = {}
             for col, val in ara_grups_raw.items():
                 if val:
                     ara_grups[col] = val
                 else:
-                    # Sadece bu satır depth>=2 ve ana_grup doluysa fallback uygula
                     ara_grups[col] = ana_grup if (depth >= 2 and ana_grup) else ""
 
             row = {
@@ -518,7 +442,6 @@ def build_act_report(acts, bedel, grup_headers):
                 h2:               r.get("grup2",""),
                 h3:               r.get("grup3",""),
             }
-            # WBS seviye sütunları
             for li in range(max_wbs_depth):
                 row[f"L{li}"] = wbs_levels[li] if li < len(wbs_levels) else ""
             rows.append(row)
@@ -532,18 +455,11 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
     from openpyxl.utils import get_column_letter
     buf = io.BytesIO()
 
-    # --- Açık tema renkleri ---
-    H_BG  = "2C5F8A"  # başlık mavi
-    H_FG  = "FFFFFF"
-    L0_BG = "D6E4F0"  # ana grup
-    L1_BG = "EAF4FB"  # ara grup
-    L2_BG = "F8FBFF"  # aktivite
-    ALT_BG= "F0F7FF"
-    RED_BG= "FDECEA"; RED_FG= "C0392B"
-    GRN_BG= "E9F7EF"; GRN_FG= "1E8449"
-    ORG_BG= "FEF9E7"; ORG_FG= "784212"
-    TEXT  = "1A1A2E"
-    BORDER_CLR = "B0C4DE"
+    H_BG  = "2C5F8A"; H_FG  = "FFFFFF"
+    L0_BG = "D6E4F0"; L1_BG = "EAF4FB"; L2_BG = "F8FBFF"
+    ALT_BG= "F0F7FF"; RED_BG= "FDECEA"; RED_FG= "C0392B"
+    GRN_BG= "E9F7EF"; GRN_FG= "1E8449"; ORG_BG= "FEF9E7"; ORG_FG= "784212"
+    TEXT  = "1A1A2E"; BORDER_CLR = "B0C4DE"
 
     thin  = Side(style="thin", color=BORDER_CLR)
     def brd(): return Border(top=thin,left=thin,right=thin,bottom=thin)
@@ -553,7 +469,6 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
 
     wb = __import__("openpyxl").Workbook()
 
-    # ── Sayfa 1: WBS Özet ──────────────────────────────────────────────
     ws = wb.active; ws.title = "WBS Özet"
     ws.sheet_view.showGridLines = False
     ws.freeze_panes = "A3"
@@ -577,13 +492,9 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
         ind = r["depth"]
         dur = {"ok":"✅ Tamam","over":"❌ Fazla","under":"⚠️ Eksik"}.get(r["status"],"—")
         act_s = f"{r['act_count']} aktivite" if r["has_acts"] else "—"
-        vals  = [r["name"], r["depth"],
-                 r["pct_local"]/100,  # decimal → "0.00%" format gösterir doğru
-                 r["pct_global"]/100,
-                 r["budget"], dur, act_s]
+        vals  = [r["name"], r["depth"], r["pct_local"]/100, r["pct_global"]/100, r["budget"], dur, act_s]
         fmts  = [None,None,"0.00%","0.0000%",'#,##0.00 "TL"',None,None]
-        alns  = [aln("left",indent=ind),aln("center"),aln("right"),
-                 aln("right"),aln("right"),aln("center"),aln("center")]
+        alns  = [aln("left",indent=ind),aln("center"),aln("right"), aln("right"),aln("right"),aln("center"),aln("center")]
         for ci,(v,fmt,al) in enumerate(zip(vals,fmts,alns),1):
             cell = ws.cell(ri,ci,v)
             cell.fill=fill(bg); cell.font=font(TEXT,fw,9 if not fw else 10)
@@ -596,7 +507,6 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
         ws.column_dimensions[get_column_letter(col[0].column)].width=min(mx+3,55)
     ws.column_dimensions["A"].width=50
 
-    # ── Sayfa 2: Aktivite Detay ─────────────────────────────────────────
     if act_rows_data:
         h1,h2,h3 = (grup_headers+["Grup 1","Grup 2","Grup 3"])[:3]
         ws2 = wb.create_sheet("Aktivite Detay")
@@ -608,8 +518,7 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
         ws2["A1"].fill=fill(H_BG); ws2["A1"].font=font(H_FG,True,13)
         ws2["A1"].alignment=aln("center"); ws2.row_dimensions[1].height=26
 
-        ah = ["WBS Öğesi","WBS Bütçe (TL)","Aktivite No","Aktivite Adı",
-              "Tür","Alt Pay","Genel Pay","Bütçe (TL)",h1,h2,h3]
+        ah = ["WBS Öğesi","WBS Bütçe (TL)","Aktivite No","Aktivite Adı","Tür","Alt Pay","Genel Pay","Bütçe (TL)",h1,h2,h3]
         for ci,h in enumerate(ah,1):
             c=ws2.cell(2,ci,h)
             c.fill=fill(H_BG); c.font=font(H_FG,True,9)
@@ -621,10 +530,7 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
             bg  = kind_bg.get(row["Tür"],ALT_BG) if ri%2==0 else kind_bg.get(row["Tür"],L2_BG)
             d3v = row["d3"] if row["d3"] is not None else None
             d4v = row["d4"] if row["d4"] is not None else None
-            vals=[row["WBS Öğesi"], row["WBS Bütçe (TL)"],
-                  row["Aktivite No"], row["Aktivite Adı"], row["Tür"],
-                  d3v, d4v, row["Bütçe (TL)"],
-                  row.get(h1,""), row.get(h2,""), row.get(h3,"")]
+            vals=[row["WBS Öğesi"], row["WBS Bütçe (TL)"], row["Aktivite No"], row["Aktivite Adı"], row["Tür"], d3v, d4v, row["Bütçe (TL)"], row.get(h1,""), row.get(h2,""), row.get(h3,"")]
             fmts=[None,'#,##0.00 "TL"',None,None,None,"0.00%","0.0000%",'#,##0.00 "TL"',None,None,None]
             for ci,(v,fmt) in enumerate(zip(vals,fmts),1):
                 cell=ws2.cell(ri,ci,v)
@@ -640,7 +546,6 @@ def build_excel_report(flat, act_rows_data, errors, warnings_list, info_list, be
             ws2.column_dimensions[get_column_letter(col[0].column)].width=min(mx+3,50)
         ws2.column_dimensions["D"].width=50
 
-    # ── Sayfa 3: Kontrol ────────────────────────────────────────────────
     ws3 = wb.create_sheet("Kontrol Raporu")
     ws3.sheet_view.showGridLines=False
     ws3.merge_cells("A1:B1")
@@ -734,6 +639,33 @@ st.markdown("""
 <h1 style="margin-bottom:0">Pursantaj Yönetim Sistemi</h1>
 <div style="height:.5rem"></div>
 """, unsafe_allow_html=True)
+
+# SIDEBAR (JSON Yükle)
+with st.sidebar:
+    st.header("🗂️ Proje Yönetimi")
+    st.caption("Daha önce dışa aktardığınız `wbs_proje.json` dosyasını yükleyebilirsiniz.")
+    json_file = st.file_uploader("Proje Yükle (.json)", type=["json"], key="json_upload")
+    if json_file:
+        try:
+            data = json.loads(json_file.read().decode("utf-8"))
+            if isinstance(data, list):
+                tree_data = data; act_count = 0
+            elif isinstance(data, dict) and "tree" in data:
+                tree_data = data["tree"]; act_count = sum(len(v) for v in data.get("activities",{}).values())
+            else:
+                st.error("❌ Geçersiz JSON formatı."); tree_data = None
+            if tree_data is not None:
+                if not isinstance(tree_data, list) or not tree_data:
+                    st.error("❌ Geçersiz format.")
+                else:
+                    roots = [n for n in tree_data if n["parent"] is None]
+                    st.success(f"**Önizleme:** {len(tree_data)} WBS, {act_count} aktivite.")
+                    if st.button("✔ Yükle ve Uygula", type="primary"):
+                        import_json(data)
+                        st.success("✅ Proje yüklendi!"); st.rerun()
+        except Exception as e:
+            st.error(f"❌ {e}")
+
 tab1,tab2,tab3,tab4,tab5 = st.tabs([
     "🌳  WBS Ağacı", "📋  Aktiviteler", "📊  Özet & Rapor", "🔍  Filtre & Analiz", "📈  Grafik"])
 
@@ -827,47 +759,15 @@ with tab1:
                 st.session_state.sel=pid; auto_distribute(pid); st.rerun()
             else: st.warning("Kök öğe silinemez.")
     with c5:
-        st.download_button("📥 JSON İndir", data=export_json(),
+        st.download_button("📥 Çalışmayı Kaydet (.json)", data=export_json(),
                            file_name="wbs_proje.json", mime="application/json")
 
-    # JSON Yükle
-    with st.expander("📂 JSON Dosyası Yükle (Ağaç + Aktiviteler)", expanded=False):
-        st.caption("Daha önce dışa aktardığınız `wbs_proje.json` dosyasını yükleyin.")
-        json_file = st.file_uploader("wbs_proje.json", type=["json"], key="json_upload")
-        if json_file:
-            try:
-                data = json.loads(json_file.read().decode("utf-8"))
-                # Hem eski (liste) hem yeni (dict) formatı destekle
-                if isinstance(data, list):
-                    tree_data = data
-                    act_count = 0
-                elif isinstance(data, dict) and "tree" in data:
-                    tree_data = data["tree"]
-                    act_count = sum(len(v) for v in data.get("activities",{}).values())
-                else:
-                    st.error("❌ Geçersiz JSON formatı."); tree_data = None
-                if tree_data is not None:
-                    if not isinstance(tree_data, list) or not tree_data:
-                        st.error("❌ Geçersiz format.")
-                    else:
-                        roots = [n for n in tree_data if n["parent"] is None]
-                        st.info(f"**Önizleme:** {len(tree_data)} WBS öğesi, {len(roots)} kök, {act_count} aktivite satırı")
-                    if tree_data is not None:
-                        c_ok,c_cancel=st.columns(2)
-                        with c_ok:
-                            if st.button("✔ Yükle ve Uygula", type="primary"):
-                                import_json(data)
-                                st.success("✅ Proje ve aktiviteler yüklendi!"); st.rerun()
-                        with c_cancel:
-                            st.info("İptal için dosyayı kaldırın.")
-            except Exception as e:
-                st.error(f"❌ {e}")
 
     # Kopyala diyaloğu
     if st.session_state.get("copy_mode") and sn:
         st.markdown(f"""<div class="copy-box">
-          <b style="color:#d29922">📋 Kopyala / Çoğalt — {sn['name']}</b><br>
-          <span style="font-size:.8rem;color:#8b949e">Tüm çocukları ve aktiviteleriyle kopyalanacak.</span>
+          <b style="color:#664d03">📋 Kopyala / Çoğalt — {sn['name']}</b><br>
+          <span style="font-size:.8rem;color:#856404">Tüm çocukları ve aktiviteleriyle kopyalanacak.</span>
         </div>""", unsafe_allow_html=True)
         with st.form("copy_form", border=False):
             cc1,cc2,cc3 = st.columns([1,1.5,1])
@@ -982,7 +882,7 @@ with tab2:
 
             disp=[]
             for r in act_rows:
-                pad="　"*r["depth"]
+                pad=" "*r["depth"]
                 icon={"ana_grup":"🔵","ara_grup":"🟢","aktivite":"🟠"}.get(r["kind"],"📄")
                 act_bgt=bgt_map.get(r["no"],0.0)
                 disp.append({
@@ -1040,7 +940,7 @@ with tab2:
                 rs=[]
                 for r in acts:
                     icon={"ana_grup":"🔵","ara_grup":"🟢","aktivite":"🟠"}.get(r["kind"],"📄")
-                    rs.append({"  Kalem":f"{'　'*r['depth']}{icon} {r['no']}  {r['name']}",
+                    rs.append({"  Kalem":f"{' '*r['depth']}{icon} {r['no']}  {r['name']}",
                                "Tür":{"ana_grup":"Ana Grup","ara_grup":"Ara Grup","aktivite":"Aktivite"}.get(r["kind"]),
                                "Bütçe (TL)":round(bgt_m.get(r["no"],0),2),
                                h1:r.get("grup1",""), h2:r.get("grup2",""), h3:r.get("grup3","")})
@@ -1130,7 +1030,7 @@ with tab3:
     st.markdown("---")
     st.markdown("### 🌳 Tam Hiyerarşik Maliyet Tablosu")
     rdf=pd.DataFrame([{
-        "  Öğe Tanımı":"　"*r["depth"]+("🔷" if r["depth"]==0 else("📁" if not r["is_leaf"] else "📄"))+" "+r["name"],
+        "  Öğe Tanımı":" "*r["depth"]+("🔷" if r["depth"]==0 else("📁" if not r["is_leaf"] else "📄"))+" "+r["name"],
         "Seviye":r["depth"],"Yerel %":round(r["pct_local"],4),"Genel %":round(r["pct_global"],4),
         "Bütçe (TL)":round(r["budget"],2),
         "Durum":{"ok":"✅","over":"❌","under":"⚠️"}.get(r["status"],"—"),
@@ -1182,7 +1082,7 @@ with tab3:
             diff  = top_total - nb
             ok    = abs(diff) < 1.0
             val_rows.append({
-                "WBS Öğesi":     node_path(nid),
+                "WBS Öğesi":      node_path(nid),
                 "Öğe Bütçesi (TL)": round(nb,2),
                 "Aktivite Toplamı (TL)": round(top_total,2),
                 "Fark (TL)":     round(diff,2),
@@ -1420,8 +1320,6 @@ with tab4:
 # ══════════════════════════════════════════════════════════════════════════
 
 # ══════════════════════════════════════════════════════════════════════════
-
-# ══════════════════════════════════════════════════════════════════════════
 # TAB 5 — Grafik: Maliyet Kırılımı Treemap
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -1548,10 +1446,10 @@ def build_treemap_figure(
 
     # Renk paleti
     cs_map = {
-        "Mavi (Kurumsal)":  [[0,"#0a1929"],[0.25,"#0d3b6e"],[0.6,"#1565c0"],[1,"#58a6ff"]],
-        "Yeşil (Doğal)":    [[0,"#051a05"],[0.25,"#1b4a1b"],[0.6,"#2ea043"],[1,"#56d364"]],
-        "Turuncu (Sıcak)":  [[0,"#1a0800"],[0.25,"#7c2d00"],[0.6,"#c84b00"],[1,"#ffa657"]],
-        "Mor (Analitik)":   [[0,"#0e0a1a"],[0.25,"#3b1f6e"],[0.6,"#7c3aed"],[1,"#c084fc"]],
+        "Mavi (Kurumsal)":  [[0,"#e3f2fd"],[0.25,"#90caf9"],[0.6,"#1e88e5"],[1,"#0d47a1"]],
+        "Yeşil (Doğal)":    [[0,"#e8f5e9"],[0.25,"#a5d6a7"],[0.6,"#43a047"],[1,"#1b5e20"]],
+        "Turuncu (Sıcak)":  [[0,"#fff3e0"],[0.25,"#ffcc80"],[0.6,"#fb8c00"],[1,"#e65100"]],
+        "Mor (Analitik)":   [[0,"#f3e5f5"],[0.25,"#ce93d8"],[0.6,"#8e24aa"],[1,"#4a148c"]],
         "Çok Renkli":       "RdYlBu",
     }
     cscale = cs_map.get(colorscheme, cs_map["Mavi (Kurumsal)"])
@@ -1593,7 +1491,7 @@ def build_treemap_figure(
             visible  = True,
             thickness= 24,
             side     = "top",
-            textfont = dict(size=12, color="#c9d1d9", family="Inter"),
+            textfont = dict(size=12, color="#495057", family="Inter"),
         ),
         marker = dict(
             colorscale  = cscale,
@@ -1601,28 +1499,28 @@ def build_treemap_figure(
             showscale   = True,
             reversescale= False,
             colorbar    = dict(
-                title       = dict(text=metric, font=dict(color="#8b949e",size=10)),
-                tickfont    = dict(color="#8b949e",size=9),
+                title       = dict(text=metric, font=dict(color="#495057",size=10)),
+                tickfont    = dict(color="#495057",size=9),
                 thickness   = 12,
                 len         = 0.7,
-                bgcolor     = "#161b22",
-                bordercolor = "#30363d",
+                bgcolor     = "#ffffff",
+                bordercolor = "#dee2e6",
                 borderwidth = 1,
                 tickformat  = ",.0f" if metric=="Bütçe (TL)" else ".2f",
             ),
-            line = dict(width=2, color="#0d1117"),
+            line = dict(width=2, color="#ffffff"),
         ),
-        textfont        = dict(family="Inter, Arial", size=12, color="#ffffff"),
-        insidetextfont  = dict(family="Inter, Arial", size=11, color="#ffffff"),
-        outsidetextfont = dict(family="Inter, Arial", size=9,  color="#8b949e"),
+        textfont        = dict(family="Inter, Arial", size=12, color="#212529"),
+        insidetextfont  = dict(family="Inter, Arial", size=11, color="#212529"),
+        outsidetextfont = dict(family="Inter, Arial", size=9,  color="#6c757d"),
     ))
 
     fig.update_layout(
-        paper_bgcolor = "#0d1117",
-        plot_bgcolor  = "#0d1117",
+        paper_bgcolor = "#ffffff",
+        plot_bgcolor  = "#ffffff",
         margin        = dict(l=0, r=10, t=6, b=0),
         height        = height,
-        font          = dict(family="Inter, Arial", color="#c9d1d9"),
+        font          = dict(family="Inter, Arial", color="#212529"),
     )
     return fig
 
@@ -1868,8 +1766,8 @@ with tab5:
                                 v = dec.get("variant","")
                                 a = dec.get("action","Ayrı tut")
                                 result = (dec.get("target","") if a=="Birleştir →"
-                                         else dec.get("new_name","") if a=="Yeniden adlandır"
-                                         else v)
+                                          else dec.get("new_name","") if a=="Yeniden adlandır"
+                                          else v)
                                 changed = (result != v)
                                 dec_rows.append({
                                     "Orijinal Ad":   v,
@@ -1970,12 +1868,12 @@ with tab5:
                                         )
                                         decisions[var_key] = {"action": action, "new_name": new_name, "variant": variant}
                                     else:
-                                        st.markdown("<span style='color:#6e7681;font-size:.85rem'>Değişmez</span>",
+                                        st.markdown("<span style='color:#adb5bd;font-size:.85rem'>Değişmez</span>",
                                                     unsafe_allow_html=True)
                                         decisions[var_key] = {"action": action, "variant": variant}
 
-                            st.session_state.cons_decisions = decisions
-                            st.markdown("---")
+                        st.session_state.cons_decisions = decisions
+                        st.markdown("---")
 
                         # Özet önizleme
                         merges_preview = []
@@ -2129,5 +2027,3 @@ with tab5:
                                      "Bütçe (TL)": st.column_config.NumberColumn(format="%,.2f"),
                                      "Ağırlık (%)":st.column_config.NumberColumn(format="%.4f %%"),
                                  })
-
-
