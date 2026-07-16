@@ -276,7 +276,7 @@ with tab4:
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         st.markdown('''
-        **Uçak havalandı. Tam 5. saatin sonunda (AT = 5) göstergelere bakıyoruz:**
+        **Uçak havalandı. Tam 5. saatin sonunda (AT = 5), 4.000 km yol alındığını ve 60 ton yakıt sarfiyatı yapıldığını varsayarak göstergelere bakıyoruz:**
 
         **1. Planlanan Değer (PV):** *Şu ana kadar nerede olmalıydık?*
         * 5 saat geçtiğine göre planımız yakıtın yarısını harcamaktı. Karşılığı: **50 Ton yakıt.** (PV = 50)
