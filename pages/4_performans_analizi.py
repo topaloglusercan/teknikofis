@@ -237,15 +237,15 @@ with tab3:
 
     st.markdown("---")
     st.markdown("#### 2. ESA (Kazanılmış Takvim Analizi) Çözüm Adımları")
-    st.markdown("**A. Doğrusal (Lineer) Yaklaşım** [cite: 3]")
+    st.markdown("**A. Doğrusal (Lineer) Yaklaşım** 📄*[^1]*")
     
     st.latex(r"PAR = \frac{BAC}{SAC} = \frac{" + format_tr(bac) + "}{" + format_tr(sac) + "} = " + format_tr(par))
     st.latex(r"ES = \frac{EV}{PAR} = \frac{" + format_tr(ev) + "}{" + format_tr(par) + "} = " + f"{es_lineer:.2f}")
     st.latex(r"TPI = \frac{ES}{AT} = \frac{" + f"{es_lineer:.2f}" + "}{" + f"{at:.2f}" + "} = " + f"{tpi:.2f}")
     st.latex(r"TEAC = \frac{SAC}{TPI} = \frac{" + format_tr(sac) + "}{" + f"{tpi:.2f}" + "} = " + f"{teac:.2f}")
 
-    st.markdown("**B. S-Eğrisi Yaklaşımı** [cite: 1, 2]")
-    st.markdown(f"Kazanılmış değerimiz ({format_tr(ev)} TL), planlanan değerler tablosunda kümülatif olarak **{c}. aya** (PV_C = {format_tr(pv_c)} TL) karşılık gelmektedir. Ancak {c+1}. ayın hedefine (PV_C+1 = {format_tr(pv_c1)} TL) ulaşamamıştır. Bu nedenle kesirli kısım (I) hesaplanır [cite: 1, 2]:")
+    st.markdown("**B. S-Eğrisi Yaklaşımı** 📄*[^2]*")
+    st.markdown(f"Kazanılmış değerimiz ({format_tr(ev)} TL), planlanan değerler tablosunda kümülatif olarak **{c}. aya** (PV_C = {format_tr(pv_c)} TL) karşılık gelmektedir. Ancak {c+1}. ayın hedefine (PV_C+1 = {format_tr(pv_c1)} TL) ulaşamamıştır. Bu nedenle kesirli kısım (I) hesaplanır:")
     
     if (pv_c1 - pv_c) > 0:
         st.latex(r"I = \frac{EV - PV_C}{PV_{C+1} - PV_C} = \frac{" + format_tr(ev) + " - " + format_tr(pv_c) + "}{" + format_tr(pv_c1) + " - " + format_tr(pv_c) + "} = " + f"{i_val:.2f}")
@@ -255,6 +255,11 @@ with tab3:
     st.latex(r"ES = C + I = " + str(c) + " + " + f"{i_val:.2f}" + " = " + f"{es_scurve:.2f}")
     st.latex(r"SPI(t) = \frac{ES}{AT} = \frac{" + f"{es_scurve:.2f}" + "}{" + f"{at:.2f}" + "} = " + f"{spi_t:.2f}")
     st.latex(r"IEAC(t) = \frac{SAC}{SPI(t)} = \frac{" + format_tr(sac) + "}{" + f"{spi_t:.2f}" + "} = " + f"{ieac_t:.2f}")
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("### 📚 Kaynakça ve Akademik Referanslar")
+    st.caption("[^1] **Anbari, F. T. (2003).** *Earned value project management method and extensions.* Project Management Journal, 34(4), 12-23. (Doğrusal/Lineer yaklaşım)
+    st.caption("[^2] **Lipke, W. (2003).** *Schedule is different.* The Measurable News, 31(4), 31-34. (S-Eğrisi interpolasyonu)
 
 
 with tab4:
@@ -292,12 +297,17 @@ with tab4:
     with col_e2:
         st.markdown('''
         #### Geleneksel EVA'nın Kusuru
-        EVA sisteminde takvim sapması (SV = EV - PV) hesaplandığında sonuç **-10 Ton** çıkar. Zamanın gerisinde kalmayı yakıt (para) cinsinden ölçmek kafa karıştırıcıdır.
+        EVA sisteminde takvim sapması (SV = EV - PV) hesaplandığında sonuç **-10 Ton** çıkar. Zamanın gerisinde kalmayı yakıt (para) cinsinden ölçmek bazı durumlarda yetersiz kalır.
 
         Eğer bu uçak hedefe 10 saatte değil de gecikerek 15 saatte varırsa; proje bittiği için 100 tonluk yol (10.000 km) tamamlanmış olur. Formül SV = 100 - 100 = 0 sonucunu verir. Yani proje 5 saat gecikmiş olsa bile, bittiği gün EVA metrikleri projeyi "tam zamanında bitmiş" gibi gösterir.
 
-        #### Kazanılmış Takvim (ESA) ile Çözüm
+        #### Kazanılmış Takvim (ESA) ile Çözüm *[1]*
         ESA, zamanı para ile değil, gerçek zaman birimiyle ölçer.
         * **Kazanılmış Takvim (ES):** *"Bulunduğumuz yere plana göre ne kadar sürede gelmeliydik?"* 40 tonluk (4.000 km) yolu **4 saatte** gelmeliydik.
         * **Zaman Sapması:** ES - AT = 4 - 5 = **-1 Saat.** (Uçuşta tam 1 saat gerideyiz). 
         ''')
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("### 📚 Analoji Kaynakçası")
+    st.caption("*[1] Bu analoji, inşaat yönetimi literatüründe maliyet/zaman kavramlarını ayırmak için kullanılan klasik **Walt Lipke (2003)** metodolojisinin basitleştirilmiş ve ölçeklendirilmiş bir versiyonudur.*")
