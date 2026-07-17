@@ -258,8 +258,8 @@ with tab3:
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("### 📚 Kaynakça ve Akademik Referanslar")
-    st.caption("[^1] **Anbari, F. T. (2003).** *Earned value project management method and extensions.* Project Management Journal, 34(4), 12-23. (Doğrusal/Lineer yaklaşım)
-    st.caption("[^2] **Lipke, W. (2003).** *Schedule is different.* The Measurable News, 31(4), 31-34. (S-Eğrisi interpolasyonu)
+    st.caption("[^1] **Anbari, F. T. (2003).** *Earned value project management method and extensions.* Project Management Journal, 34(4), 12-23. (Doğrusal/Lineer yaklaşım)")
+    st.caption("[^2] **Lipke, W. (2003).** *Schedule is different.* The Measurable News, 31(4), 31-34. (S-Eğrisi interpolasyonu)")
 
 
 with tab4:
