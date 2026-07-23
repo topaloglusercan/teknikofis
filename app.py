@@ -9,10 +9,11 @@ Bu portal şantiye ve teknik ofis süreçlerinizi dijitalleştirmek için tasarl
     
 **Nasıl Kullanılır?**
 Sol taraftaki menüyü kullanarak modüller arasında geçiş yapabilirsiniz:
-* 📂 **İdari Hakediş:** İdari Hakediş sayısal kontrol sistem aracıdır. 
+* 📂 **İdari Hakediş:** İdari Hakediş sayısal kontrol sistem aracıdır.
 * 📂 **Pursantaj:** Pursantaj Yönetim Sistemi, inşaat projelerinde sözleşme bedelinin iş kalemlerine göre dağılımını planlayan, izleyen ve analiz eden bütünleşik bir dijital araçtır.
 * 📂 **Şantiye Tutanak:** İnşaat projelerinde eklenti ve kesinti tutanakları hazırlayıp, pdf dosyası indirebileceğiniz, filtre yapabileceğiniz bir dijital araçtır.
 * 📂 **Performans Analizi:** Projelerdeki harcama ve ilerleme durumunu Kazanılmış Takvim (ESA) ve Kazanılmış Değer (EVA) yöntemleriyle kıyaslayan performans ölçüm aracıdır.
+* 📂 **Fiyat Farkı Simülatörü:** Kova sistemi ve gecikme matrisi mantığıyla hesaplanan fiyat farkını, gecikme/hızlanma, imalat hızı, endeks artışı ve alt endeks ağırlıkları gibi değişkenleri slider'larla anlık değiştirerek simüle etmenizi ve farklı senaryoları yan yana karşılaştırmanızı sağlayan bir dijital araçtır.
 
 *Not: Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz, yan menüden projelerinizi kendi bilgisayarınıza indirebilir ve yükleyebilirsiniz.*
 """)
