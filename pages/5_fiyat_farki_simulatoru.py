@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 try:
     st.set_page_config(page_title="Hakediş Fiyat Farkı Simülatörü", page_icon="🏗️", layout="wide")
 except Exception:
-    pass  # Çoklu sayfa (pages/) uygulamasında ana dosya zaten set_page_config çağırmış olabilir
+    pass
 
 # ─────────────────────────────────────────────────────────
 # YARDIMCI FONKSİYONLAR  (orijinal motorla birebir aynı)
@@ -82,29 +82,25 @@ def tr(val, d=2):
 EMAP = {'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}
 ENDEKS_KOLONLARI = list(EMAP.values())
 
-# Resmi "Fiyat Farkı Listesi / Temel Endeks" tablosuna göre kod eşlemesi
-# (İn / Çn-23 / Dn-24 / Ayn / Kn-16 / Gn (Yİ-ÜFE) / Mn-28)
 KOD_BILGI = {
     'a':  {'kolon': 'I o', 'resmi_kod': 'İn',    'kisa': 'İşçilik',      'ad': 'İşçilik (TÜFE bağlı)'},
     'b1': {'kolon': 'Ç o', 'resmi_kod': 'Çn-23', 'kisa': 'Çimento/Mineral', 'ad': 'Metalik Olmayan Diğer Mineral Ürünler (Çimento vb.)'},
     'b2': {'kolon': 'D o', 'resmi_kod': 'Dn-24', 'kisa': 'Demir-Çelik',  'ad': 'Ana Metaller (Demir-Çelik)'},
     'b3': {'kolon': 'Y o', 'resmi_kod': 'Ayn',   'kisa': 'Akaryakıt',    'ad': 'Akaryakıt Ürünleri'},
     'b4': {'kolon': 'K o', 'resmi_kod': 'Kn-16', 'kisa': 'Ağaç/Mantar',  'ad': 'Ağaç ve Mantar Ürünleri (mobilya hariç)'},
-    'b5': {'kolon': 'G o', 'resmi_kod': 'Gn',    'kisa': 'Genel ÜFE',   'ad': 'Genel Yurt İçi ÜFE (Yİ-ÜFE)'},
+    'b5': {'kolon': 'G o', 'resmi_kod': 'Gn',    'kisa': 'Genel ÜFE',    'ad': 'Genel Yurt İçi ÜFE (Yİ-ÜFE)'},
     'c':  {'kolon': 'M o', 'resmi_kod': 'Mn-28', 'kisa': 'Makine/Ekipman', 'ad': 'Makine ve Ekipmanlar b.y.s.'},
 }
 KOD_ETIKET = {k: v['kisa'] for k, v in KOD_BILGI.items()}
 KOLON_BILGI = {v['kolon']: v for v in KOD_BILGI.values()}
 
 # ─────────────────────────────────────────────────────────
-# JSON İÇE / DIŞA AKTARMA  (mevcut motorunuzun dosya formatıyla uyumlu)
+# JSON İÇE / DIŞA AKTARMA
 # ─────────────────────────────────────────────────────────
 def _num(x):
     return float(dec(x))
 
 def json_to_dataframes(data):
-    """Motorunuzun JSON formatını (prog/endeks/alt/b anahtarları, Türkçe
-    sayı biçimi '1.234,56') iç DataFrame yapısına çevirir."""
     prog_rows = []
     for r in data.get('prog', []):
         prog_rows.append({
@@ -138,7 +134,6 @@ def json_to_dataframes(data):
 
     return df_prog, df_end, df_alt, df_b
 
-
 def _tl_str(x):
     if x is None or (isinstance(x, float) and math.isnan(x)):
         return ""
@@ -151,8 +146,6 @@ def _plain_str(x, d=6):
         return str(x)
 
 def dataframes_to_json(df_prog, df_end, df_alt, df_b):
-    """İç DataFrame yapısını, motorunuzun okuyabileceği JSON formatına
-    (Türkçe sayı biçimiyle) geri çevirir."""
     data = {'prog': [], 'endeks': [], 'alt': [], 'b': []}
     for _, r in df_prog.iterrows():
         imal = r['İMALAT TUTARI KÜMÜLATİF']
@@ -177,7 +170,7 @@ def dataframes_to_json(df_prog, df_end, df_alt, df_b):
     return data
 
 # ─────────────────────────────────────────────────────────
-# HESAPLAMA MOTORU  (orijinal ile birebir aynı mantık)
+# HESAPLAMA MOTORU
 # ─────────────────────────────────────────────────────────
 def hesapla(df_prog, df_end, df_alt, df_b):
     df_prog = df_prog.copy(); df_end = df_end.copy()
@@ -199,14 +192,12 @@ def hesapla(df_prog, df_end, df_alt, df_b):
     pkol = 'İŞ PROGRAMI KÜMÜLATİF'
     ikol = 'İMALAT TUTARI KÜMÜLATİF'
 
-    # ── 1. Kovalar ──
     kovalar, prev = [], Decimal('0')
     for _, r in df_prog.iterrows():
         kum = dec(r[pkol])
         kovalar.append({'ay': r['_ay'], 'kap': kum - prev, 'orig': kum - prev})
         prev = kum
 
-    # ── 2. Hesaplama döngüsü ──
     ff_list, matris, aylik_rows = [], [], []
     prev_imal, kum_ff = Decimal('0'), Decimal('0')
 
@@ -289,15 +280,10 @@ def hesapla(df_prog, df_end, df_alt, df_b):
     df_aylik = pd.DataFrame(aylik_rows)
     return df_sonuc, df_pivot, df_kov, df_aylik, son_end
 
-
 # ─────────────────────────────────────────────────────────
-# SİMÜLASYON DÖNÜŞÜMLERİ  (yeni katman — motora dokunmaz)
+# SİMÜLASYON DÖNÜŞÜMLERİ
 # ─────────────────────────────────────────────────────────
 def endeks_uzat(df_end, artis, ek_ay=36):
-    """Endeks tablosunu, son bilinen aydan itibaren aylık bileşik artış
-    oranıyla ileriye doğru uzatır (gelecekteki enflasyon/artış senaryosu).
-    artis: tek bir float (%/ay, tüm kolonlara aynı oran uygulanır) VEYA
-    {'I o': pct, 'Ç o': pct, ...} şeklinde kolon bazında sözlük."""
     df = df_end.copy()
     df['_ay'] = pd.to_datetime(df['AYLAR'].apply(parse_tarih)).dt.to_period('M')
     df = df.sort_values('_ay').reset_index(drop=True)
@@ -321,15 +307,7 @@ def endeks_uzat(df_end, artis, ek_ay=36):
     df_ek = pd.DataFrame(yeni)
     return pd.concat([df.drop(columns='_ay'), df_ek], ignore_index=True)
 
-
 def imalat_donustur(df_prog, hiz_carpani=1.0, gecikme_ay=0, tek_ay_index=None, tek_ay_kaydirma=0):
-    """İmalat kümülatif eğrisini dönüştürür:
-    - hiz_carpani: tüm ayların imalat artışını ölçekler.
-    - gecikme_ay: TÜM ayları birlikte zaman ekseninde kaydırır (genel mod).
-      Pozitif = iş geride kalır, negatif = iş önde gider.
-    - tek_ay_index verilirse (Belirli Ay modu): sadece o aya ait imalat
-      artışı, tek_ay_kaydirma kadar başka bir aya taşınır; diğer aylar
-      olduğu gibi kalır. Bu durumda gecikme_ay dikkate alınmaz."""
     df = df_prog.copy()
     imal_col = 'İMALAT TUTARI KÜMÜLATİF'
     kum = [dec(v) for v in df[imal_col]]
@@ -360,16 +338,12 @@ def imalat_donustur(df_prog, hiz_carpani=1.0, gecikme_ay=0, tek_ay_index=None, t
     df[imal_col] = yeni_kum
     return df
 
-
 def b_override_uygula(df_b, b_deger):
     df = df_b.copy()
     df['B'] = b_deger
     return df
 
-
 def katsayi_override_uygula(df_alt, katsayi_dict):
-    """Alt endeks ağırlıklarını (Katsayı sütunu) verilen sözlükle değiştirir.
-    katsayi_dict: {'a': 0.5, 'b1': 0.0, ...} — kod bazında."""
     df = df_alt.copy()
     for i, row in df.iterrows():
         kod = str(row['Ağırlık']).strip()
@@ -377,13 +351,8 @@ def katsayi_override_uygula(df_alt, katsayi_dict):
             df.at[i, 'Katsayı'] = katsayi_dict[kod]
     return df
 
-
 def senaryo_calistir(df_prog, df_end, df_alt, df_b, gecikme_ay, hiz_carpani, endeks_artis,
                       b_deger, tek_ay_index=None, tek_ay_kaydirma=0, katsayi_override=None):
-    """endeks_artis: tek bir float (%/ay, tüm alt endekslere uygulanır) VEYA
-    {'I o': pct, 'Ç o': pct, ...} şeklinde alt-endeks bazında sözlük olabilir.
-    katsayi_override: {'a': 0.5, 'b3': 0.5, ...} verilirse alt endeks ağırlıkları
-    (Katsayı) bu değerlerle değiştirilir."""
     p2 = imalat_donustur(df_prog, hiz_carpani=hiz_carpani, gecikme_ay=gecikme_ay,
                           tek_ay_index=tek_ay_index, tek_ay_kaydirma=tek_ay_kaydirma)
     e2 = endeks_uzat(df_end, endeks_artis)
@@ -391,9 +360,8 @@ def senaryo_calistir(df_prog, df_end, df_alt, df_b, gecikme_ay, hiz_carpani, end
     a2 = katsayi_override_uygula(df_alt, katsayi_override) if katsayi_override else df_alt
     return hesapla(p2, e2, a2, b2)
 
-
 # ─────────────────────────────────────────────────────────
-# ÖRNEK VERİ  (gösterim amaçlı — kendi verinizle değiştirin)
+# ÖRNEK VERİ
 # ─────────────────────────────────────────────────────────
 def ornek_veri():
     aylar = ["Oca 2025", "Şub 2025", "Mar 2025", "Nis 2025", "May 2025", "Haz 2025"]
@@ -421,7 +389,6 @@ def ornek_veri():
 
     b = pd.DataFrame({"AYLAR": aylar, "B": [0.9] * len(aylar)})
     return prog, end, alt, b
-
 
 # ─────────────────────────────────────────────────────────
 # SESSION STATE
@@ -464,8 +431,12 @@ with tab1:
         with jc2:
             st.markdown("**Dışa Aktar**")
             try:
-                json_data = dataframes_to_json(st.session_state.prog, st.session_state.end,
-                                                st.session_state.alt, st.session_state.b_df)
+                json_data = dataframes_to_json(
+                    st.session_state.get("prog_edited", st.session_state.prog), 
+                    st.session_state.get("end_edited", st.session_state.end),
+                    st.session_state.get("alt_edited", st.session_state.alt), 
+                    st.session_state.get("b_df_edited", st.session_state.b_df)
+                )
                 json_str = json.dumps(json_data, ensure_ascii=False, indent=2)
                 st.download_button("💾 JSON olarak indir", data=json_str,
                                     file_name="hakedis_verisi.json", mime="application/json")
@@ -478,12 +449,12 @@ with tab1:
     with c1:
         st.subheader("1️⃣ İş Programı ve İmalatlar")
         ep = st.data_editor(st.session_state.prog, num_rows="dynamic", use_container_width=True, key=f"ep_{rc}")
-        st.session_state.prog = ep
+        st.session_state.prog_edited = ep
 
         st.divider()
         st.subheader("3️⃣ Alt Endeks Ağırlıkları")
         ea = st.data_editor(st.session_state.alt, num_rows="dynamic", use_container_width=True, key=f"ea_{rc}")
-        st.session_state.alt = ea
+        st.session_state.alt_edited = ea
         try:
             ks = pd.to_numeric(ea['Katsayı'], errors='coerce').sum()
             ok = abs(ks - 1) < 0.001
@@ -503,18 +474,21 @@ with tab1:
     with c2:
         st.subheader("2️⃣ Aylık Endeks Tablosu")
         ee = st.data_editor(st.session_state.end, num_rows="dynamic", use_container_width=True, key=f"ee_{rc}")
-        st.session_state.end = ee
+        st.session_state.end_edited = ee
 
         st.divider()
         st.subheader("4️⃣ B Katsayısı")
         eb = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"eb_{rc}")
-        st.session_state.b_df = eb
+        st.session_state.b_df_edited = eb
 
 # ══════════════════════ TAB 2 — BAZ SONUÇ ══════════════════════
 with tab2:
     try:
         df_sonuc, df_pivot, df_kov, df_aylik, son_end = hesapla(
-            st.session_state.prog, st.session_state.end, st.session_state.alt, st.session_state.b_df
+            st.session_state.get("prog_edited", st.session_state.prog), 
+            st.session_state.get("end_edited", st.session_state.end), 
+            st.session_state.get("alt_edited", st.session_state.alt), 
+            st.session_state.get("b_df_edited", st.session_state.b_df)
         )
         toplam_ff = df_aylik['Aylık Fiyat Farkı'].sum() if not df_aylik.empty else 0
         st.metric("Toplam Fiyat Farkı (Baz Senaryo)", f"{tr(toplam_ff)} TL")
@@ -541,7 +515,7 @@ with tab2:
         st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"🚨 {e}")
+        st.error(f"🚨 Hata: Lütfen giriş verilerinin eksiksiz olduğundan emin olun.")
         import traceback
         with st.expander("Teknik hata detayı"):
             st.code(traceback.format_exc())
@@ -553,7 +527,8 @@ with tab3:
     mod = st.radio("Kaydırma Modu", ["Genel (tüm aylar)", "Belirli Ay"], horizontal=True,
                     help="Genel: tüm ayları birlikte kaydırır. Belirli Ay: sadece seçtiğiniz tek bir ayın imalatını taşır, diğer aylar olduğu gibi kalır.")
 
-    ay_listesi = list(st.session_state.prog['AYLAR'])
+    prog_aktif = st.session_state.get("prog_edited", st.session_state.prog)
+    ay_listesi = list(prog_aktif['AYLAR'])
     tek_ay_index, tek_ay_kaydirma, gecikme_ay = None, 0, 0
 
     s1, s2, s3, s4 = st.columns(4)
@@ -581,13 +556,8 @@ with tab3:
 
 Şantiyenizi bir **koşu bandı** gibi düşünün:
 
-- 🔵 **İmalat Hızı Çarpanı** = bandın **hızı**. Ne kadar hızlı koşuyorsunuz
-  (ayda ne kadar iş bitiyor)?
-- 🔴 **Gecikme / Hızlanma** = koştuğunuz mesafenin **hangi takvim ayına**
-  yazıldığı. Aynı mesafeyi, farklı bir ayda koşmuş gibi göstermek.
-
-Kısacası: **Hız Çarpanı → "ne kadar iş"**, **Gecikme/Hızlanma → "ne zaman"**.
-İkisi birbirinden bağımsızdır ve genelde birlikte kullanılır.
+- 🔵 **İmalat Hızı Çarpanı** = bandın **hızı**. Ne kadar hızlı koşuyorsunuz (ayda ne kadar iş bitiyor)?
+- 🔴 **Gecikme / Hızlanma** = koştuğunuz mesafenin **hangi takvim ayına** yazıldığı. Aynı mesafeyi, farklı bir ayda koşmuş gibi göstermek.
 """)
 
         ornek_ay = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran"]
@@ -602,94 +572,30 @@ Kısacası: **Hız Çarpanı → "ne kadar iş"**, **Gecikme/Hızlanma → "ne z
             return yeni
 
         st.markdown("#### 🔴① En basit hâli: sadece TEK bir ayı kaydırmak (\"Belirli Ay\" modu)")
-        st.markdown(
-            "Örnek: **Mart** ayının işini (20 milyon TL) **+2** kaydırıyoruz. '+2' demek "
-            "**2 takvim ayı ileri** demektir: Mart → (+1) → Nisan → (+1) → **Mayıs**. "
-            "Nisan sadece 'yol üstünde', kendisi hiç değişmiyor — iş doğrudan Mayıs'a düşüyor:"
-        )
         tek_ay_ornek = ornek_orijinal.copy()
-        tek_ay_ornek[2] = 0  # Mart boşalıyor
-        tek_ay_ornek[4] += ornek_orijinal[2]  # Mayıs'a ekleniyor
+        tek_ay_ornek[2] = 0  
+        tek_ay_ornek[4] += ornek_orijinal[2]  
         fig_tek = go.Figure()
         fig_tek.add_trace(go.Bar(x=ornek_ay, y=ornek_orijinal, name='Orijinal', marker_color='#94a3b8'))
         fig_tek.add_trace(go.Bar(x=ornek_ay, y=tek_ay_ornek, name="Mart'ı +2 kaydır", marker_color='#f97316'))
-        fig_tek.add_annotation(
-            x="Mayıs", y=53, ax="Mart", ay=53, xref="x", yref="y", axref="x", ayref="y",
-            showarrow=True, arrowhead=3, arrowsize=1.3, arrowwidth=2, arrowcolor="#ef4444",
-            text="tam 2 ay ileri (Nisan atlanıyor)", font=dict(color="#ef4444", size=12), yshift=14
-        )
-        fig_tek.update_layout(barmode='group', title="Sadece Mart'ın İşi Mayıs'a Taşınıyor, Gerisi Aynı",
-                               yaxis_title='Milyon TL (örnek)', height=300, margin=dict(t=40, b=10))
+        fig_tek.update_layout(barmode='group', title="Sadece Mart'ın İşi Mayıs'a Taşınıyor", yaxis_title='Milyon TL', height=300, margin=dict(t=40, b=10))
         st.plotly_chart(fig_tek, use_container_width=True)
-        st.caption(
-            "Mart'ın 20 milyon TL'lik işi artık Mayıs ayında görünüyor, Mart'ta '0' kalıyor. Nisan "
-            "**hiç etkilenmedi** (sadece aradan geçilen bir ay, kendi işi hâlâ 25). Ocak, Şubat ve "
-            "Haziran da hiç değişmedi. Program hâlâ bu işi Mart ayına yazdığı için, Mayıs'a kayan bu "
-            "iş **gecikmeli** sayılır ve Mart'ın (daha düşük) endeksiyle sabitlenir."
-        )
 
         st.markdown("#### 🔴② Daha kapsamlı hâli: TÜM ayları birlikte kaydırmak (\"Genel\" modu)")
-        st.markdown(
-            "Genel modda tek bir ay değil, **her ayın işi kendi + N ay sonrasına** taşınır — "
-            "yani hepsi aynı anda, aynı miktarda kayar. Aşağıda tüm aylara +2 uygulanmış hâli:"
-        )
         gecikmeli = _ornek_kaydir(ornek_orijinal, 2)
         fig_gec = go.Figure()
         fig_gec.add_trace(go.Bar(x=ornek_ay, y=ornek_orijinal, name='Orijinal (gecikme=0)', marker_color='#94a3b8'))
         fig_gec.add_trace(go.Bar(x=ornek_ay, y=gecikmeli, name='Gecikme = +2 (tüm aylar)', marker_color='#ef4444'))
-        fig_gec.update_layout(barmode='group', title='Her Ayın İşi Kendi +2 Ayına Taşınıyor (Toplam TL Aynı)',
-                               yaxis_title='Milyon TL (örnek)', height=300, margin=dict(t=40, b=10))
+        fig_gec.update_layout(barmode='group', title='Her Ayın İşi Kendi +2 Ayına Taşınıyor', yaxis_title='Milyon TL', height=300, margin=dict(t=40, b=10))
         st.plotly_chart(fig_gec, use_container_width=True)
-
-        esleme = []
-        n = len(ornek_ay)
-        for i, ay in enumerate(ornek_ay):
-            j = max(0, min(n - 1, i + 2))
-            not_str = ""
-            if i + 2 > n - 1:
-                not_str = " (program burada bittiği için son aya yığıldı)"
-            esleme.append({'Orijinal Ay': ay, 'Tutar (milyon TL)': ornek_orijinal[i],
-                            '→ Yeni Ay': ornek_ay[j] + not_str})
-        st.dataframe(pd.DataFrame(esleme), use_container_width=True, hide_index=True)
-
-        st.caption(
-            "Her satırda görüldüğü gibi Ocak'ın işi Mart'a, Şubat'ınki Nisan'a, Mart'ınki Mayıs'a "
-            "taşınıyor — hepsi kendi +2 ayına. Ama Nisan, Mayıs ve Haziran'ın işi +2 kaydırılınca "
-            "programın son ayı olan Haziran'ı aşıyor; taşacak yer olmadığı için hepsi **Haziran'da "
-            "birikiyor** (bu yüzden Haziran çubuğu bu kadar yüksek). Toplam iş miktarı "
-            f"({sum(ornek_orijinal)} milyon TL) hiç değişmiyor, sadece hangi ayda göründüğü değişiyor. "
-            "Program hâlâ eski aylarını beklediği için, kaymış her iş **gecikmeli** sayılır ve kendi "
-            "(daha düşük) programlanmış ayının endeksiyle sabitlenir — sonuç olarak fiyat farkı "
-            "genelde **düşer**."
-        )
-
 
         st.markdown("#### 🔵 Örnek: İmalat Hızı Çarpanı = 1.3 uygulanırsa")
         hizli = [round(v * 1.3, 1) for v in ornek_orijinal]
         fig_hiz = go.Figure()
         fig_hiz.add_trace(go.Bar(x=ornek_ay, y=ornek_orijinal, name='Orijinal (çarpan=1.0)', marker_color='#94a3b8'))
         fig_hiz.add_trace(go.Bar(x=ornek_ay, y=hizli, name='Çarpan = 1.3', marker_color='#3b82f6'))
-        fig_hiz.update_layout(barmode='group', title='Her Ayın Kendi İş Miktarı Değişiyor (Zaman Aynı)',
-                               yaxis_title='Milyon TL (örnek)', height=300, margin=dict(t=40, b=10))
+        fig_hiz.update_layout(barmode='group', title='Her Ayın Kendi İş Miktarı Değişiyor', yaxis_title='Milyon TL', height=300, margin=dict(t=40, b=10))
         st.plotly_chart(fig_hiz, use_container_width=True)
-        st.caption(
-            "Ocak yine Ocak, Şubat yine Şubat — hiçbir ay yer değiştirmiyor. Sadece her ayda yapılan iş "
-            "%30 artıyor (10→13, 15→19,5 vb.). Daha fazla iş, o ayın kovasını daha hızlı doldurur; taşan "
-            "kısım bir sonraki kovaya sızar."
-        )
-
-        st.markdown("""
-#### 📋 Özet
-
-| | Neyi değiştirir? | Neyi değiştirmez? | Fiyat farkına genel etkisi |
-|---|---|---|---|
-| 🔴 **Gecikme/Hızlanma** | **Zaman** — hangi ayda yapıldığı | Toplam TL tutarı | (+) gecikme → **düşer**, (−) hızlanma → **artar** |
-| 🔵 **İmalat Hızı Çarpanı** | **Miktar** — ne kadar iş yapıldığı | Zaman ekseni (aylar) | >1 → kovalar hızlı dolar, <1 → programın gerisinde kalınır |
-
-**İkisini birlikte kullanmak:** "İş 2 ay gecikmeli ama aynı zamanda normalden
-%20 daha hızlı ilerliyor" senaryosunu görmek için Gecikme=+2 **ve**
-Hız Çarpanı=1.2 birlikte ayarlanabilir.
-        """)
 
     alt_bazinda = st.checkbox("Alt endeks bazında ayrı artış oranı ayarla (gelişmiş)")
     endeks_artis = endeks_artis_genel
@@ -706,18 +612,12 @@ Hız Çarpanı=1.2 birlikte ayarlanabilir.
                                                         help=f"Resmi kod: {bilgi['resmi_kod']} — {bilgi['ad']}")
         endeks_artis = endeks_artis_dict
 
-    # ── Alt endeks ağırlıkları (Katsayı) simülasyonu ──
-    katsayi_bazinda = st.checkbox("Alt endeks ağırlıklarını (Katsayı) simüle et (gelişmiş)",
-                                   help="Örn: 'sadece işçilik %100 olsa' veya 'işçilik %50 + akaryakıt %50 olsa' ne olurdu?")
+    katsayi_bazinda = st.checkbox("Alt endeks ağırlıklarını (Katsayı) simüle et (gelişmiş)")
     katsayi_override = None
     if katsayi_bazinda:
-        orijinal_kat = {str(r['Ağırlık']).strip(): float(r['Katsayı']) for _, r in st.session_state.alt.iterrows()}
+        alt_aktif = st.session_state.get("alt_edited", st.session_state.alt)
+        orijinal_kat = {str(r['Ağırlık']).strip(): float(r['Katsayı']) for _, r in alt_aktif.iterrows()}
 
-        # Widget'lar oluşturulmadan ÖNCE, bekleyen (buton kaynaklı) bir güncelleme
-        # varsa uygula. Streamlit, bir widget'ın key'ine, o widget bu run içinde
-        # oluşturulduktan SONRA session_state üzerinden yazılmasına izin vermez;
-        # bu yüzden güncelleme her zaman bir önceki rerun'da (widget'lar henüz
-        # oluşmadan) uygulanır.
         if st.session_state.get("kat_pending") is not None:
             for kod, val in st.session_state["kat_pending"].items():
                 st.session_state[f"kat_{kod}"] = val
@@ -769,11 +669,15 @@ Hız Çarpanı=1.2 birlikte ayarlanabilir.
         katsayi_override = {kod: st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET}
 
     try:
+        end_aktif = st.session_state.get("end_edited", st.session_state.end)
+        alt_aktif = st.session_state.get("alt_edited", st.session_state.alt)
+        b_aktif = st.session_state.get("b_df_edited", st.session_state.b_df)
+
         base_sonuc, base_pivot, base_kov, base_aylik, _ = hesapla(
-            st.session_state.prog, st.session_state.end, st.session_state.alt, st.session_state.b_df
+            prog_aktif, end_aktif, alt_aktif, b_aktif
         )
         sim_sonuc, sim_pivot, sim_kov, sim_aylik, _ = senaryo_calistir(
-            st.session_state.prog, st.session_state.end, st.session_state.alt, st.session_state.b_df,
+            prog_aktif, end_aktif, alt_aktif, b_aktif,
             gecikme_ay, hiz_carpani, endeks_artis, b_ovr,
             tek_ay_index=tek_ay_index, tek_ay_kaydirma=tek_ay_kaydirma,
             katsayi_override=katsayi_override
@@ -825,7 +729,7 @@ Hız Çarpanı=1.2 birlikte ayarlanabilir.
                 st.warning("Lütfen bir senaryo ismi girin.")
 
     except Exception as e:
-        st.error(f"🚨 {e}")
+        st.error(f"🚨 Hata oluştu. Veriler eksik veya hatalı olabilir.")
         import traceback
         with st.expander("Teknik hata detayı"):
             st.code(traceback.format_exc())
