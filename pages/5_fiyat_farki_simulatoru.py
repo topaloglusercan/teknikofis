@@ -709,6 +709,43 @@ with tab3:
                 'Aylık Fiyat Farkı': lambda x: tr(x), 'Kümülatif Fiyat Farkı': lambda x: tr(x),
             }), use_container_width=True)
 
+        # ════════════════════════════════════════════════════════════════
+        # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (İŞ PROGRAMINA TAM UYUM)
+        # ════════════════════════════════════════════════════════════════
+        st.markdown("---")
+        st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum (Sıfır Gecikme)")
+        st.info("Eğer imalatlar, İş Programı ile **birebir aynı** gitseydi (hiç gecikme olmasaydı ve her imalat tam olarak kendi ayının endeksini alsaydı) fiyat farkı sonucu ne olurdu?")
+
+        # 1. Mevcut aktif program verisinin kopyasını alıyoruz
+        df_teorik = prog_aktif.copy()
+        
+        # 2. İmalatı, İş Programına eşitliyoruz (Gecikmeyi sıfırlıyoruz)
+        df_teorik['İMALAT TUTARI KÜMÜLATİF'] = df_teorik['İŞ PROGRAMI KÜMÜLATİF']
+        
+        # 3. Motoru bu hayali "Sıfır Gecikme" verisiyle çalıştırıyoruz (aktif endeks tablosu ile)
+        _, _, _, teorik_aylik, _ = hesapla(df_teorik, end_aktif, alt_aktif, b_aktif)
+        
+        toplam_teorik = teorik_aylik['Aylık Fiyat Farkı'].sum() if not teorik_aylik.empty else 0
+        fark_teorik = toplam_sim - toplam_teorik
+        
+        # 4. Ekrana Şık Bir Metrik Kartı Olarak Basıyoruz
+        t_col1, t_col2, t_col3 = st.columns(3)
+        
+        t_col1.metric("Simülasyon Toplam FF", f"{tr(toplam_sim)} TL")
+        t_col2.metric("Teorik Toplam FF (Tam Uyum)", f"{tr(toplam_teorik)} TL")
+        
+        # Farkın pozitif/negatif durumuna göre renk ve yönlendirme ayarı
+        if fark_teorik > 0:
+            t_col3.metric("Fark (Simülasyon - Teorik)", f"+{tr(fark_teorik)} TL", delta_color="inverse")
+            st.error("⚠️ **Analiz:** Simüle edilen gecikmeli durum ve geçmiş aylara düşen kova hesaplamaları, idareye/yükleniciye teorik senaryodan daha fazla fiyat farkı maliyeti çıkarıyor.")
+        elif fark_teorik < 0:
+            t_col3.metric("Fark (Simülasyon - Teorik)", f"{tr(fark_teorik)} TL", delta_color="normal")
+            st.success("✅ **Analiz:** Simüle edilen imalat ilerleyişi, teorik iş programı maliyetinin altında bir fiyat farkı oluşturmuş.")
+        else:
+            t_col3.metric("Fark", "0,00 TL")
+            st.info("İmalatlar tam olarak iş programı ile paralel ilerlemiş veya endeks artışları tamamen aynı kalmış.")
+        # ════════════════════════════════════════════════════════════════
+
         st.divider()
         senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet (isim ver):", placeholder="örn. 'Senaryo A - 3 ay gecikme'")
         if st.button("💾 Senaryoyu Kaydet"):
