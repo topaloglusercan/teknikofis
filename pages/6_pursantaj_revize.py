@@ -1,9 +1,10 @@
 """
-Revize Pursantaj Dağıtım Motoru (Üretim / Prod Sürümü - Matematiksel Optimizasyon)
+Revize Pursantaj Dağıtım Motoru (Üretim / Prod Sürümü - Esnek Hedefli)
 ============================================================
-- Yüzde ve Kuruş (TL) yuvarlama sapmaları (residual error) artık sadece 
-  Serbest kalemlere değil, tablodaki en büyük esnek kaleme yedirilir. 
-- Bu sayede düşük bütçeli kalemlerin eksiye (-) düşmesi engellenmiştir.
+- Kullanıcıya kuruş ve yuvarlama farklarını (residual error) 
+  istediği kaleme yedirme özgürlüğü eklendi.
+- Sistem en büyük bütçeli esnek kalemi otomatik önerir ancak 
+  son söz tamamen kullanıcıdadır.
 """
 
 import streamlit as st
@@ -181,7 +182,7 @@ with col3:
 st.divider()
 
 # ==========================================
-# 3. VERİ GİRİŞ TABLOSU
+# 3. VERİ GİRİŞ TABLOSU VE YEDİRME AYARI
 # ==========================================
 st.subheader("İş Kalemleri ve Dağıtım Kısıtları")
 edited_df = st.data_editor(
@@ -195,12 +196,32 @@ edited_df = st.data_editor(
     num_rows="dynamic",
     key=f"editor_{st.session_state.editor_key}"
 )
-
 st.session_state.data = edited_df.copy()
+
+# Kullanıcının Kuruş Farkı Kalemini Seçmesi İçin Özel Alan
+st.markdown("### ⚙️ Hesaplama Ayarları")
+esnek_df = edited_df[edited_df["Durum"] != "% Sabit"]
+
+# Eğer tabloda esnek (TL Sabit veya Serbest) kalem varsa onlardan liste yap, yoksa hepsini al
+if not esnek_df.empty:
+    en_buyuk_kalem_adi = esnek_df.loc[esnek_df["Eski TL"].astype(float).idxmax(), "Kalem"]
+    esnek_kalemler = esnek_df["Kalem"].tolist()
+    default_idx = esnek_kalemler.index(en_buyuk_kalem_adi) if en_buyuk_kalem_adi in esnek_kalemler else 0
+else:
+    esnek_kalemler = edited_df["Kalem"].tolist()
+    default_idx = 0
+
+secili_duzeltme_kalemi = st.selectbox(
+    "Kuruş ve Yuvarlama Farklarının Yedirileceği Hedef Kalem:",
+    options=esnek_kalemler,
+    index=default_idx,
+    help="Yüzde hesaplamalarından kaynaklanan 0.01'lik kuruş ve sapma farkları bu kaleme eklenir/çıkarılır."
+)
+
 st.divider()
 
 # ==========================================
-# 4. HESAPLAMA MOTORU (MATEMATİKSEL KORUMA)
+# 4. HESAPLAMA MOTORU (ESNEK KORUMALI)
 # ==========================================
 if st.button("🚀 Yeni Pursantajı Dağıt ve Ödemeyi Hesapla", type="primary"):
     df = edited_df.copy()
@@ -209,7 +230,7 @@ if st.button("🚀 Yeni Pursantajı Dağıt ve Ödemeyi Hesapla", type="primary"
     df["Yeni %"] = 0.00
     df["İdare Ödeme (TL)"] = 0.00
     
-    # ADIM 1: Tıpkı kümülatif tablolarda yaptığımız gibi önce TL'leri netleştiriyoruz
+    # ADIM 1: TL'leri netleştir
     kullanilan_tl = 0.00
     for index, row in df.iterrows():
         durum = row["Durum"]
@@ -224,7 +245,6 @@ if st.button("🚀 Yeni Pursantajı Dağıt ve Ödemeyi Hesapla", type="primary"
     serbest_mask = df["Durum"] == "Serbest"
     serbest_eski_tl_toplam = df.loc[serbest_mask, "Eski TL"].astype(float).sum()
 
-    # Serbestlere kalan TL'yi ağırlığına göre dağıt
     if serbest_eski_tl_toplam > 0:
         for index, row in df[serbest_mask].iterrows():
             agirlik = float(row["Eski TL"]) / serbest_eski_tl_toplam
@@ -232,42 +252,36 @@ if st.button("🚀 Yeni Pursantajı Dağıt ve Ödemeyi Hesapla", type="primary"
     elif kalan_tl != 0:
         st.error("Havuzda dağıtılacak tutar kaldı ancak 'Serbest' kalem bulunamadı!")
 
-    # TL Kuruş Düzeltmesi (Eksik/Fazla varsa % Sabit olmayan EN BÜYÜK kaleme yedir)
+    # Hedef Kalemi İndeksini Bul (Kullanıcı Seçimi)
+    hedef_idx = df[df["Kalem"] == secili_duzeltme_kalemi].index[0]
+
+    # TL Kuruş Düzeltmesi
     fark_tl = round(yeni_toplam_tl - df["Yeni TL"].sum(), 2)
     if fark_tl != 0:
-        esnek_mask = df["Durum"] != "% Sabit"
-        if esnek_mask.any():
-            en_buyuk_tl_idx = df[esnek_mask]["Yeni TL"].idxmax()
-            df.at[en_buyuk_tl_idx, "Yeni TL"] = round(df.at[en_buyuk_tl_idx, "Yeni TL"] + fark_tl, 2)
+        df.at[hedef_idx, "Yeni TL"] = round(df.at[hedef_idx, "Yeni TL"] + fark_tl, 2)
 
-    # ADIM 2: Şimdi netleşmiş TL'ler üzerinden oranları (%) buluyoruz (Erken yuvarlama yasak)
+    # ADIM 2: Yeni Oranları (%) bul (Erken yuvarlama yasak)
     for index, row in df.iterrows():
         durum = row["Durum"]
         if durum == "% Sabit":
             df.at[index, "Yeni %"] = round(float(row["Eski %"]), 2)
-        else: # TL Sabit veya Serbest ise orantıdan çek
+        else:
             df.at[index, "Yeni %"] = round((df.at[index, "Yeni TL"] / yeni_toplam_tl) * 100, 2) if yeni_toplam_tl > 0 else 0.00
 
-    # YÜZDE Kuruş Düzeltmesi (İşte eksiyi önleyen hamle: Farkı EN BÜYÜK kaleme gömüyoruz)
+    # YÜZDE Kuruş Düzeltmesi (Kullanıcı Seçimi)
     fark_yuzde = round(100.00 - df["Yeni %"].sum(), 2)
     if fark_yuzde != 0:
-        esnek_mask = df["Durum"] != "% Sabit"
-        if esnek_mask.any():
-            en_buyuk_yuzde_idx = df[esnek_mask]["Yeni %"].idxmax()
-            df.at[en_buyuk_yuzde_idx, "Yeni %"] = round(df.at[en_buyuk_yuzde_idx, "Yeni %"] + fark_yuzde, 2)
+        df.at[hedef_idx, "Yeni %"] = round(df.at[hedef_idx, "Yeni %"] + fark_yuzde, 2)
 
-    # ADIM 3: İdare Ödeme Hesaplaması (Sistemdeki 2 haneli Yeni % ile çarpım)
+    # ADIM 3: İdare Ödeme Hesaplaması
     for index, row in df.iterrows():
         df.at[index, "İdare Ödeme (TL)"] = round((df.at[index, "Yeni %"] / 100.0) * yeni_toplam_tl, 2)
 
-    # İdare Kuruş Düzeltmesi (Toplam TL'ye kitlemek için)
+    # İdare Kuruş Düzeltmesi (Kullanıcı Seçimi)
     idare_fark_tl = round(yeni_toplam_tl - df["İdare Ödeme (TL)"].sum(), 2)
     if idare_fark_tl != 0:
-        esnek_mask = df["Durum"] != "% Sabit"
-        if esnek_mask.any():
-            en_buyuk_idare_idx = df[esnek_mask]["İdare Ödeme (TL)"].idxmax()
-            df.at[en_buyuk_idare_idx, "İdare Ödeme (TL)"] = round(df.at[en_buyuk_idare_idx, "İdare Ödeme (TL)"] + idare_fark_tl, 2)
-            st.toast(f"Mühendislik Düzeltmesi: Toplamı eşitlemek için {idare_fark_tl:+.2f} TL en büyük kaleme yedirildi.", icon="🛠️")
+        df.at[hedef_idx, "İdare Ödeme (TL)"] = round(df.at[hedef_idx, "İdare Ödeme (TL)"] + idare_fark_tl, 2)
+        st.toast(f"Mühendislik Düzeltmesi: Toplamı eşitlemek için {idare_fark_tl:+.2f} TL seçtiğiniz kaleme ({secili_duzeltme_kalemi}) yedirildi.", icon="🛠️")
 
     # ==========================================
     # 5. SONUÇ EKRANI VE DIŞA AKTARIM
