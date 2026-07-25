@@ -387,7 +387,7 @@ def ornek_veri():
         "Temel Endeks": [base["I o"], base["Ç o"], base["D o"], base["Y o"], base["K o"], base["G o"], base["M o"]],
     })
 
-    b = pd.DataFrame({"AYLAR": aylar, "B": [0.9] * len(aylar)})
+    b = pd.DataFrame({"AYLAR": aylar, "B": [1.0] * len(aylar)})
     return prog, end, alt, b
 
 # ─────────────────────────────────────────────────────────
@@ -545,10 +545,16 @@ with tab3:
         hiz_carpani = st.slider("Aylık İmalat Hızı Çarpanı", 0.3, 2.0, 1.0, 0.05,
                                  help="Her ayın imalat artışını bu katsayıyla ölçekler.")
     with s3:
-        endeks_artis_genel = st.slider("Gelecek Aylar İçin Varsayılan Endeks Artışı (%/ay)", 0.0, 10.0, 1.5, 0.1,
+        # HATA DÜZELTİLDİ: Varsayılan artış 1.5'tan 0.0'a çekildi. (Baz veriyi bozmamak için)
+        endeks_artis_genel = st.slider("Gelecek Aylar İçin Endeks Artışı (%/ay)", 0.0, 10.0, 0.0, 0.1,
                                         help="Endeks tablosunda veri olmayan aylar için bileşik aylık artış varsayımı.")
     with s4:
-        b_ovr = st.slider("B Katsayısı (override)", 0.0, 2.0, 0.9, 0.01)
+        # HATA DÜZELTİLDİ: Sinsi B Katsayısı tamamen kullanıcının opsiyonuna bağlandı ve varsayılanı 1.0 yapıldı.
+        b_override_aktif = st.checkbox("B Katsayısını Simüle Et")
+        if b_override_aktif:
+            b_ovr = st.slider("Sabit B Katsayısı (Tüm aylar)", 0.0, 2.0, 1.0, 0.01, help="İşaretlendiğinde tüm aylar için B katsayısını bu değerle ezer.")
+        else:
+            b_ovr = None
 
     with st.expander("ℹ️ 'Gecikme/Hızlanma' ve 'İmalat Hızı Çarpanı' ne yapar? (örnekli açıklama)"):
         st.markdown("""
@@ -709,7 +715,7 @@ with tab3:
                 'Aylık Fiyat Farkı': lambda x: tr(x), 'Kümülatif Fiyat Farkı': lambda x: tr(x),
             }), use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════
+        # ════════════════════════════════════════════════════════════════
         # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (HACİM KONTROLLÜ TAM UYUM)
         # ════════════════════════════════════════════════════════════════
         st.markdown("---")
@@ -718,11 +724,14 @@ with tab3:
 
         # 1. Slider'dan gelen simülasyon şartlarını (TÜFE, B katsayısı vb.) hazırlayalım
         e_sim = endeks_uzat(end_aktif, endeks_artis)
-        b_sim = b_override_uygula(b_aktif, b_ovr)
+        b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
 
-        # 2. Toplam Simülasyon İmalat Hacmini Bulalım (Elma ile Elma kıyaslamak için)
-        toplam_sim_imalat = sim_aylik['Aylık İmalat'].sum() if not sim_aylik.empty else 0
+        # 2. Toplam Simülasyon İmalat Hacmini Bulalım (Kuruş kayıplarını önlemek için Decimal ile)
+        if not sim_sonuc.empty:
+            toplam_sim_imalat = dec(sim_sonuc['İMALAT TUTARI KÜMÜLATİF'].iloc[-1])
+        else:
+            toplam_sim_imalat = Decimal('0')
 
         # 3. Mevcut aktif program verisinin kopyasını alıp İmalatı İş Programına eşitliyoruz.
         #    ANCAK, toplam parasal hacmin simülasyonu geçmemesi için bir sınır (cap) koyuyoruz!
@@ -730,11 +739,12 @@ with tab3:
         
         yeni_imalat_kum = []
         for planlanan in df_teorik['İŞ PROGRAMI KÜMÜLATİF']:
+            p_val = dec(planlanan)
             # Planlanan ödenek, bizim gerçekleşen/simüle edilen toplam imalatımızı aşıyorsa; orada dur!
-            if float(planlanan) > float(toplam_sim_imalat):
-                yeni_imalat_kum.append(toplam_sim_imalat)
+            if p_val > toplam_sim_imalat:
+                yeni_imalat_kum.append(float(toplam_sim_imalat))
             else:
-                yeni_imalat_kum.append(planlanan)
+                yeni_imalat_kum.append(float(p_val))
                 
         df_teorik['İMALAT TUTARI KÜMÜLATİF'] = yeni_imalat_kum
         
