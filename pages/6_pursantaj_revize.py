@@ -1,9 +1,9 @@
 """
-Revize Pursantaj Dağıtım Motoru (Üretim / Prod Sürümü - Kesin Çözüm)
+Revize Pursantaj Dağıtım Motoru (Üretim / Prod Sürümü - Matematiksel Optimizasyon)
 ============================================================
-- Yüklenen dosyanın her tıklamada verileri sıfırlama sorunu (File Cache Overwrite) çözüldü.
-- Yeni kalemler tabloya otomatik olarak "Serbest" statüsünde eklenir.
-- Buton tepkimesi ve hesaplama algoritması %100 istikrarlı hale getirildi.
+- Yüzde ve Kuruş (TL) yuvarlama sapmaları (residual error) artık sadece 
+  Serbest kalemlere değil, tablodaki en büyük esnek kaleme yedirilir. 
+- Bu sayede düşük bütçeli kalemlerin eksiye (-) düşmesi engellenmiştir.
 """
 
 import streamlit as st
@@ -104,7 +104,6 @@ st.sidebar.info("Proje verilerinizi Google E-Tablo (Excel) veya JSON olarak yük
 
 uploaded_file = st.sidebar.file_uploader("Veri Yükle (.xlsx, .json)", type=["xlsx", "json"])
 if uploaded_file is not None:
-    # DOSYA KİLİDİ: Eğer bu dosyayı zaten yüklediysek, tekrar okuyup senin eklediğin satırları silmesine izin verme!
     if "yuklenen_dosya_adi" not in st.session_state or st.session_state.yuklenen_dosya_adi != uploaded_file.name:
         try:
             if uploaded_file.name.endswith('.json'):
@@ -114,7 +113,7 @@ if uploaded_file is not None:
                 st.session_state.data = pd.read_excel(uploaded_file)
             
             st.session_state.editor_key += 1
-            st.session_state.yuklenen_dosya_adi = uploaded_file.name # Dosyayı hafızaya mühürle
+            st.session_state.yuklenen_dosya_adi = uploaded_file.name
             st.sidebar.success("Dosya başarıyla yüklendi!")
         except Exception as e:
             st.sidebar.error("Geçersiz dosya formatı.")
@@ -147,10 +146,7 @@ with col1:
     )
     st.caption(f"Mevcut Tablo Toplamı: {aktif_eski_toplam:,.2f} TL")
 
-# Fark anında hesaplanır
 otomatik_fark = round(yeni_toplam_tl - aktif_eski_toplam, 2)
-
-# Kullanıcıya değiştirebilmesi için text input sunuyoruz
 tahmin_isim, eklenecek_index = get_next_mukayese_info(st.session_state.data)
 
 with col2:
@@ -165,8 +161,6 @@ with col3:
     st.write("")
     if st.button("➕ Otomatik Tutarla Listeye Ekle", use_container_width=True):
         if otomatik_fark > 0 and girilen_kalem_adi.strip() != "":
-            
-            # YENİ SATIR: Algoritmanın hata vermemesi için OTOMATİK OLARAK 'Serbest' tanımlanıyor.
             yeni_satir = pd.DataFrame([{
                 "Kalem": girilen_kalem_adi.strip(), 
                 "Eski %": 0.00, 
@@ -180,13 +174,8 @@ with col3:
             df_ust = df_kopya.iloc[:non_empty_index]
             df_alt = df_kopya.iloc[non_empty_index:]
             
-            # Veriyi listeye kaynak yapıyoruz
             st.session_state.data = pd.concat([df_ust, yeni_satir, df_alt]).reset_index(drop=True)
-            
-            # Tablonun eskiye dönmesini engellemek için kimliğini değiştir
             st.session_state.editor_key += 1
-            
-            # Ekranı yeniden yükle (Artık dosya yükleme zırhı devrede olduğu için veri ezilmeyecek)
             st.rerun()
 
 st.divider()
@@ -207,13 +196,11 @@ edited_df = st.data_editor(
     key=f"editor_{st.session_state.editor_key}"
 )
 
-# Tablodaki manuel değişiklikleri güvenle kaydet
 st.session_state.data = edited_df.copy()
-
 st.divider()
 
 # ==========================================
-# 4. HESAPLAMA MOTORU
+# 4. HESAPLAMA MOTORU (MATEMATİKSEL KORUMA)
 # ==========================================
 if st.button("🚀 Yeni Pursantajı Dağıt ve Ödemeyi Hesapla", type="primary"):
     df = edited_df.copy()
@@ -222,65 +209,65 @@ if st.button("🚀 Yeni Pursantajı Dağıt ve Ödemeyi Hesapla", type="primary"
     df["Yeni %"] = 0.00
     df["İdare Ödeme (TL)"] = 0.00
     
+    # ADIM 1: Tıpkı kümülatif tablolarda yaptığımız gibi önce TL'leri netleştiriyoruz
     kullanilan_tl = 0.00
-    kullanilan_yuzde = 0.00
-    
     for index, row in df.iterrows():
         durum = row["Durum"]
-        eski_tl = float(row["Eski TL"])
-        eski_yuzde = float(row["Eski %"])
-        
         if durum == "TL Sabit":
-            hesap_tl = round(eski_tl, 2)
-            hesap_yuzde = round((hesap_tl / yeni_toplam_tl) * 100, 2) if yeni_toplam_tl > 0 else 0.00
-            
-            df.at[index, "Yeni TL"] = hesap_tl
-            df.at[index, "Yeni %"] = hesap_yuzde
-            kullanilan_tl += hesap_tl
-            kullanilan_yuzde += hesap_yuzde
-            
+            df.at[index, "Yeni TL"] = round(float(row["Eski TL"]), 2)
+            kullanilan_tl += df.at[index, "Yeni TL"]
         elif durum == "% Sabit":
-            hesap_yuzde = round(eski_yuzde, 2)
-            hesap_tl = round((hesap_yuzde / 100.0) * yeni_toplam_tl, 2)
-            
-            df.at[index, "Yeni %"] = hesap_yuzde
-            df.at[index, "Yeni TL"] = hesap_tl
-            kullanilan_yuzde += hesap_yuzde
-            kullanilan_tl += hesap_tl
+            df.at[index, "Yeni TL"] = round((float(row["Eski %"]) / 100.0) * yeni_toplam_tl, 2)
+            kullanilan_tl += df.at[index, "Yeni TL"]
 
     kalan_tl = round(yeni_toplam_tl - kullanilan_tl, 2)
-    kalan_yuzde = round(100.00 - kullanilan_yuzde, 2)
-    
     serbest_mask = df["Durum"] == "Serbest"
-    serbest_eski_tl_toplam = df.loc[serbest_mask, "Eski TL"].sum()
-    
+    serbest_eski_tl_toplam = df.loc[serbest_mask, "Eski TL"].astype(float).sum()
+
+    # Serbestlere kalan TL'yi ağırlığına göre dağıt
     if serbest_eski_tl_toplam > 0:
         for index, row in df[serbest_mask].iterrows():
             agirlik = float(row["Eski TL"]) / serbest_eski_tl_toplam
-            
             df.at[index, "Yeni TL"] = round(kalan_tl * agirlik, 2)
-            df.at[index, "Yeni %"] = round(kalan_yuzde * agirlik, 2)
-            
-        toplam_yeni_yuzde = round(df["Yeni %"].sum(), 2)
-        fark_yuzde = round(100.00 - toplam_yeni_yuzde, 2)
-        
-        if fark_yuzde != 0:
-            en_buyuk_idx = df[serbest_mask]["Yeni TL"].idxmax()
-            df.at[en_buyuk_idx, "Yeni %"] = round(df.at[en_buyuk_idx, "Yeni %"] + fark_yuzde, 2)
-    else:
-        if kalan_tl != 0 or kalan_yuzde != 0:
-            st.error("Havuzda dağıtılacak tutar kaldı ancak 'Serbest' kalem bulunamadı!")
+    elif kalan_tl != 0:
+        st.error("Havuzda dağıtılacak tutar kaldı ancak 'Serbest' kalem bulunamadı!")
 
+    # TL Kuruş Düzeltmesi (Eksik/Fazla varsa % Sabit olmayan EN BÜYÜK kaleme yedir)
+    fark_tl = round(yeni_toplam_tl - df["Yeni TL"].sum(), 2)
+    if fark_tl != 0:
+        esnek_mask = df["Durum"] != "% Sabit"
+        if esnek_mask.any():
+            en_buyuk_tl_idx = df[esnek_mask]["Yeni TL"].idxmax()
+            df.at[en_buyuk_tl_idx, "Yeni TL"] = round(df.at[en_buyuk_tl_idx, "Yeni TL"] + fark_tl, 2)
+
+    # ADIM 2: Şimdi netleşmiş TL'ler üzerinden oranları (%) buluyoruz (Erken yuvarlama yasak)
+    for index, row in df.iterrows():
+        durum = row["Durum"]
+        if durum == "% Sabit":
+            df.at[index, "Yeni %"] = round(float(row["Eski %"]), 2)
+        else: # TL Sabit veya Serbest ise orantıdan çek
+            df.at[index, "Yeni %"] = round((df.at[index, "Yeni TL"] / yeni_toplam_tl) * 100, 2) if yeni_toplam_tl > 0 else 0.00
+
+    # YÜZDE Kuruş Düzeltmesi (İşte eksiyi önleyen hamle: Farkı EN BÜYÜK kaleme gömüyoruz)
+    fark_yuzde = round(100.00 - df["Yeni %"].sum(), 2)
+    if fark_yuzde != 0:
+        esnek_mask = df["Durum"] != "% Sabit"
+        if esnek_mask.any():
+            en_buyuk_yuzde_idx = df[esnek_mask]["Yeni %"].idxmax()
+            df.at[en_buyuk_yuzde_idx, "Yeni %"] = round(df.at[en_buyuk_yuzde_idx, "Yeni %"] + fark_yuzde, 2)
+
+    # ADIM 3: İdare Ödeme Hesaplaması (Sistemdeki 2 haneli Yeni % ile çarpım)
     for index, row in df.iterrows():
         df.at[index, "İdare Ödeme (TL)"] = round((df.at[index, "Yeni %"] / 100.0) * yeni_toplam_tl, 2)
-        
-    idare_toplam_tl = round(df["İdare Ödeme (TL)"].sum(), 2)
-    idare_fark_tl = round(yeni_toplam_tl - idare_toplam_tl, 2)
-    
+
+    # İdare Kuruş Düzeltmesi (Toplam TL'ye kitlemek için)
+    idare_fark_tl = round(yeni_toplam_tl - df["İdare Ödeme (TL)"].sum(), 2)
     if idare_fark_tl != 0:
-        en_buyuk_idare_idx = df["İdare Ödeme (TL)"].idxmax()
-        df.at[en_buyuk_idare_idx, "İdare Ödeme (TL)"] = round(df.at[en_buyuk_idare_idx, "İdare Ödeme (TL)"] + idare_fark_tl, 2)
-        st.toast(f"Kuruş Düzeltmesi: Toplam tutarı eşitlemek için {idare_fark_tl:+.2f} TL en büyük kaleme yedirildi.", icon="⚙️")
+        esnek_mask = df["Durum"] != "% Sabit"
+        if esnek_mask.any():
+            en_buyuk_idare_idx = df[esnek_mask]["İdare Ödeme (TL)"].idxmax()
+            df.at[en_buyuk_idare_idx, "İdare Ödeme (TL)"] = round(df.at[en_buyuk_idare_idx, "İdare Ödeme (TL)"] + idare_fark_tl, 2)
+            st.toast(f"Mühendislik Düzeltmesi: Toplamı eşitlemek için {idare_fark_tl:+.2f} TL en büyük kaleme yedirildi.", icon="🛠️")
 
     # ==========================================
     # 5. SONUÇ EKRANI VE DIŞA AKTARIM
