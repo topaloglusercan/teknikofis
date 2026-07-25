@@ -1,8 +1,7 @@
 """
 Hakediş Fiyat Farkı Simülatörü
 ================================
-Mevcut "Hakediş Fiyat Farkı Hesaplayıcı" motorunun (kova sistemi + gecikme
-matrisi + B katsayısı + endeks tablosu) BİREBİR AYNI hesaplama çekirdeği
+Mevcut "İdari Hakediş" motorunun BİREBİR AYNI hesaplama çekirdeği
 üzerine kurulu; slider'larla anlık simülasyon ve senaryo karşılaştırma
 katmanı eklenmiştir.
 
@@ -14,10 +13,11 @@ katmanı eklenmiştir.
 import streamlit as st
 import pandas as pd
 import numpy as np
-import math, re, json, warnings, copy
-from decimal import Decimal, ROUND_HALF_UP
+import math, re, json, warnings, copy, io
+from decimal import Decimal, ROUND_HALF_UP, getcontext
 import plotly.graph_objects as go
 
+getcontext().prec = 28
 warnings.filterwarnings("ignore")
 
 try:
@@ -25,63 +25,101 @@ try:
 except Exception:
     pass
 
-# ─────────────────────────────────────────────────────────
-# YARDIMCI FONKSİYONLAR  (orijinal motorla birebir aynı)
-# ─────────────────────────────────────────────────────────
-MONTHS = {
-    "oca": "01", "ocak": "01", "şub": "02", "sub": "02", "şubat": "02", "subat": "02",
-    "mar": "03", "mart": "03", "nis": "04", "nisan": "04",
-    "may": "05", "mayıs": "05", "mayis": "05",
-    "haz": "06", "haziran": "06", "tem": "07", "temmuz": "07",
-    "ağu": "08", "agu": "08", "ağustos": "08", "agustos": "08",
-    "eyl": "09", "eylül": "09", "eylul": "09",
-    "eki": "10", "ekim": "10", "kas": "11", "kasım": "11", "kasim": "11",
-    "ara": "12", "aralık": "12", "aralik": "12",
-}
+# ==========================================
+# --- YARDIMCI FONKSİYONLAR ---
+# ==========================================
+def parse_turkish_date(date_str):
+    if pd.isna(date_str) or str(date_str).strip() == '': return pd.NaT
+    date_str = str(date_str).strip().replace('.', ' ').lower()
+    if date_str in ['none', 'nan', 'nat', '<na>']: return pd.NaT
+    months = {'oca': '01', 'ocak': '01', 'şub': '02', 'şubat': '02', 'mar': '03', 'mart': '03',
+              'nis': '04', 'nisan': '04', 'may': '05', 'mayıs': '05', 'haz': '06', 'haziran': '06',
+              'tem': '07', 'temmuz': '07', 'ağu': '08', 'ağustos': '08', 'eyl': '09', 'eylül': '09',
+              'eki': '10', 'ekim': '10', 'kas': '11', 'kasım': '11', 'ara': '12', 'aralık': '12'}
+    parts = date_str.split()
+    if len(parts) == 2:
+        m_num = months.get(parts[0], '01')
+        y_num = parts[1] if len(parts[1]) == 4 else f"20{parts[1]}"
+        return f"{y_num}-{m_num}"
+    return pd.NaT
 
-def parse_tarih(s):
-    s = str(s).strip()
-    if re.match(r'^\d{4}-\d{2}(-\d{2})?$', s):
-        return s[:7] + "-01"
-    s = s.lower()
-    parts = s.replace(".", " ").replace("/", " ").split()
-    if len(parts) < 2:
-        return None
-    ay_str, yil = parts[0], parts[1]
-    ay = MONTHS.get(ay_str[:3], MONTHS.get(ay_str))
-    if ay is None:
-        return None
-    if len(yil) == 2:
-        yil = "20" + yil
-    return f"{yil}-{ay}-01"
-
-def dec(x):
+def clean_decimal(val):
+    if pd.isna(val): return Decimal('0.0')
+    val_str = str(val).strip()
+    if val_str.lower() in ['', 'none', 'nan', 'nat', '<na>']: return Decimal('0.0')
+    
+    val_str = val_str.replace('TL', '').replace('%', '').strip()
+    
+    if '.' in val_str and ',' in val_str:
+        if val_str.rfind(',') > val_str.rfind('.'):
+            val_str = val_str.replace('.', '').replace(',', '.')
+        else:
+            val_str = val_str.replace(',', '')
+    else:
+        if ',' in val_str:
+            val_str = val_str.replace(',', '.')
+        elif val_str.count('.') > 1:
+            val_str = val_str.replace('.', '')
+            
     try:
-        if x is None:
-            return Decimal('0')
-        if isinstance(x, (int, float)):
-            if isinstance(x, float) and math.isnan(x):
-                return Decimal('0')
-            return Decimal(str(x))
-        s = str(x).strip()
-        if s == '' or s.lower() == 'nan':
-            return Decimal('0')
-        return Decimal(s.replace('.', '').replace(',', '.')) if ',' in s else Decimal(s)
-    except Exception:
-        return Decimal('0')
+        d = Decimal(val_str)
+        if d.is_nan(): return Decimal('0.0')
+        return d
+    except:
+        return Decimal('0.0')
 
-def tr(val, d=2):
+def tr_format(val):
+    if pd.isna(val) or val == "": return ""
     try:
-        if val is None or (isinstance(val, float) and math.isnan(val)) or float(val) == 0:
-            return "-"
-        s = f"{{:,.{d}f}}".format(float(val))
-        return s.replace(",", "X").replace(".", ",").replace("X", ".")
-    except Exception:
-        return str(val)
+        formatted = "{:,.2f}".format(float(val))
+        return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return val
 
-EMAP = {'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}
-ENDEKS_KOLONLARI = list(EMAP.values())
+def filter_empty_rows(df):
+    if df.empty: return df
+    mask = df.iloc[:, 0].astype(str).str.strip().str.lower().isin(['', 'none', 'nan', 'nat', '<na>'])
+    return df[~mask]
 
+# ==========================================
+# --- EXCEL / JSON YÜKLEME ---
+# ==========================================
+def load_from_excel(file):
+    xls = pd.ExcelFile(file)
+    dfs = {}
+    sheet_map = {'IsProgrami': 'prog_df', 'Endeks': 'endeks_df', 'AltEndeks': 'alt_df', 'B': 'b_df'}
+    
+    for sheet in xls.sheet_names:
+        if sheet in sheet_map:
+            df_temp = pd.read_excel(xls, sheet_name=sheet, nrows=5)
+            skip = 0
+            cols = [str(c).upper() for c in df_temp.columns]
+            
+            if 'AYLAR' in cols or 'AĞIRLIK' in cols:
+                skip = 0
+            else:
+                for i, row in df_temp.iterrows():
+                    row_vals = [str(v).upper() for v in row.values]
+                    if 'AYLAR' in row_vals or 'AĞIRLIK' in row_vals:
+                        skip = i + 1
+                        break
+            
+            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            df = df.astype(str).replace(['nan', 'NaN', 'None', '<NA>'], '')
+            dfs[sheet_map[sheet]] = df
+    return dfs
+
+def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_prog.to_excel(writer, sheet_name='IsProgrami', index=False)
+        df_endeks.to_excel(writer, sheet_name='Endeks', index=False)
+        df_alt.to_excel(writer, sheet_name='AltEndeks', index=False)
+        df_b.to_excel(writer, sheet_name='B', index=False)
+    return output.getvalue()
+
+# Arayüz etiketleri için (Simülatör Gelişmiş Seçenekleri)
 KOD_BILGI = {
     'a':  {'kolon': 'I o', 'resmi_kod': 'İn',    'kisa': 'İşçilik',      'ad': 'İşçilik (TÜFE bağlı)'},
     'b1': {'kolon': 'Ç o', 'resmi_kod': 'Çn-23', 'kisa': 'Çimento/Mineral', 'ad': 'Metalik Olmayan Diğer Mineral Ürünler (Çimento vb.)'},
@@ -92,204 +130,153 @@ KOD_BILGI = {
     'c':  {'kolon': 'M o', 'resmi_kod': 'Mn-28', 'kisa': 'Makine/Ekipman', 'ad': 'Makine ve Ekipmanlar b.y.s.'},
 }
 KOD_ETIKET = {k: v['kisa'] for k, v in KOD_BILGI.items()}
-KOLON_BILGI = {v['kolon']: v for v in KOD_BILGI.values()}
 
-# ─────────────────────────────────────────────────────────
-# JSON İÇE / DIŞA AKTARMA
-# ─────────────────────────────────────────────────────────
-def _num(x):
-    return float(dec(x))
-
-def json_to_dataframes(data):
-    prog_rows = []
-    for r in data.get('prog', []):
-        prog_rows.append({
-            'AYLAR': r['AYLAR'],
-            'İŞ PROGRAMI KÜMÜLATİF': _num(r.get('İŞ PROGRAMI KÜMÜLATİF', '0')),
-            'İMALAT TUTARI KÜMÜLATİF': _num(r.get('İMALAT TUTARI KÜMÜLATİF', '0')),
-        })
-    df_prog = pd.DataFrame(prog_rows)
-
-    end_rows = []
-    for r in data.get('endeks', []):
-        row = {'AYLAR': r['AYLAR']}
-        for k in ENDEKS_KOLONLARI:
-            row[k] = _num(r.get(k, '0'))
-        end_rows.append(row)
-    df_end = pd.DataFrame(end_rows)
-
-    alt_rows = []
-    for r in data.get('alt', []):
-        alt_rows.append({
-            'Ağırlık': r['Ağırlık'],
-            'Katsayı': _num(r.get('Katsayı', '0')),
-            'Temel Endeks': _num(r.get('Temel Endeks', '0')),
-        })
-    df_alt = pd.DataFrame(alt_rows)
-
-    b_rows = []
-    for r in data.get('b', []):
-        b_rows.append({'AYLAR': r['AYLAR'], 'B': _num(r.get('B', '1'))})
-    df_b = pd.DataFrame(b_rows)
-
-    return df_prog, df_end, df_alt, df_b
-
-def _tl_str(x):
-    if x is None or (isinstance(x, float) and math.isnan(x)):
-        return ""
-    return tr(x, 2)
-
-def _plain_str(x, d=6):
-    try:
-        return f"{float(x):.{d}f}".replace('.', ',')
-    except Exception:
-        return str(x)
-
-def dataframes_to_json(df_prog, df_end, df_alt, df_b):
-    data = {'prog': [], 'endeks': [], 'alt': [], 'b': []}
-    for _, r in df_prog.iterrows():
-        imal = r['İMALAT TUTARI KÜMÜLATİF']
-        data['prog'].append({
-            'AYLAR': r['AYLAR'],
-            'İŞ PROGRAMI KÜMÜLATİF': _tl_str(r['İŞ PROGRAMI KÜMÜLATİF']),
-            'İMALAT TUTARI KÜMÜLATİF': _tl_str(imal) if not (imal == 0 or imal == '') else "",
-        })
-    for _, r in df_end.iterrows():
-        row = {'AYLAR': r['AYLAR']}
-        for k in ENDEKS_KOLONLARI:
-            row[k] = _plain_str(r[k])
-        data['endeks'].append(row)
-    for _, r in df_alt.iterrows():
-        data['alt'].append({
-            'Ağırlık': r['Ağırlık'],
-            'Katsayı': _plain_str(r['Katsayı'], d=2),
-            'Temel Endeks': _plain_str(r['Temel Endeks']),
-        })
-    for _, r in df_b.iterrows():
-        data['b'].append({'AYLAR': r['AYLAR'], 'B': _plain_str(r['B'], d=1)})
-    return data
-
-# ─────────────────────────────────────────────────────────
-# HESAPLAMA MOTORU
-# ─────────────────────────────────────────────────────────
-def hesapla(df_prog, df_end, df_alt, df_b):
-    df_prog = df_prog.copy(); df_end = df_end.copy()
-    df_alt  = df_alt.copy();  df_b   = df_b.copy()
+# ==========================================
+# --- ANA HESAPLAMA MOTORU (idari_hakedis.py'den BİREBİR) ---
+# ==========================================
+def hesapla(df_prog, df_endeks, df_alt, df_b):
+    df_prog = filter_empty_rows(df_prog.copy())
+    df_endeks = filter_empty_rows(df_endeks.copy())
+    df_alt = filter_empty_rows(df_alt.copy())
+    df_b = filter_empty_rows(df_b.copy())
+    
+    if df_prog.empty or df_endeks.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
     df_prog.columns = df_prog.columns.str.strip()
+    
+    end_col = 'AYLAR' if 'AYLAR' in df_endeks.columns else 'Aylar'
+    df_endeks['AyKodu'] = pd.to_datetime(df_endeks[end_col].apply(parse_turkish_date)).dt.to_period('M')
+    df_endeks = df_endeks.dropna(subset=['AyKodu']).drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
+    
+    df_b['AyKodu'] = pd.to_datetime(df_b['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
+    df_b = df_b.dropna(subset=['AyKodu']).drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
+    
+    df_prog['AyKodu'] = pd.to_datetime(df_prog['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
+    df_prog = df_prog.dropna(subset=['AyKodu'])
 
-    df_end['_ay'] = pd.to_datetime(df_end['AYLAR'].apply(parse_tarih)).dt.to_period('M')
-    df_end = df_end.drop_duplicates('_ay').set_index('_ay')
+    if df_endeks.empty or df_prog.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    df_b['_ay'] = pd.to_datetime(df_b['AYLAR'].apply(parse_tarih)).dt.to_period('M')
-    df_b = df_b.drop_duplicates('_ay').set_index('_ay')
+    son_endeks_ayi = df_endeks.index.max()
+    
+    katsayilar = {str(row['Ağırlık']).strip().lower(): clean_decimal(row['Katsayı']) for _, row in df_alt.iterrows()}
+    temel_endeksler = {str(row['Ağırlık']).strip().lower(): clean_decimal(row['Temel Endeks']) for _, row in df_alt.iterrows()}
+    endeks_haritasi = {'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}
 
-    df_prog['_ay'] = pd.to_datetime(df_prog['AYLAR'].apply(parse_tarih)).dt.to_period('M')
-    son_end = df_end.index.max()
+    prog_kum_col = df_prog.columns[1] 
+    imalat_kum_col = df_prog.columns[2] 
 
-    kat = {str(r['Ağırlık']).strip(): dec(r['Katsayı'])      for _, r in df_alt.iterrows()}
-    tbl = {str(r['Ağırlık']).strip(): dec(r['Temel Endeks']) for _, r in df_alt.iterrows()}
+    kovalar = []
+    onceki_kum = Decimal('0.0')
+    for _, row in df_prog.iterrows():
+        kum = clean_decimal(row[prog_kum_col])
+        capacity = kum - onceki_kum
+        kovalar.append({'ay': row['AyKodu'], 'kapasite': capacity if capacity > Decimal('0.0') else Decimal('0.0'), 'orig': capacity if capacity > Decimal('0.0') else Decimal('0.0')})
+        onceki_kum = kum
 
-    pkol = 'İŞ PROGRAMI KÜMÜLATİF'
-    ikol = 'İMALAT TUTARI KÜMÜLATİF'
+    final_ff_listesi, matris_verileri, aylik_rows = [], [], []
+    onceki_imalat_kum, kümülatif_toplam_ff = Decimal('0.0'), Decimal('0.0')
 
-    kovalar, prev = [], Decimal('0')
-    for _, r in df_prog.iterrows():
-        kum = dec(r[pkol])
-        kovalar.append({'ay': r['_ay'], 'kap': kum - prev, 'orig': kum - prev})
-        prev = kum
-
-    ff_list, matris, aylik_rows = [], [], []
-    prev_imal, kum_ff = Decimal('0'), Decimal('0')
-
-    for _, r in df_prog.iterrows():
-        ay = r['_ay']
-        kum_imal = dec(r[ikol])
-        ayl_imal = kum_imal - prev_imal
-
-        if ayl_imal <= 0:
-            ff_list.append(kum_ff if kum_imal > 0 else Decimal('0'))
-            if kum_imal > 0:
-                prev_imal = kum_imal
+    for _, row in df_prog.iterrows():
+        uyg_ayi = row['AyKodu']
+        guncel_imalat_kum = clean_decimal(row[imalat_kum_col])
+        aylik_imalat = guncel_imalat_kum - onceki_imalat_kum
+        
+        if aylik_imalat <= Decimal('0.0'):
+            final_ff_listesi.append(float(kümülatif_toplam_ff))
+            if guncel_imalat_kum > Decimal('0.0'): onceki_imalat_kum = guncel_imalat_kum
             continue
-
-        b_val = dec(df_b.loc[ay, 'B']) if ay in df_b.index else Decimal('1')
-        if b_val == 0:
-            b_val = Decimal('1')
-
-        real_end = min(ay, son_end)
-        e_uyg = df_end.loc[real_end]
-        ayl_ff = Decimal('0')
-        kalan = ayl_imal
-
+            
+        b_val = df_b.loc[uyg_ayi, 'B'] if uyg_ayi in df_b.index else Decimal('1.0')
+        b_kat = clean_decimal(b_val) if clean_decimal(b_val) > Decimal('0.0') else Decimal('1.0')
+        
+        gercek_endeks_ayi = min(uyg_ayi, son_endeks_ayi)
+        if gercek_endeks_ayi in df_endeks.index:
+            endeks_uyg = df_endeks.loc[gercek_endeks_ayi]
+        else:
+            endeks_uyg = df_endeks.iloc[-1]
+            
+        toplam_ff_aylik, kalan_para = Decimal('0.0'), aylik_imalat
+        
         for kova in kovalar:
-            if kalan <= 0:
-                break
-            if kova['kap'] <= 0:
-                continue
+            if kalan_para <= Decimal('0.0'): break 
+            if kova['kapasite'] > Decimal('0.0'):
+                kullanilan_tutar = min(kalan_para, kova['kapasite'])
+                
+                gercek_prog_ayi = min(kova['ay'], son_endeks_ayi)
+                gecikme = kova['ay'] < uyg_ayi
+                
+                if gecikme:
+                    comp_ayi = min(gercek_endeks_ayi, gercek_prog_ayi)
+                    endeks_prog = df_endeks.loc[comp_ayi] if comp_ayi in df_endeks.index else endeks_uyg
+                else:
+                    endeks_prog = endeks_uyg
+                
+                pn = Decimal('0.0')
+                for k, sutun in endeks_haritasi.items():
+                    e_temel = temel_endeksler.get(k, Decimal('0.0'))
+                    e_uyg = clean_decimal(endeks_uyg.get(sutun, 0))
+                    e_prog = clean_decimal(endeks_prog.get(sutun, 0))
+                    e_gecerli = min(e_uyg, e_prog) if gecikme else e_uyg
+                    katsayi = katsayilar.get(k, Decimal('0.0'))
+                    
+                    if e_temel > Decimal('0.0'):
+                        pn += katsayi * (e_gecerli / e_temel)
+                    elif katsayi > Decimal('0.0'):
+                        pn += katsayi
+                
+                ff_dilim = kullanilan_tutar * b_kat * (pn - Decimal('1.0'))
+                ff_dilim_yuvarlanmis = ff_dilim.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
+                matris_verileri.append({
+                    'Hakediş Ayı': str(uyg_ayi),
+                    'İş Programı (Ödenek) Ayı': str(kova['ay']),
+                    'Kullanılan Tutar': float(kullanilan_tutar),
+                    'Uygulanan Pn (Excel - 15 Hane)': float(pn),
+                    'Fiyat Farkı Tutarı': float(ff_dilim_yuvarlanmis)
+                })
+                
+                toplam_ff_aylik += ff_dilim_yuvarlanmis
+                kova['kapasite'] -= kullanilan_tutar
+                kalan_para -= kullanilan_tutar
+        
+        kümülatif_toplam_ff += toplam_ff_aylik
+        final_ff_listesi.append(float(kümülatif_toplam_ff))
+        
+        # Grafik ve Simülatör Analizleri için aylık özet
+        aylik_rows.append({'Ay': str(uyg_ayi), 'Aylık İmalat': float(aylik_imalat),
+                            'B Katsayısı': float(b_kat),
+                            'Aylık Fiyat Farkı': float(toplam_ff_aylik),
+                            'Kümülatif Fiyat Farkı': float(kümülatif_toplam_ff)})
+                            
+        onceki_imalat_kum = guncel_imalat_kum
 
-            kullan = min(kalan, kova['kap'])
-            prog_ay = kova['ay']
-            gecikme = prog_ay < ay
-            real_prog = min(prog_ay, son_end)
-            e_prog = df_end.loc[real_prog] if gecikme else e_uyg
-
-            matris.append({'Kova Ayı': str(prog_ay), 'Hakediş Ayı': str(ay),
-                            'Tutar': float(kullan), 'Gecikme': gecikme})
-
-            pn = Decimal('0')
-            for k, sut in EMAP.items():
-                et = tbl.get(k, Decimal('0'))
-                eu = dec(e_uyg[sut]); ep_ = dec(e_prog[sut])
-                eg = min(eu, ep_) if gecikme else eu
-                if et > 0:
-                    pn += kat.get(k, Decimal('0')) * (eg / et)
-
-            dilim = (kullan * b_val * (pn - 1)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            ayl_ff += dilim
-            kova['kap'] -= kullan
-            kalan -= kullan
-
-        kum_ff += ayl_ff
-        ff_list.append(kum_ff)
-        aylik_rows.append({'Ay': str(ay), 'Aylık İmalat': float(ayl_imal),
-                            'B Katsayısı': float(b_val),
-                            'Aylık Fiyat Farkı': float(ayl_ff),
-                            'Kümülatif Fiyat Farkı': float(kum_ff)})
-        prev_imal = kum_imal
-
-    df_sonuc = df_prog.drop(columns=['_ay'], errors='ignore').copy()
-    df_sonuc['KÜMÜLATİF FF (TL)'] = [float(x) for x in ff_list]
-
-    df_mat = pd.DataFrame(matris)
-    df_pivot = pd.DataFrame()
-    if not df_mat.empty:
-        df_pivot = df_mat.pivot_table(index='Kova Ayı', columns='Hakediş Ayı',
-                                       values='Tutar', aggfunc='sum', fill_value=0)
-        kap_map = {str(k['ay']): float(k['orig']) for k in kovalar}
-        df_pivot.insert(0, 'Kova Kapasitesi', pd.Series(kap_map))
-        df_pivot.loc['TOPLAM'] = df_pivot.sum()
-
-    df_kov = pd.DataFrame([{
-        'Kova Ayı': str(k['ay']),
-        'Başlangıç Kapasitesi': float(k['orig']),
-        'Kalan Kapasite': float(k['kap']),
-        'Kullanılan': float(k['orig'] - k['kap']),
-        'Doluluk %': round(float((k['orig'] - k['kap']) / k['orig'] * 100), 1) if k['orig'] > 0 else 0,
-    } for k in kovalar])
+    df_sonuc = df_prog.copy()
+    df_sonuc['KÜMÜLATİF FİYAT FARKI'] = final_ff_listesi
+    df_detay = pd.DataFrame(matris_verileri)
+    
+    if not df_detay.empty:
+        df_pivot = df_detay.pivot_table(index='Hakediş Ayı', columns='İş Programı (Ödenek) Ayı', values='Kullanılan Tutar', aggfunc='sum', fill_value=0)
+        df_pivot['HAKEDİŞ TUTARI (Toplam)'] = df_pivot.sum(axis=1)
+        df_pivot.loc['ÖDENEK MİKTARI (Kullanılan Toplam)'] = df_pivot.sum()
+    else: 
+        df_pivot = pd.DataFrame()
 
     df_aylik = pd.DataFrame(aylik_rows)
-    return df_sonuc, df_pivot, df_kov, df_aylik, son_end
+    return df_sonuc, df_pivot, df_detay, df_aylik
 
-# ─────────────────────────────────────────────────────────
-# SİMÜLASYON DÖNÜŞÜMLERİ
-# ─────────────────────────────────────────────────────────
+# ==========================================
+# --- SİMÜLASYON DÖNÜŞÜMLERİ ---
+# ==========================================
 def endeks_uzat(df_end, artis, ek_ay=36):
     df = df_end.copy()
-    df['_ay'] = pd.to_datetime(df['AYLAR'].apply(parse_tarih)).dt.to_period('M')
+    end_col = 'AYLAR' if 'AYLAR' in df.columns else 'Aylar'
+    df['_ay'] = pd.to_datetime(df[end_col].apply(parse_turkish_date)).dt.to_period('M')
     df = df.sort_values('_ay').reset_index(drop=True)
     son = df.iloc[-1]
     son_ay = df['_ay'].iloc[-1]
-    cols = [c for c in df.columns if c not in ('AYLAR', '_ay')]
+    cols = [c for c in df.columns if c not in (end_col, '_ay')]
 
     if isinstance(artis, dict):
         artis_map = {c: artis.get(c, 0.0) for c in cols}
@@ -299,9 +286,10 @@ def endeks_uzat(df_end, artis, ek_ay=36):
     yeni = []
     for k in range(1, ek_ay + 1):
         yeni_ay = son_ay + k
-        satir = {'AYLAR': str(yeni_ay)}
+        satir = {end_col: str(yeni_ay)}
         for c in cols:
-            satir[c] = float(son[c]) * ((1 + artis_map[c] / 100) ** k)
+            val_str = str(son[c]).replace(',', '.')
+            satir[c] = f"{(float(val_str) * ((1 + artis_map[c] / 100) ** k)):.6f}".replace('.', ',')
         yeni.append(satir)
 
     df_ek = pd.DataFrame(yeni)
@@ -309,8 +297,8 @@ def endeks_uzat(df_end, artis, ek_ay=36):
 
 def imalat_donustur(df_prog, hiz_carpani=1.0, gecikme_ay=0, tek_ay_index=None, tek_ay_kaydirma=0):
     df = df_prog.copy()
-    imal_col = 'İMALAT TUTARI KÜMÜLATİF'
-    kum = [dec(v) for v in df[imal_col]]
+    imal_col = df.columns[2]
+    kum = [clean_decimal(v) for v in df[imal_col]]
     n = len(kum)
 
     aylik = [kum[0]] + [kum[i] - kum[i - 1] for i in range(1, n)]
@@ -320,35 +308,35 @@ def imalat_donustur(df_prog, hiz_carpani=1.0, gecikme_ay=0, tek_ay_index=None, t
         j = tek_ay_index + tek_ay_kaydirma
         j = max(0, min(n - 1, j))
         deger = aylik[tek_ay_index]
-        aylik[tek_ay_index] = Decimal('0')
+        aylik[tek_ay_index] = Decimal('0.0')
         aylik[j] += deger
     elif gecikme_ay != 0:
-        shifted = [Decimal('0')] * n
+        shifted = [Decimal('0.0')] * n
         for i, a in enumerate(aylik):
             j = i + gecikme_ay
             j = max(0, min(n - 1, j))
             shifted[j] += a
         aylik = shifted
 
-    yeni_kum, running = [], Decimal('0')
+    yeni_kum, running = [], Decimal('0.0')
     for a in aylik:
         running += a
-        yeni_kum.append(float(running))
+        yeni_kum.append(str(running).replace('.', ','))
 
     df[imal_col] = yeni_kum
     return df
 
 def b_override_uygula(df_b, b_deger):
     df = df_b.copy()
-    df['B'] = b_deger
+    df['B'] = str(b_deger).replace('.', ',')
     return df
 
 def katsayi_override_uygula(df_alt, katsayi_dict):
     df = df_alt.copy()
     for i, row in df.iterrows():
-        kod = str(row['Ağırlık']).strip()
+        kod = str(row['Ağırlık']).strip().lower()
         if kod in katsayi_dict:
-            df.at[i, 'Katsayı'] = katsayi_dict[kod]
+            df.at[i, 'Katsayı'] = str(katsayi_dict[kod]).replace('.', ',')
     return df
 
 def senaryo_calistir(df_prog, df_end, df_alt, df_b, gecikme_ay, hiz_carpani, endeks_artis,
@@ -360,47 +348,22 @@ def senaryo_calistir(df_prog, df_end, df_alt, df_b, gecikme_ay, hiz_carpani, end
     a2 = katsayi_override_uygula(df_alt, katsayi_override) if katsayi_override else df_alt
     return hesapla(p2, e2, a2, b2)
 
-# ─────────────────────────────────────────────────────────
-# ÖRNEK VERİ
-# ─────────────────────────────────────────────────────────
-def ornek_veri():
-    aylar = ["Oca 2025", "Şub 2025", "Mar 2025", "Nis 2025", "May 2025", "Haz 2025"]
 
-    prog = pd.DataFrame({
-        "AYLAR": aylar,
-        "İŞ PROGRAMI KÜMÜLATİF": [2_000_000, 5_000_000, 9_000_000, 14_000_000, 20_000_000, 27_000_000],
-        "İMALAT TUTARI KÜMÜLATİF": [1_800_000, 4_500_000, 8_000_000, 12_500_000, 18_000_000, 25_500_000],
-    })
-
-    base = {"I o": 3000.0, "Ç o": 4800.0, "D o": 5900.0, "Y o": 44.7, "K o": 3400.0, "G o": 4300.0, "M o": 3100.0}
-    end_rows = []
-    for i, ay in enumerate(aylar):
-        row = {"AYLAR": ay}
-        for k, v in base.items():
-            row[k] = round(v * (1.015 ** i), 2)
-        end_rows.append(row)
-    end = pd.DataFrame(end_rows)
-
-    alt = pd.DataFrame({
-        "Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"],
-        "Katsayı": [0.15, 0.20, 0.20, 0.15, 0.05, 0.10, 0.15],
-        "Temel Endeks": [base["I o"], base["Ç o"], base["D o"], base["Y o"], base["K o"], base["G o"], base["M o"]],
-    })
-
-    b = pd.DataFrame({"AYLAR": aylar, "B": [1.0] * len(aylar)})
-    return prog, end, alt, b
-
-# ─────────────────────────────────────────────────────────
-# SESSION STATE
-# ─────────────────────────────────────────────────────────
-if "prog" not in st.session_state:
-    p, e, a, b = ornek_veri()
-    st.session_state.prog, st.session_state.end = p, e
-    st.session_state.alt, st.session_state.b_df = a, b
+# ==========================================
+# --- SESSION STATE VE ÖRNEK VERİ ---
+# ==========================================
+if 'load_count' not in st.session_state:
+    st.session_state.load_count = 0
+if 'prog_df' not in st.session_state:
+    st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": ["0,00"], "İMALAT TUTARI KÜMÜLATİF": ["0,00"]})
+if 'endeks_df' not in st.session_state:
+    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": ["0,00"], "Ç o": ["0,00"], "D o": ["0,00"], "Y o": ["0,00"], "K o": ["0,00"], "G o": ["0,00"], "M o": ["0,00"]})
+if 'alt_df' not in st.session_state:
+    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00"], "Temel Endeks": ["0,00", "0,00", "0,00", "0,00", "0,00", "0,00", "0,00"]})
+if 'b_df' not in st.session_state:
+    st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 if "senaryolar" not in st.session_state:
     st.session_state.senaryolar = {}
-if "rc" not in st.session_state:
-    st.session_state.rc = 0
 
 st.title("🏗️ Hakediş Fiyat Farkı Simülatörü")
 st.caption("Kova sistemi · Gecikme matrisi · Slider'lı anlık simülasyon · Senaryo karşılaştırma")
@@ -409,111 +372,96 @@ tab1, tab2, tab3, tab4 = st.tabs(["📋 Veri Girişi", "📊 Baz Sonuç", "🎛�
 
 # ══════════════════════ TAB 1 — VERİ GİRİŞİ ══════════════════════
 with tab1:
-    st.info("Kendi projenizin verilerini buraya girin/yapıştırın, veya JSON dosyanızı içe aktarın. Aşağıdaki değerler örnek veridir.", icon="💡")
+    st.info("Kendi projenizin verilerini buraya girin/yapıştırın, veya JSON/Excel dosyanızı sol menüden içe aktarın.")
 
-    with st.expander("📂 JSON İçe / Dışa Aktar (motorunuzun dosya formatı)", expanded=False):
-        jc1, jc2 = st.columns(2)
-        with jc1:
-            st.markdown("**İçe Aktar**")
-            yuklenen = st.file_uploader("JSON dosyası seçin", type=['json'], key='json_uploader')
-            if yuklenen is not None:
-                if st.button("✅ Bu JSON ile verileri değiştir"):
-                    try:
-                        veri = json.load(yuklenen)
-                        p2, e2, a2, b2 = json_to_dataframes(veri)
-                        st.session_state.prog, st.session_state.end = p2, e2
-                        st.session_state.alt, st.session_state.b_df = a2, b2
-                        st.session_state.rc += 1
-                        st.success("JSON verisi içe aktarıldı.")
-                        st.rerun()
-                    except Exception as ex:
-                        st.error(f"JSON okunamadı: {ex}")
-        with jc2:
-            st.markdown("**Dışa Aktar**")
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📥 Proje Verisi Yükle")
+    st.sidebar.caption("JSON projenizi veya Excel şablonunuzu buradan yükleyin.")
+    uploaded_file = st.sidebar.file_uploader("Dosya Seç (.json veya .xlsx)", type=["json", "xlsx"])
+
+    if uploaded_file is not None:
+        if uploaded_file.name.endswith('.json'):
+            data = json.load(uploaded_file)
+            st.session_state.prog_df = pd.DataFrame(data['prog']).map(str)
+            st.session_state.endeks_df = pd.DataFrame(data['endeks']).map(str)
+            st.session_state.alt_df = pd.DataFrame(data['alt']).map(str)
+            st.session_state.b_df = pd.DataFrame(data['b']).map(str)
+            st.session_state.load_count += 1
+            st.sidebar.success("JSON projesi başarıyla yüklendi!")
+        elif uploaded_file.name.endswith('.xlsx'):
             try:
-                json_data = dataframes_to_json(
-                    st.session_state.get("prog_edited", st.session_state.prog), 
-                    st.session_state.get("end_edited", st.session_state.end),
-                    st.session_state.get("alt_edited", st.session_state.alt), 
-                    st.session_state.get("b_df_edited", st.session_state.b_df)
-                )
-                json_str = json.dumps(json_data, ensure_ascii=False, indent=2)
-                st.download_button("💾 JSON olarak indir", data=json_str,
-                                    file_name="hakedis_verisi.json", mime="application/json")
-            except Exception as ex:
-                st.error(f"JSON oluşturulamadı: {ex}")
+                dfs = load_from_excel(uploaded_file)
+                if 'prog_df' in dfs: st.session_state.prog_df = dfs['prog_df']
+                if 'endeks_df' in dfs: st.session_state.endeks_df = dfs['endeks_df']
+                if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
+                if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
+                st.session_state.load_count += 1
+                st.sidebar.success("Excel şablonu başarıyla okundu!")
+            except Exception as e:
+                st.sidebar.error(f"Excel okuma hatası. Detay: {e}")
 
-    rc = st.session_state.rc
+    suffix = st.session_state.load_count
+
     c1, c2 = st.columns(2)
-
     with c1:
         st.subheader("1️⃣ İş Programı ve İmalatlar")
-        ep = st.data_editor(st.session_state.prog, num_rows="dynamic", use_container_width=True, key=f"ep_{rc}")
+        ep = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
         st.session_state.prog_edited = ep
 
         st.divider()
         st.subheader("3️⃣ Alt Endeks Ağırlıkları")
-        ea = st.data_editor(st.session_state.alt, num_rows="dynamic", use_container_width=True, key=f"ea_{rc}")
+        ea = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
         st.session_state.alt_edited = ea
-        try:
-            ks = pd.to_numeric(ea['Katsayı'], errors='coerce').sum()
-            ok = abs(ks - 1) < 0.001
-            st.caption(f"{'✅' if ok else '⚠️'} Katsayı toplamı: **{ks:.4f}** {'(Doğru)' if ok else '→ 1.0000 olmalı!'}")
-        except Exception:
-            pass
-
-        with st.expander("ℹ️ Hangi kod (Ağırlık) neye karşılık geliyor?"):
-            st.caption("Resmi 'Fiyat Farkı Listesi / Temel Endeks' tablosuna göre eşleme:")
-            ref = pd.DataFrame([
-                {'Ağırlık Kodu': kod, 'Endeks Kolonu': b['kolon'],
-                 'Resmi Kod': b['resmi_kod'], 'Açıklama': b['ad']}
-                for kod, b in KOD_BILGI.items()
-            ])
-            st.dataframe(ref, use_container_width=True, hide_index=True)
 
     with c2:
         st.subheader("2️⃣ Aylık Endeks Tablosu")
-        ee = st.data_editor(st.session_state.end, num_rows="dynamic", use_container_width=True, key=f"ee_{rc}")
+        ee = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
         st.session_state.end_edited = ee
 
         st.divider()
         st.subheader("4️⃣ B Katsayısı")
-        eb = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"eb_{rc}")
+        eb = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
         st.session_state.b_df_edited = eb
+
+    project_data = {
+        'prog': ep.to_dict(orient='records'),
+        'endeks': ee.to_dict(orient='records'),
+        'alt': ea.to_dict(orient='records'),
+        'b': eb.to_dict(orient='records')
+    }
+    excel_data = generate_excel_download(ep, ee, ea, eb)
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📤 Mevcut Veriyi Dışa Aktar")
+    st.sidebar.download_button("💾 JSON Olarak Kaydet", data=json.dumps(project_data, indent=4), file_name="hakedis_projem.json", mime="application/json", use_container_width=True)
+    st.sidebar.download_button("📊 Excel Şablonu İndir", data=excel_data, file_name="idari_hakedis_sablonu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
 
 # ══════════════════════ TAB 2 — BAZ SONUÇ ══════════════════════
 with tab2:
     try:
-        df_sonuc, df_pivot, df_kov, df_aylik, son_end = hesapla(
-            st.session_state.get("prog_edited", st.session_state.prog), 
-            st.session_state.get("end_edited", st.session_state.end), 
-            st.session_state.get("alt_edited", st.session_state.alt), 
+        df_sonuc, df_pivot, df_detay, df_aylik = hesapla(
+            st.session_state.get("prog_edited", st.session_state.prog_df), 
+            st.session_state.get("end_edited", st.session_state.endeks_df), 
+            st.session_state.get("alt_edited", st.session_state.alt_df), 
             st.session_state.get("b_df_edited", st.session_state.b_df)
         )
-        toplam_ff = df_aylik['Aylık Fiyat Farkı'].sum() if not df_aylik.empty else 0
-        st.metric("Toplam Fiyat Farkı (Baz Senaryo)", f"{tr(toplam_ff)} TL")
+        if not df_aylik.empty:
+            toplam_ff = df_aylik['Aylık Fiyat Farkı'].sum()
+            st.metric("Toplam Fiyat Farkı (Baz Senaryo)", f"{tr_format(toplam_ff)} TL")
 
-        colA, colB = st.columns(2)
-        with colA:
             st.subheader("Aylık / Kümülatif Fiyat Farkı")
             st.dataframe(df_aylik.style.format({
-                'Aylık İmalat': lambda x: tr(x), 'B Katsayısı': '{:.4f}',
-                'Aylık Fiyat Farkı': lambda x: tr(x), 'Kümülatif Fiyat Farkı': lambda x: tr(x),
+                'Aylık İmalat': lambda x: tr_format(x), 'B Katsayısı': '{:.4f}',
+                'Aylık Fiyat Farkı': lambda x: tr_format(x), 'Kümülatif Fiyat Farkı': lambda x: tr_format(x),
             }), use_container_width=True)
-        with colB:
-            st.subheader("Kova Durumu")
-            st.dataframe(df_kov, use_container_width=True)
 
-        st.subheader("Kova Matrisi (Kova Ayı × Hakediş Ayı)")
-        st.caption("🟩 Diyagonal = zamanında yapılan iş · 🟧 Üst-diyagonal = gecikmeli tüketim (düşük endeks cezası)")
-        if not df_pivot.empty:
-            st.dataframe(df_pivot.style.format(lambda x: tr(x) if isinstance(x, (int, float)) else x), use_container_width=True)
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df_aylik['Ay'], y=df_aylik['Kümülatif Fiyat Farkı'], mode='lines+markers', name='Kümülatif FF'))
-        fig.update_layout(title="Kümülatif Fiyat Farkı Gelişimi", xaxis_title="Ay", yaxis_title="TL", height=350)
-        st.plotly_chart(fig, use_container_width=True)
-
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df_aylik['Ay'], y=df_aylik['Kümülatif Fiyat Farkı'], mode='lines+markers', name='Kümülatif FF'))
+            fig.update_layout(title="Kümülatif Fiyat Farkı Gelişimi", xaxis_title="Ay", yaxis_title="TL", height=350)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Lütfen Tab 1'den veri giriniz.")
     except Exception as e:
         st.error(f"🚨 Hata: Lütfen giriş verilerinin eksiksiz olduğundan emin olun.")
         import traceback
@@ -524,84 +472,30 @@ with tab2:
 with tab3:
     st.markdown("Sliderları hareket ettirin — sonuçlar **anlık** yeniden hesaplanır.")
 
-    mod = st.radio("Kaydırma Modu", ["Genel (tüm aylar)", "Belirli Ay"], horizontal=True,
-                    help="Genel: tüm ayları birlikte kaydırır. Belirli Ay: sadece seçtiğiniz tek bir ayın imalatını taşır, diğer aylar olduğu gibi kalır.")
+    mod = st.radio("Kaydırma Modu", ["Genel (tüm aylar)", "Belirli Ay"], horizontal=True)
 
-    prog_aktif = st.session_state.get("prog_edited", st.session_state.prog)
-    ay_listesi = list(prog_aktif['AYLAR'])
+    prog_aktif = st.session_state.get("prog_edited", st.session_state.prog_df)
+    ay_listesi = list(prog_aktif[prog_aktif.columns[0]])
     tek_ay_index, tek_ay_kaydirma, gecikme_ay = None, 0, 0
 
     s1, s2, s3, s4 = st.columns(4)
     with s1:
         if mod == "Genel (tüm aylar)":
-            gecikme_ay = st.slider("Gecikme / Hızlanma (ay)", -6, 6, 0,
-                                    help="Pozitif: iş programın gerisinde kalır (üretim ileri aylara kayar). Negatif: iş programın önüne geçer.")
+            gecikme_ay = st.slider("Gecikme / Hızlanma (ay)", -6, 6, 0)
         else:
             secim_ay = st.selectbox("Hangi ay kaydırılsın?", ay_listesi)
             tek_ay_index = ay_listesi.index(secim_ay)
-            tek_ay_kaydirma = st.slider(f"'{secim_ay}' kaç ay kaydırılsın", -6, 6, 0,
-                                         help="Pozitif: bu ayın imalatı ileri bir aya taşınır (o ay gecikmeli yapılmış gibi). Negatif: geriye taşınır.")
+            tek_ay_kaydirma = st.slider(f"'{secim_ay}' kaç ay kaydırılsın", -6, 6, 0)
     with s2:
-        hiz_carpani = st.slider("Aylık İmalat Hızı Çarpanı", 0.3, 2.0, 1.0, 0.05,
-                                 help="Her ayın imalat artışını bu katsayıyla ölçekler.")
+        hiz_carpani = st.slider("Aylık İmalat Hızı Çarpanı", 0.3, 2.0, 1.0, 0.05)
     with s3:
-        # HATA DÜZELTİLDİ: Varsayılan artış 1.5'tan 0.0'a çekildi. (Baz veriyi bozmamak için)
-        endeks_artis_genel = st.slider("Gelecek Aylar İçin Endeks Artışı (%/ay)", 0.0, 10.0, 0.0, 0.1,
-                                        help="Endeks tablosunda veri olmayan aylar için bileşik aylık artış varsayımı.")
+        endeks_artis_genel = st.slider("Gelecek Aylar İçin Endeks Artışı (%/ay)", 0.0, 10.0, 0.0, 0.1)
     with s4:
-        # HATA DÜZELTİLDİ: Sinsi B Katsayısı tamamen kullanıcının opsiyonuna bağlandı ve varsayılanı 1.0 yapıldı.
         b_override_aktif = st.checkbox("B Katsayısını Simüle Et")
         if b_override_aktif:
-            b_ovr = st.slider("Sabit B Katsayısı (Tüm aylar)", 0.0, 2.0, 1.0, 0.01, help="İşaretlendiğinde tüm aylar için B katsayısını bu değerle ezer.")
+            b_ovr = st.slider("Sabit B Katsayısı (Tüm aylar)", 0.0, 2.0, 1.0, 0.01)
         else:
             b_ovr = None
-
-    with st.expander("ℹ️ 'Gecikme/Hızlanma' ve 'İmalat Hızı Çarpanı' ne yapar? (örnekli açıklama)"):
-        st.markdown("""
-### 🤔 Basit bir benzetme
-
-Şantiyenizi bir **koşu bandı** gibi düşünün:
-
-- 🔵 **İmalat Hızı Çarpanı** = bandın **hızı**. Ne kadar hızlı koşuyorsunuz (ayda ne kadar iş bitiyor)?
-- 🔴 **Gecikme / Hızlanma** = koştuğunuz mesafenin **hangi takvim ayına** yazıldığı. Aynı mesafeyi, farklı bir ayda koşmuş gibi göstermek.
-""")
-
-        ornek_ay = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran"]
-        ornek_orijinal = [10, 15, 20, 25, 30, 40]
-
-        def _ornek_kaydir(vals, kaydirma):
-            n = len(vals)
-            yeni = [0.0] * n
-            for i, v in enumerate(vals):
-                j = max(0, min(n - 1, i + kaydirma))
-                yeni[j] += v
-            return yeni
-
-        st.markdown("#### 🔴① En basit hâli: sadece TEK bir ayı kaydırmak (\"Belirli Ay\" modu)")
-        tek_ay_ornek = ornek_orijinal.copy()
-        tek_ay_ornek[2] = 0  
-        tek_ay_ornek[4] += ornek_orijinal[2]  
-        fig_tek = go.Figure()
-        fig_tek.add_trace(go.Bar(x=ornek_ay, y=ornek_orijinal, name='Orijinal', marker_color='#94a3b8'))
-        fig_tek.add_trace(go.Bar(x=ornek_ay, y=tek_ay_ornek, name="Mart'ı +2 kaydır", marker_color='#f97316'))
-        fig_tek.update_layout(barmode='group', title="Sadece Mart'ın İşi Mayıs'a Taşınıyor", yaxis_title='Milyon TL', height=300, margin=dict(t=40, b=10))
-        st.plotly_chart(fig_tek, use_container_width=True)
-
-        st.markdown("#### 🔴② Daha kapsamlı hâli: TÜM ayları birlikte kaydırmak (\"Genel\" modu)")
-        gecikmeli = _ornek_kaydir(ornek_orijinal, 2)
-        fig_gec = go.Figure()
-        fig_gec.add_trace(go.Bar(x=ornek_ay, y=ornek_orijinal, name='Orijinal (gecikme=0)', marker_color='#94a3b8'))
-        fig_gec.add_trace(go.Bar(x=ornek_ay, y=gecikmeli, name='Gecikme = +2 (tüm aylar)', marker_color='#ef4444'))
-        fig_gec.update_layout(barmode='group', title='Her Ayın İşi Kendi +2 Ayına Taşınıyor', yaxis_title='Milyon TL', height=300, margin=dict(t=40, b=10))
-        st.plotly_chart(fig_gec, use_container_width=True)
-
-        st.markdown("#### 🔵 Örnek: İmalat Hızı Çarpanı = 1.3 uygulanırsa")
-        hizli = [round(v * 1.3, 1) for v in ornek_orijinal]
-        fig_hiz = go.Figure()
-        fig_hiz.add_trace(go.Bar(x=ornek_ay, y=ornek_orijinal, name='Orijinal (çarpan=1.0)', marker_color='#94a3b8'))
-        fig_hiz.add_trace(go.Bar(x=ornek_ay, y=hizli, name='Çarpan = 1.3', marker_color='#3b82f6'))
-        fig_hiz.update_layout(barmode='group', title='Her Ayın Kendi İş Miktarı Değişiyor', yaxis_title='Milyon TL', height=300, margin=dict(t=40, b=10))
-        st.plotly_chart(fig_hiz, use_container_width=True)
 
     alt_bazinda = st.checkbox("Alt endeks bazında ayrı artış oranı ayarla (gelişmiş)")
     endeks_artis = endeks_artis_genel
@@ -613,76 +507,27 @@ with tab3:
                 bilgi = KOD_BILGI[kod]
                 kol = bilgi['kolon']
                 with ac[i]:
-                    endeks_artis_dict[kol] = st.slider(bilgi['kisa'], 0.0, 10.0, endeks_artis_genel, 0.1,
-                                                        key=f"artis_{kol}",
-                                                        help=f"Resmi kod: {bilgi['resmi_kod']} — {bilgi['ad']}")
+                    endeks_artis_dict[kol] = st.slider(bilgi['kisa'], 0.0, 10.0, endeks_artis_genel, 0.1, key=f"artis_{kol}")
         endeks_artis = endeks_artis_dict
 
     katsayi_bazinda = st.checkbox("Alt endeks ağırlıklarını (Katsayı) simüle et (gelişmiş)")
     katsayi_override = None
     if katsayi_bazinda:
-        alt_aktif = st.session_state.get("alt_edited", st.session_state.alt)
-        orijinal_kat = {str(r['Ağırlık']).strip(): float(r['Katsayı']) for _, r in alt_aktif.iterrows()}
-
-        if st.session_state.get("kat_pending") is not None:
-            for kod, val in st.session_state["kat_pending"].items():
-                st.session_state[f"kat_{kod}"] = val
-            st.session_state["kat_pending"] = None
-
-        for kod in KOD_ETIKET:
-            key = f"kat_{kod}"
-            if key not in st.session_state:
-                st.session_state[key] = orijinal_kat.get(kod, 0.0)
-
+        alt_aktif = st.session_state.get("alt_edited", st.session_state.alt_df)
         with st.expander("Alt Endeks Ağırlıkları (Katsayı) — Toplamı 1.000 Olmalı", expanded=True):
             pcols = st.columns(7)
             for i, kod in enumerate(KOD_ETIKET):
                 with pcols[i]:
-                    bilgi = KOD_BILGI[kod]
-                    st.slider(KOD_ETIKET[kod], 0.0, 1.0, step=0.01, key=f"kat_{kod}",
-                               help=f"Resmi kod: {bilgi['resmi_kod']} — {bilgi['ad']}")
-
-            toplam_kat = sum(st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET)
-            if abs(toplam_kat - 1.0) < 0.001:
-                st.success(f"✅ Toplam: {toplam_kat:.3f} (Doğru)")
-            else:
-                st.warning(f"⚠️ Toplam: {toplam_kat:.3f} — 1.000 olmalı! (Sonuçlar yine hesaplanır ama gerçek dışı olur)")
-
-            pb1, pb2, pb3, pb4, pb5 = st.columns(5)
-            with pb1:
-                if st.button("Sadece İşçilik"):
-                    st.session_state["kat_pending"] = {kod: (1.0 if kod == 'a' else 0.0) for kod in KOD_ETIKET}
-                    st.rerun()
-            with pb2:
-                if st.button("Sadece ÜFE"):
-                    st.session_state["kat_pending"] = {kod: (1.0 if kod == 'b5' else 0.0) for kod in KOD_ETIKET}
-                    st.rerun()
-            with pb3:
-                if st.button("50 İşçilik 50 ÜFE"):
-                    st.session_state["kat_pending"] = {kod: (0.5 if kod in ('a', 'b5') else 0.0) for kod in KOD_ETIKET}
-                    st.rerun()
-            with pb4:
-                if st.button("Normalize Et"):
-                    s = sum(st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET)
-                    if s > 0:
-                        st.session_state["kat_pending"] = {kod: st.session_state[f"kat_{kod}"] / s for kod in KOD_ETIKET}
-                        st.rerun()
-            with pb5:
-                if st.button("Orijinale Dön"):
-                    st.session_state["kat_pending"] = {kod: orijinal_kat.get(kod, 0.0) for kod in KOD_ETIKET}
-                    st.rerun()
-
+                    st.slider(KOD_ETIKET[kod], 0.0, 1.0, 0.0, step=0.01, key=f"kat_{kod}")
         katsayi_override = {kod: st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET}
 
     try:
-        end_aktif = st.session_state.get("end_edited", st.session_state.end)
-        alt_aktif = st.session_state.get("alt_edited", st.session_state.alt)
+        end_aktif = st.session_state.get("end_edited", st.session_state.endeks_df)
+        alt_aktif = st.session_state.get("alt_edited", st.session_state.alt_df)
         b_aktif = st.session_state.get("b_df_edited", st.session_state.b_df)
 
-        base_sonuc, base_pivot, base_kov, base_aylik, _ = hesapla(
-            prog_aktif, end_aktif, alt_aktif, b_aktif
-        )
-        sim_sonuc, sim_pivot, sim_kov, sim_aylik, _ = senaryo_calistir(
+        base_sonuc, base_pivot, _, base_aylik = hesapla(prog_aktif, end_aktif, alt_aktif, b_aktif)
+        sim_sonuc, sim_pivot, _, sim_aylik = senaryo_calistir(
             prog_aktif, end_aktif, alt_aktif, b_aktif,
             gecikme_ay, hiz_carpani, endeks_artis, b_ovr,
             tek_ay_index=tek_ay_index, tek_ay_kaydirma=tek_ay_kaydirma,
@@ -695,152 +540,88 @@ with tab3:
         fark_pct = (fark / toplam_base * 100) if toplam_base != 0 else 0
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("Baz Senaryo Toplam FF", f"{tr(toplam_base)} TL")
-        m2.metric("Simülasyon Toplam FF", f"{tr(toplam_sim)} TL", delta=f"{tr(fark)} TL")
+        m1.metric("Baz Senaryo Toplam FF", f"{tr_format(toplam_base)} TL")
+        m2.metric("Simülasyon Toplam FF", f"{tr_format(toplam_sim)} TL", delta=f"{tr_format(fark)} TL")
         m3.metric("Fark (%)", f"{fark_pct:+.1f}%")
 
         fig2 = go.Figure()
         if not base_aylik.empty:
-            fig2.add_trace(go.Scatter(x=base_aylik['Ay'], y=base_aylik['Kümülatif Fiyat Farkı'],
-                                       mode='lines+markers', name='Baz Senaryo', line=dict(dash='dot')))
+            fig2.add_trace(go.Scatter(x=base_aylik['Ay'], y=base_aylik['Kümülatif Fiyat Farkı'], mode='lines+markers', name='Baz Senaryo', line=dict(dash='dot')))
         if not sim_aylik.empty:
-            fig2.add_trace(go.Scatter(x=sim_aylik['Ay'], y=sim_aylik['Kümülatif Fiyat Farkı'],
-                                       mode='lines+markers', name='Simülasyon'))
+            fig2.add_trace(go.Scatter(x=sim_aylik['Ay'], y=sim_aylik['Kümülatif Fiyat Farkı'], mode='lines+markers', name='Simülasyon'))
         fig2.update_layout(title="Kümülatif Fiyat Farkı — Baz vs Simülasyon", xaxis_title="Ay", yaxis_title="TL", height=380)
         st.plotly_chart(fig2, use_container_width=True)
-
-        with st.expander("📊 Aylık detay tablosu (simülasyon)"):
-            st.dataframe(sim_aylik.style.format({
-                'Aylık İmalat': lambda x: tr(x), 'B Katsayısı': '{:.4f}',
-                'Aylık Fiyat Farkı': lambda x: tr(x), 'Kümülatif Fiyat Farkı': lambda x: tr(x),
-            }), use_container_width=True)
 
         # ════════════════════════════════════════════════════════════════
         # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (HACİM KONTROLLÜ TAM UYUM)
         # ════════════════════════════════════════════════════════════════
         st.markdown("---")
         st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum (Sıfır Gecikme)")
-        st.info("Eğer BUGÜNE KADAR YAPILAN toplam imalat, İş Programı ile **birebir aynı** hızda gitseydi (hiç gecikme olmasaydı) VE **şu anki slider ayarlarınızdaki ekonomik şartlar geçerli olsaydı** fiyat farkı ne olurdu?")
 
-        # 1. Slider'dan gelen simülasyon şartlarını (TÜFE, B katsayısı vb.) hazırlayalım
         e_sim = endeks_uzat(end_aktif, endeks_artis)
         b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
 
-        # 2. Toplam Simülasyon İmalat Hacmini Bulalım (Kuruş kayıplarını önlemek için Decimal ile)
         if not sim_sonuc.empty:
-            toplam_sim_imalat = dec(sim_sonuc['İMALAT TUTARI KÜMÜLATİF'].iloc[-1])
+            imal_col = sim_sonuc.columns[2]
+            toplam_sim_imalat = dec(sim_sonuc[imal_col].iloc[-1])
         else:
             toplam_sim_imalat = Decimal('0')
 
-        # 3. Mevcut aktif program verisinin kopyasını alıp İmalatı İş Programına eşitliyoruz.
-        #    ANCAK, toplam parasal hacmin simülasyonu geçmemesi için bir sınır (cap) koyuyoruz!
         df_teorik = prog_aktif.copy()
-        
         yeni_imalat_kum = []
-        for planlanan in df_teorik['İŞ PROGRAMI KÜMÜLATİF']:
-            p_val = dec(planlanan)
-            # Planlanan ödenek, bizim gerçekleşen/simüle edilen toplam imalatımızı aşıyorsa; orada dur!
+        prog_col = df_teorik.columns[1]
+        
+        for planlanan in df_teorik[prog_col]:
+            p_val = clean_decimal(planlanan)
             if p_val > toplam_sim_imalat:
-                yeni_imalat_kum.append(float(toplam_sim_imalat))
+                yeni_imalat_kum.append(str(toplam_sim_imalat).replace('.', ','))
             else:
-                yeni_imalat_kum.append(float(p_val))
+                yeni_imalat_kum.append(str(p_val).replace('.', ','))
                 
-        df_teorik['İMALAT TUTARI KÜMÜLATİF'] = yeni_imalat_kum
+        df_teorik[df_teorik.columns[2]] = yeni_imalat_kum
         
-        # 4. Motoru bu hayali "Sıfır Gecikme ve Hacmi Sınırlandırılmış" veriyle çalıştırıyoruz
-        _, _, _, teorik_aylik, _ = hesapla(df_teorik, e_sim, a_sim, b_sim)
-        
+        _, _, _, teorik_aylik = hesapla(df_teorik, e_sim, a_sim, b_sim)
         toplam_teorik = teorik_aylik['Aylık Fiyat Farkı'].sum() if not teorik_aylik.empty else 0
         fark_teorik = toplam_sim - toplam_teorik
         
-        # 5. Ekrana Şık Bir Metrik Kartı Olarak Basıyoruz
         t_col1, t_col2, t_col3 = st.columns(3)
+        t_col1.metric("Simülasyon Toplam FF", f"{tr_format(toplam_sim)} TL")
+        t_col2.metric("Teorik Toplam FF (Tam Uyum)", f"{tr_format(toplam_teorik)} TL")
         
-        t_col1.metric("Simülasyon Toplam FF (Gecikmeli/Hızlı)", f"{tr(toplam_sim)} TL")
-        t_col2.metric("Teorik Toplam FF (Tam Uyum)", f"{tr(toplam_teorik)} TL")
-        
-        # Farkın pozitif/negatif durumuna göre renk ve yönlendirme ayarı
         if fark_teorik > 0:
-            t_col3.metric("Fark (Simülasyon - Teorik)", f"+{tr(fark_teorik)} TL", delta_color="inverse")
-            st.error("⚠️ **Analiz:** Simüle edilen iş ilerleyişi ve geçmiş aylara düşen kova hesaplamaları (min endeks cezası dahil), bu ekonomik şartlar altında idareye/yükleniciye tam uyum senaryosundan daha fazla fiyat farkı çıkarıyor.")
+            t_col3.metric("Fark (Simülasyon - Teorik)", f"+{tr_format(fark_teorik)} TL", delta_color="inverse")
         elif fark_teorik < 0:
-            t_col3.metric("Fark (Simülasyon - Teorik)", f"{tr(fark_teorik)} TL", delta_color="normal")
-            st.success("✅ **Analiz:** Simüle edilen imalat ilerleyişi, bu ekonomik şartlar altındaki teorik maliyetin altında bir fiyat farkı oluşturmuş.")
+            t_col3.metric("Fark (Simülasyon - Teorik)", f"{tr_format(fark_teorik)} TL", delta_color="normal")
         else:
             t_col3.metric("Fark", "0,00 TL")
-            st.info("İmalatlar tam olarak iş programı ile paralel ilerlemiş.")
-        # ════════════════════════════════════════════════════════════════
 
         st.divider()
-        senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet (isim ver):", placeholder="örn. 'Senaryo A - 3 ay gecikme'")
+        senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet:", placeholder="örn. 'Senaryo A'")
         if st.button("💾 Senaryoyu Kaydet"):
-            if senaryo_adi.strip():
-                st.session_state.senaryolar[senaryo_adi.strip()] = {
-                    'mod': mod,
-                    'gecikme_ay': gecikme_ay,
-                    'tek_ay': ay_listesi[tek_ay_index] if tek_ay_index is not None else None,
-                    'tek_ay_kaydirma': tek_ay_kaydirma,
-                    'hiz_carpani': hiz_carpani,
-                    'endeks_artis': endeks_artis if not isinstance(endeks_artis, dict) else "alt endeks bazlı",
-                    'b_ovr': b_ovr,
-                    'katsayi': katsayi_override if katsayi_override else "orijinal",
-                    'toplam_ff': toplam_sim, 'aylik': sim_aylik.to_dict('records'),
-                }
-                st.success(f"'{senaryo_adi}' kaydedildi. Karşılaştırmak için '⚖️ Senaryo Karşılaştır' sekmesine geçin.")
-            else:
-                st.warning("Lütfen bir senaryo ismi girin.")
+            st.session_state.senaryolar[senaryo_adi.strip()] = {
+                'mod': mod, 'gecikme_ay': gecikme_ay, 'toplam_ff': float(toplam_sim), 'aylik': sim_aylik.to_dict('records'),
+            }
+            st.success("Kaydedildi. Karşılaştırmak için 'Senaryo Karşılaştır' sekmesine geçin.")
 
     except Exception as e:
-        st.error(f"🚨 Hata oluştu. Veriler eksik veya hatalı olabilir.")
-        import traceback
-        with st.expander("Teknik hata detayı"):
-            st.code(traceback.format_exc())
+        st.error(f"🚨 Hata oluştu. Detay: {e}")
 
 # ══════════════════════ TAB 4 — SENARYO KARŞILAŞTIR ══════════════════════
 with tab4:
-    st.markdown("Simülatör sekmesinde kaydettiğiniz senaryoları burada yan yana karşılaştırın.")
-
     if not st.session_state.senaryolar:
-        st.info("👈 Henüz kaydedilmiş senaryo yok. '🎛️ Simülatör' sekmesinde ayarları belirleyip **Senaryoyu Kaydet** butonuna basın.")
+        st.info("Henüz kaydedilmiş senaryo yok.")
     else:
-        secilenler = st.multiselect("Karşılaştırılacak senaryolar:", list(st.session_state.senaryolar.keys()),
-                                     default=list(st.session_state.senaryolar.keys()),
-                                     help="İstediğiniz kadar senaryoyu aynı grafikte üst üste görebilirsiniz.")
-
+        secilenler = st.multiselect("Karşılaştırılacak senaryolar:", list(st.session_state.senaryolar.keys()), default=list(st.session_state.senaryolar.keys()))
         if secilenler:
-            ozet = []
-            for ad in secilenler:
-                s = st.session_state.senaryolar[ad]
-                ozet.append({
-                    'Senaryo': ad,
-                    'Mod': s.get('mod', 'Genel (tüm aylar)'),
-                    'Gecikme (ay)': s['gecikme_ay'],
-                    'Kaydırılan Ay': s.get('tek_ay') or '-',
-                    'Ay Kaydırma': s.get('tek_ay_kaydirma', 0),
-                    'İmalat Hız Çarpanı': s['hiz_carpani'],
-                    'Endeks Artışı (%/ay)': s['endeks_artis'],
-                    'B Katsayısı': s['b_ovr'],
-                    'Toplam Fiyat Farkı (TL)': s['toplam_ff'],
-                })
-            df_ozet = pd.DataFrame(ozet)
-            st.dataframe(df_ozet.style.format({'Toplam Fiyat Farkı (TL)': lambda x: tr(x)}), use_container_width=True)
-
             fig3 = go.Figure()
             for ad in secilenler:
                 s = st.session_state.senaryolar[ad]
                 aylik = pd.DataFrame(s['aylik'])
                 if not aylik.empty:
                     fig3.add_trace(go.Scatter(x=aylik['Ay'], y=aylik['Kümülatif Fiyat Farkı'], mode='lines+markers', name=ad))
-            fig3.update_layout(title="Senaryolar Arası Kümülatif Fiyat Farkı Karşılaştırması",
-                                xaxis_title="Ay", yaxis_title="TL", height=400)
+            fig3.update_layout(title="Senaryolar Arası Karşılaştırma", xaxis_title="Ay", yaxis_title="TL", height=400)
             st.plotly_chart(fig3, use_container_width=True)
-
-            if len(secilenler) == 2:
-                a, b_ = secilenler
-                fark = st.session_state.senaryolar[b_]['toplam_ff'] - st.session_state.senaryolar[a]['toplam_ff']
-                st.metric(f"'{b_}' − '{a}' Farkı", f"{tr(fark)} TL")
-
         if st.button("🗑️ Tüm senaryoları temizle"):
             st.session_state.senaryolar = {}
             st.rerun()
