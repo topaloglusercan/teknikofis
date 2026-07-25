@@ -709,29 +709,42 @@ with tab3:
                 'Aylık Fiyat Farkı': lambda x: tr(x), 'Kümülatif Fiyat Farkı': lambda x: tr(x),
             }), use_container_width=True)
 
-        # ════════════════════════════════════════════════════════════════
-        # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (SİMÜLASYON ŞARTLARINDA TAM UYUM)
+# ════════════════════════════════════════════════════════════════
+        # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (HACİM KONTROLLÜ TAM UYUM)
         # ════════════════════════════════════════════════════════════════
         st.markdown("---")
         st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum (Sıfır Gecikme)")
-        st.info("Eğer imalatlar, İş Programı ile **birebir aynı** gitseydi (hiç gecikme olmasaydı) VE **şu anki slider ayarlarınızdaki (B katsayısı, Endeks artışı vb.) ekonomik şartlar geçerli olsaydı** fiyat farkı ne olurdu?")
+        st.info("Eğer BUGÜNE KADAR YAPILAN toplam imalat, İş Programı ile **birebir aynı** hızda gitseydi (hiç gecikme olmasaydı) VE **şu anki slider ayarlarınızdaki ekonomik şartlar geçerli olsaydı** fiyat farkı ne olurdu?")
 
         # 1. Slider'dan gelen simülasyon şartlarını (TÜFE, B katsayısı vb.) hazırlayalım
         e_sim = endeks_uzat(end_aktif, endeks_artis)
         b_sim = b_override_uygula(b_aktif, b_ovr)
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
 
-        # 2. Mevcut aktif program verisinin kopyasını alıp İmalatı İş Programına eşitliyoruz (Gecikmeyi sıfırlıyoruz)
+        # 2. Toplam Simülasyon İmalat Hacmini Bulalım (Elma ile Elma kıyaslamak için)
+        toplam_sim_imalat = sim_aylik['Aylık İmalat'].sum() if not sim_aylik.empty else 0
+
+        # 3. Mevcut aktif program verisinin kopyasını alıp İmalatı İş Programına eşitliyoruz.
+        #    ANCAK, toplam parasal hacmin simülasyonu geçmemesi için bir sınır (cap) koyuyoruz!
         df_teorik = prog_aktif.copy()
-        df_teorik['İMALAT TUTARI KÜMÜLATİF'] = df_teorik['İŞ PROGRAMI KÜMÜLATİF']
         
-        # 3. Motoru bu hayali "Sıfır Gecikme" verisiyle ve SİMÜLE EDİLMİŞ endeks/B/Katsayı değerleriyle çalıştırıyoruz
+        yeni_imalat_kum = []
+        for planlanan in df_teorik['İŞ PROGRAMI KÜMÜLATİF']:
+            # Planlanan ödenek, bizim gerçekleşen/simüle edilen toplam imalatımızı aşıyorsa; orada dur!
+            if float(planlanan) > float(toplam_sim_imalat):
+                yeni_imalat_kum.append(toplam_sim_imalat)
+            else:
+                yeni_imalat_kum.append(planlanan)
+                
+        df_teorik['İMALAT TUTARI KÜMÜLATİF'] = yeni_imalat_kum
+        
+        # 4. Motoru bu hayali "Sıfır Gecikme ve Hacmi Sınırlandırılmış" veriyle çalıştırıyoruz
         _, _, _, teorik_aylik, _ = hesapla(df_teorik, e_sim, a_sim, b_sim)
         
         toplam_teorik = teorik_aylik['Aylık Fiyat Farkı'].sum() if not teorik_aylik.empty else 0
         fark_teorik = toplam_sim - toplam_teorik
         
-        # 4. Ekrana Şık Bir Metrik Kartı Olarak Basıyoruz
+        # 5. Ekrana Şık Bir Metrik Kartı Olarak Basıyoruz
         t_col1, t_col2, t_col3 = st.columns(3)
         
         t_col1.metric("Simülasyon Toplam FF (Gecikmeli/Hızlı)", f"{tr(toplam_sim)} TL")
@@ -740,7 +753,7 @@ with tab3:
         # Farkın pozitif/negatif durumuna göre renk ve yönlendirme ayarı
         if fark_teorik > 0:
             t_col3.metric("Fark (Simülasyon - Teorik)", f"+{tr(fark_teorik)} TL", delta_color="inverse")
-            st.error("⚠️ **Analiz:** Simüle edilen iş ilerleyişi ve geçmiş aylara düşen kova hesaplamaları, bu ekonomik şartlar altında idareye/yükleniciye tam uyum senaryosundan daha fazla fiyat farkı çıkarıyor.")
+            st.error("⚠️ **Analiz:** Simüle edilen iş ilerleyişi ve geçmiş aylara düşen kova hesaplamaları (min endeks cezası dahil), bu ekonomik şartlar altında idareye/yükleniciye tam uyum senaryosundan daha fazla fiyat farkı çıkarıyor.")
         elif fark_teorik < 0:
             t_col3.metric("Fark (Simülasyon - Teorik)", f"{tr(fark_teorik)} TL", delta_color="normal")
             st.success("✅ **Analiz:** Simüle edilen imalat ilerleyişi, bu ekonomik şartlar altındaki teorik maliyetin altında bir fiyat farkı oluşturmuş.")
