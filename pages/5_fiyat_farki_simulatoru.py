@@ -132,7 +132,7 @@ KOD_BILGI = {
 KOD_ETIKET = {k: v['kisa'] for k, v in KOD_BILGI.items()}
 
 # ==========================================
-# --- ANA HESAPLAMA MOTORU ---
+# --- ANA HESAPLAMA MOTORU (idari_hakedis.py ile BİREBİR AYNI) ---
 # ==========================================
 def hesapla(df_prog, df_endeks, df_alt, df_b):
     df_prog = filter_empty_rows(df_prog.copy())
@@ -604,19 +604,16 @@ with tab3:
         st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum (Sıfır Gecikme)")
         st.info("Eğer BUGÜNE KADAR YAPILAN toplam imalat hacmi, İş Programı ile **birebir aynı tutarda ve zamanda** gerçekleşseydi VE **şu anki slider ayarlarınızdaki ekonomik şartlar geçerli olsaydı** fiyat farkı ne olurdu?")
 
-        # 1. Slider'dan gelen TÜM simülasyon şartlarını (Endeks, B katsayısı, Alt endeks ağırlıkları) hazırlıyoruz
         e_sim = endeks_uzat(end_aktif, endeks_artis)
         b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
 
-        # 2. Sınırımızı belirliyoruz (Simüle edilen maksimum imalat hacmi)
         if not sim_sonuc.empty:
             imal_col = sim_sonuc.columns[2]
             toplam_sim_imalat = max([clean_decimal(val) for val in sim_sonuc[imal_col]])
         else:
             toplam_sim_imalat = Decimal('0.0')
 
-        # 3. Teorik İş Programını oluşturuyoruz (Kova sınırı koyarak)
         df_teorik = prog_aktif.copy()
         yeni_imalat_kum = []
         prog_col = df_teorik.columns[1]
@@ -630,13 +627,10 @@ with tab3:
                 
         df_teorik[df_teorik.columns[2]] = yeni_imalat_kum
         
-        # 4. Motoru Teorik Veriyle ve SİMÜLE EDİLMİŞ EKONOMİK ŞARTLARLA çalıştırıyoruz
         _, _, _, teorik_aylik = hesapla(df_teorik, e_sim, a_sim, b_sim)
-        
         toplam_teorik = teorik_aylik['Aylık Fiyat Farkı'].sum() if not teorik_aylik.empty else 0
         fark_teorik = float(toplam_sim) - float(toplam_teorik)
         
-        # 5. Sonuçları Ekrana Basıyoruz
         t_col1, t_col2, t_col3 = st.columns(3)
         t_col1.metric("Simülasyon Toplam FF (Gerçekleşen)", f"{tr_format(toplam_sim)} TL")
         t_col2.metric("Teorik Toplam FF (Tam Uyum)", f"{tr_format(toplam_teorik)} TL")
@@ -650,6 +644,10 @@ with tab3:
         else:
             t_col3.metric("Fark", "0,00 TL")
             st.info("Simülasyon ve Teorik senaryo tamamen eşit.")
+            
+        # KİK Paradoksu için Akıllı Uyarı Kutusu
+        if abs(fark_teorik) < 1.0:
+            st.info("💡 **Neden Birebir Aynı Çıktı (Tesadüf Mü)?** Hayır! Eğer endeks sürekli artıyorsa (örneğin İşçilik), KİK Kararnamesi geciken işlerde `min(güncel, planlanan)` kuralı gereği düşük olan **planlanan ayın endeksini** kullanır. İşi tam zamanında yapsanız da zaten o ayın endeksini alacaktınız. İki senaryo da **aynı parayı, mecburen aynı endeksle çarptığı için** sonuç kuruşu kuruşuna aynı çıkar. İnanmıyorsanız 'Sadece Demir-Çelik' seçerek test edin!")
 
         st.divider()
         senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet:", placeholder="örn. 'Senaryo A'")
