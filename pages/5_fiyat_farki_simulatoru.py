@@ -132,7 +132,7 @@ KOD_BILGI = {
 KOD_ETIKET = {k: v['kisa'] for k, v in KOD_BILGI.items()}
 
 # ==========================================
-# --- ANA HESAPLAMA MOTORU (idari_hakedis.py ile BİREBİR AYNI) ---
+# --- ANA HESAPLAMA MOTORU ---
 # ==========================================
 def hesapla(df_prog, df_endeks, df_alt, df_b):
     df_prog = filter_empty_rows(df_prog.copy())
@@ -597,7 +597,7 @@ with tab3:
         fig2.update_layout(title="Kümülatif Fiyat Farkı — Baz vs Simülasyon", xaxis_title="Ay", yaxis_title="TL", height=380)
         st.plotly_chart(fig2, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════
+        # ════════════════════════════════════════════════════════════════
         # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (HACİM KONTROLLÜ TAM UYUM)
         # ════════════════════════════════════════════════════════════════
         st.markdown("---")
@@ -609,15 +609,17 @@ with tab3:
         b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
 
-        # 2. Sınırımızı belirliyoruz (Şu anki gerçekleşen maksimum imalat hacmi, örn: 203 Milyon)
-        imal_col = prog_aktif.columns[2]
-        prog_col = prog_aktif.columns[1]
-        
-        toplam_sim_imalat = max([clean_decimal(val) for val in prog_aktif[imal_col]])
+        # 2. Sınırımızı belirliyoruz (Simüle edilen maksimum imalat hacmi)
+        if not sim_sonuc.empty:
+            imal_col = sim_sonuc.columns[2]
+            toplam_sim_imalat = max([clean_decimal(val) for val in sim_sonuc[imal_col]])
+        else:
+            toplam_sim_imalat = Decimal('0.0')
 
         # 3. Teorik İş Programını oluşturuyoruz (Kova sınırı koyarak)
         df_teorik = prog_aktif.copy()
         yeni_imalat_kum = []
+        prog_col = df_teorik.columns[1]
         
         for planlanan in df_teorik[prog_col]:
             p_val = clean_decimal(planlanan)
@@ -626,7 +628,7 @@ with tab3:
             else:
                 yeni_imalat_kum.append(f"{float(p_val):.2f}".replace('.', ','))
                 
-        df_teorik[imal_col] = yeni_imalat_kum
+        df_teorik[df_teorik.columns[2]] = yeni_imalat_kum
         
         # 4. Motoru Teorik Veriyle ve SİMÜLE EDİLMİŞ EKONOMİK ŞARTLARLA çalıştırıyoruz
         _, _, _, teorik_aylik = hesapla(df_teorik, e_sim, a_sim, b_sim)
@@ -656,6 +658,9 @@ with tab3:
                 'mod': mod, 'gecikme_ay': gecikme_ay, 'toplam_ff': float(toplam_sim), 'aylik': sim_aylik.to_dict('records'),
             }
             st.success("Kaydedildi. Karşılaştırmak için 'Senaryo Karşılaştır' sekmesine geçin.")
+
+    except Exception as e:
+        st.error(f"🚨 Hata oluştu. Detay: {e}")
 
 # ══════════════════════ TAB 4 — SENARYO KARŞILAŞTIR ══════════════════════
 with tab4:
