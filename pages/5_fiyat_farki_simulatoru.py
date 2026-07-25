@@ -514,11 +514,56 @@ with tab3:
     katsayi_override = None
     if katsayi_bazinda:
         alt_aktif = st.session_state.get("alt_edited", st.session_state.alt_df)
+        orijinal_kat = {str(r['Ağırlık']).strip().lower(): float(clean_decimal(r['Katsayı'])) for _, r in alt_aktif.iterrows()}
+
+        if st.session_state.get("kat_pending") is not None:
+            for kod, val in st.session_state["kat_pending"].items():
+                st.session_state[f"kat_{kod}"] = val
+            st.session_state["kat_pending"] = None
+
+        for kod in KOD_ETIKET:
+            key = f"kat_{kod}"
+            if key not in st.session_state:
+                st.session_state[key] = orijinal_kat.get(kod, 0.0)
+
         with st.expander("Alt Endeks Ağırlıkları (Katsayı) — Toplamı 1.000 Olmalı", expanded=True):
             pcols = st.columns(7)
             for i, kod in enumerate(KOD_ETIKET):
                 with pcols[i]:
-                    st.slider(KOD_ETIKET[kod], 0.0, 1.0, 0.0, step=0.01, key=f"kat_{kod}")
+                    bilgi = KOD_BILGI[kod]
+                    st.slider(KOD_ETIKET[kod], 0.0, 1.0, step=0.01, key=f"kat_{kod}",
+                               help=f"Resmi kod: {bilgi['resmi_kod']} — {bilgi['ad']}")
+
+            toplam_kat = sum(st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET)
+            if abs(toplam_kat - 1.0) < 0.001:
+                st.success(f"✅ Toplam: {toplam_kat:.3f} (Doğru)")
+            else:
+                st.warning(f"⚠️ Toplam: {toplam_kat:.3f} — 1.000 olmalı! (Sonuçlar yine hesaplanır ama gerçek dışı olur)")
+
+            pb1, pb2, pb3, pb4, pb5 = st.columns(5)
+            with pb1:
+                if st.button("Sadece İşçilik"):
+                    st.session_state["kat_pending"] = {kod: (1.0 if kod == 'a' else 0.0) for kod in KOD_ETIKET}
+                    st.rerun()
+            with pb2:
+                if st.button("Sadece ÜFE"):
+                    st.session_state["kat_pending"] = {kod: (1.0 if kod == 'b5' else 0.0) for kod in KOD_ETIKET}
+                    st.rerun()
+            with pb3:
+                if st.button("50 İşçilik 50 ÜFE"):
+                    st.session_state["kat_pending"] = {kod: (0.5 if kod in ('a', 'b5') else 0.0) for kod in KOD_ETIKET}
+                    st.rerun()
+            with pb4:
+                if st.button("Normalize Et"):
+                    s = sum(st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET)
+                    if s > 0:
+                        st.session_state["kat_pending"] = {kod: st.session_state[f"kat_{kod}"] / s for kod in KOD_ETIKET}
+                        st.rerun()
+            with pb5:
+                if st.button("Orijinale Dön"):
+                    st.session_state["kat_pending"] = {kod: orijinal_kat.get(kod, 0.0) for kod in KOD_ETIKET}
+                    st.rerun()
+
         katsayi_override = {kod: st.session_state[f"kat_{kod}"] for kod in KOD_ETIKET}
 
     try:
@@ -564,7 +609,7 @@ with tab3:
 
         if not sim_sonuc.empty:
             imal_col = sim_sonuc.columns[2]
-            toplam_sim_imalat = dec(sim_sonuc[imal_col].iloc[-1])
+            toplam_sim_imalat = clean_decimal(sim_sonuc[imal_col].iloc[-1])
         else:
             toplam_sim_imalat = Decimal('0')
 
