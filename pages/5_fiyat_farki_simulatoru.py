@@ -540,7 +540,6 @@ with tab3:
             else:
                 st.warning(f"⚠️ Toplam: {toplam_kat:.3f} — 1.000 olmalı! (Sonuçlar yine hesaplanır ama gerçek dışı olur)")
 
-            # --- SİLİNEN BUTONLAR BURAYA GERİ GELDİ ---
             pb1, pb2, pb3, pb4, pb5 = st.columns(5)
             with pb1:
                 if st.button("Sadece İşçilik"):
@@ -599,54 +598,35 @@ with tab3:
         st.plotly_chart(fig2, use_container_width=True)
 
         # ════════════════════════════════════════════════════════════════
-        # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (HACİM KONTROLLÜ TAM UYUM)
+        # YENİ EKLENEN BÖLÜM: TEORİK KIYASLAMA (İŞ PROGRAMINA TAM UYUM)
         # ════════════════════════════════════════════════════════════════
         st.markdown("---")
-        st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum (Sıfır Gecikme)")
-        st.info("Eğer BUGÜNE KADAR YAPILAN toplam imalat, İş Programı ile **birebir aynı** hızda gitseydi (hiç gecikme olmasaydı) VE **şu anki slider ayarlarınızdaki ekonomik şartlar geçerli olsaydı** fiyat farkı ne olurdu?")
+        st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum (Sıfır Gecikme & Tam Gerçekleşme)")
+        st.info("Eğer imalatlar, İş Programı ile **birebir aynı tutarda ve zamanda** gerçekleşseydi VE **şu anki slider ayarlarınızdaki ekonomik şartlar geçerli olsaydı** fiyat farkı ne olurdu?")
 
         e_sim = endeks_uzat(end_aktif, endeks_artis)
         b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
 
-        if not sim_sonuc.empty:
-            imal_col = sim_sonuc.columns[2]
-            # SADECE 0 OLMAYAN MAKSİMUM DEĞERİ BAZ ALIYORUZ
-            toplam_sim_imalat = max([clean_decimal(val) for val in sim_sonuc[imal_col]])
-        else:
-            toplam_sim_imalat = Decimal('0.0')
-
         df_teorik = prog_aktif.copy()
-        yeni_imalat_kum = []
-        prog_col = df_teorik.columns[1]
-        
-        # Tam anlattığın mantık: İş programını takip et, Toplam İmalatı (örn: 203M) geçtiği an orada kes ve sabitle!
-        for planlanan in df_teorik[prog_col]:
-            p_val = clean_decimal(planlanan)
-            if p_val > toplam_sim_imalat:
-                yeni_imalat_kum.append(f"{float(toplam_sim_imalat):.2f}".replace('.', ','))
-            else:
-                yeni_imalat_kum.append(f"{float(p_val):.2f}".replace('.', ','))
-                
-        df_teorik[df_teorik.columns[2]] = yeni_imalat_kum
+        df_teorik[df_teorik.columns[2]] = df_teorik[df_teorik.columns[1]]
         
         _, _, _, teorik_aylik = hesapla(df_teorik, e_sim, a_sim, b_sim)
         toplam_teorik = teorik_aylik['Aylık Fiyat Farkı'].sum() if not teorik_aylik.empty else 0
         fark_teorik = float(toplam_sim) - float(toplam_teorik)
         
         t_col1, t_col2, t_col3 = st.columns(3)
-        t_col1.metric("Simülasyon Toplam FF", f"{tr_format(toplam_sim)} TL")
+        t_col1.metric("Simülasyon Toplam FF (Gerçekleşen)", f"{tr_format(toplam_sim)} TL")
         t_col2.metric("Teorik Toplam FF (Tam Uyum)", f"{tr_format(toplam_teorik)} TL")
         
         if fark_teorik > 0:
             t_col3.metric("Fark (Simülasyon - Teorik)", f"+{tr_format(fark_teorik)} TL", delta_color="inverse")
-            st.error("⚠️ **Analiz:** Simüle edilen iş ilerleyişi, bu ekonomik şartlar altında tam uyum senaryosundan daha FAZLA fiyat farkı maliyeti çıkarıyor.")
+            st.error("⚠️ **Analiz:** Simülasyon, iş programına tam uyulan duruma göre DAHA FAZLA fiyat farkı maliyeti/getirisi çıkarıyor.")
         elif fark_teorik < 0:
             t_col3.metric("Fark (Simülasyon - Teorik)", f"{tr_format(fark_teorik)} TL", delta_color="normal")
-            st.success("✅ **Analiz:** Simüle edilen imalat ilerleyişi, teorik senaryoya göre DAHA AZ fiyat farkı maliyeti oluşturmuş.")
+            st.success("✅ **Analiz:** İş programının gerisinde kalındığı için (veya imalat hacmi düşük kaldığı için) teorik FF potansiyelinin altında kalındı.")
         else:
             t_col3.metric("Fark", "0,00 TL")
-            st.info("Simülasyon ve Teorik senaryo tamamen eşit.")
 
         st.divider()
         senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet:", placeholder="örn. 'Senaryo A'")
