@@ -649,9 +649,15 @@ with tab3:
         elif fark_teorik < 0:
             t_col3.metric("Fark (Yeni Senaryonun Getirisi)", f"{tr_format(fark_teorik)} TL", delta_color="inverse")
             st.error("⚠️ **Analiz:** Seçtiğiniz yeni ekonomik şartlar, iş programına tam uyduğunuz senaryoda fiyat farkı getirisini DÜŞÜRÜYOR.")
+        # Eski Hali:
+        # else:
+        #    t_col3.metric("Fark", "0,00 TL")
+        #    st.info("Senaryonuz, iş programına tam uyumlu kusursuz durumda herhangi bir getiri farkı yaratmadı.")
+
+        # Yeni Hali:
         else:
             t_col3.metric("Fark", "0,00 TL")
-            st.info("Senaryonuz, iş programına tam uyumlu kusursuz durumda herhangi bir getiri farkı yaratmadı.")
+            st.caption("Orijinal sözleşme katsayıları devrede.")
 
         st.divider()
         senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet:", placeholder="örn. 'Senaryo A'")
