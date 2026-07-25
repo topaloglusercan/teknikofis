@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import warnings
-import json
+import io
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 
 getcontext().prec = 28 
@@ -9,7 +9,9 @@ warnings.filterwarnings("ignore")
 
 st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_icon="📂")
 
+# ==========================================
 # --- YARDIMCI FONKSİYONLAR ---
+# ==========================================
 def parse_turkish_date(date_str):
     if pd.isna(date_str) or str(date_str).strip() == '': return pd.NaT
     date_str = str(date_str).strip().replace('.', ' ').lower()
@@ -63,7 +65,57 @@ def filter_empty_rows(df):
     mask = df.iloc[:, 0].astype(str).str.strip().str.lower().isin(['', 'none', 'nan', 'nat', '<na>'])
     return df[~mask]
 
+# ==========================================
+# --- EXCEL YÜKLEME VE İNDİRME MOTORU ---
+# ==========================================
+def load_from_excel(file):
+    """Excel şablonunu (veya düz dışa aktarımı) okuyarak DataFramelere çevirir."""
+    xls = pd.ExcelFile(file)
+    dfs = {}
+    sheet_map = {
+        'IsProgrami': 'prog_df',
+        'Endeks': 'endeks_df',
+        'AltEndeks': 'alt_df',
+        'B': 'b_df'
+    }
+    
+    for sheet in xls.sheet_names:
+        if sheet in sheet_map:
+            # Şablondaki açıklama satırlarını (skiprows) otomatik tespit et
+            df_temp = pd.read_excel(xls, sheet_name=sheet, nrows=5)
+            skip = 0
+            cols = [str(c).upper() for c in df_temp.columns]
+            
+            if 'AYLAR' in cols or 'AĞIRLIK' in cols:
+                skip = 0
+            else:
+                for i, row in df_temp.iterrows():
+                    row_vals = [str(v).upper() for v in row.values]
+                    if 'AYLAR' in row_vals or 'AĞIRLIK' in row_vals:
+                        skip = i + 1
+                        break
+            
+            # Veriyi temizle ve belleğe al
+            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            df = df.astype(str).replace(['nan', 'NaN', 'None', '<NA>'], '')
+            dfs[sheet_map[sheet]] = df
+            
+    return dfs
+
+def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
+    """Ekranda düzenlenen tabloları Excel dosyasına paketler."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_prog.to_excel(writer, sheet_name='IsProgrami', index=False)
+        df_endeks.to_excel(writer, sheet_name='Endeks', index=False)
+        df_alt.to_excel(writer, sheet_name='AltEndeks', index=False)
+        df_b.to_excel(writer, sheet_name='B', index=False)
+    return output.getvalue()
+
+# ==========================================
 # --- ANA HESAPLAMA MOTORU ---
+# ==========================================
 def hesapla(df_prog, df_endeks, df_alt, df_b):
     df_prog = filter_empty_rows(df_prog.copy())
     df_endeks = filter_empty_rows(df_endeks.copy())
@@ -188,7 +240,9 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
 
     return df_sonuc, df_pivot, df_detay
 
+# ==========================================
 # --- ARAYÜZ VE HAFIZA YÖNETİMİ ---
+# ==========================================
 if 'load_count' not in st.session_state:
     st.session_state.load_count = 0
 
@@ -202,19 +256,24 @@ if 'b_df' not in st.session_state:
     st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 
 st.title("📂 İdari Hakediş & Teyit Matrisi")
+st.info("💡 **Nasıl Kullanılır:** Verileri tablolara tıklayarak (en alta yeni satır ekleyebilirsiniz) el ile girebilirsiniz. Tabloların sağındaki küçük butonlar yerine, **sol menüdeki Excel butonlarını** kullanarak tüm projeyi tek tıkla şablon formatında indirebilir veya yükleyebilirsiniz.")
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("📥 Hakediş Projesi Yönetimi")
-uploaded_file = st.sidebar.file_uploader("Önceki Projeyi Yükle (.json)", type=["json"])
+st.sidebar.subheader("📥 Excel ile Proje Yükle")
+st.sidebar.caption("💡 Excel şablonunuzu (`.xlsx`) buradan yükleyin.")
+uploaded_file = st.sidebar.file_uploader("Dosya Seç", type=["xlsx"])
 
 if uploaded_file is not None:
-    data = json.load(uploaded_file)
-    st.session_state.prog_df = pd.DataFrame(data['prog']).map(str)
-    st.session_state.endeks_df = pd.DataFrame(data['endeks']).map(str)
-    st.session_state.alt_df = pd.DataFrame(data['alt']).map(str)
-    st.session_state.b_df = pd.DataFrame(data['b']).map(str)
-    st.session_state.load_count += 1
-    st.sidebar.success("Proje başarıyla yüklendi!")
+    try:
+        dfs = load_from_excel(uploaded_file)
+        if 'prog_df' in dfs: st.session_state.prog_df = dfs['prog_df']
+        if 'endeks_df' in dfs: st.session_state.endeks_df = dfs['endeks_df']
+        if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
+        if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
+        st.session_state.load_count += 1
+        st.sidebar.success("Excel başarıyla okundu!")
+    except Exception as e:
+        st.sidebar.error(f"Dosya okuma hatası: Lütfen dosya yapısının doğru olduğundan emin olun. Detay: {e}")
 
 suffix = st.session_state.load_count
 
@@ -230,29 +289,29 @@ with col2:
     st.subheader("4. B Katsayısı Tablosu")
     edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
 
-project_data = {
-    'prog': edited_prog.to_dict(orient='records'),
-    'endeks': edited_endeks.to_dict(orient='records'),
-    'alt': edited_alt.to_dict(orient='records'),
-    'b': edited_b.to_dict(orient='records')
-}
+# İndirme Butonu (Ekranda gözüken anlık veriyi paketler)
+st.sidebar.markdown("---")
+st.sidebar.subheader("📤 Excel Olarak Kaydet / Şablon İndir")
+excel_data = generate_excel_download(edited_prog, edited_endeks, edited_alt, edited_b)
 st.sidebar.download_button(
-    label="💾 Mevcut Veriyi Bilgisayara İndir",
-    data=json.dumps(project_data, indent=4),
-    file_name="hakedis_projem.json",
-    mime="application/json",
+    label="💾 Mevcut Projeyi İndir (.xlsx)",
+    data=excel_data,
+    file_name="idari_hakedis_projem.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     use_container_width=True
 )
+st.sidebar.caption("Boş tablo durumunda indirirseniz, sistem temiz bir çalışma şablonu oluşturur.")
 
 st.markdown("---")
-if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
+if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True, type="primary"):
     try:
         p = edited_prog.copy()
         e = edited_endeks.copy()
         a = edited_alt.copy()
         b = edited_b.copy()
         
-        df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
+        with st.spinner("Matematiksel motor çalışıyor..."):
+            df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
         
         if df_sonuc.empty:
             st.warning("⚠️ Lütfen tablolara geçerli hakediş ve endeks verilerini giriniz.")
@@ -273,5 +332,6 @@ if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
                 if any(x in col.upper() for x in ['TUTAR', 'PROGRAM', 'FARKI']):
                     df_sonuc[col] = df_sonuc[col].apply(tr_format)
             st.dataframe(df_sonuc, use_container_width=True)
+            
     except Exception as ex:
         st.error(f"🚨 Hesaplama Sırasında Hata Oluştu: {ex}")
