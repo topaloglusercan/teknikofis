@@ -647,7 +647,7 @@ with tab3:
             
         # KİK Paradoksu için Akıllı Uyarı Kutusu
         if abs(fark_teorik) < 1.0:
-            st.info("💡 **Neden Birebir Aynı Çıktı (Tesadüf Mü)?** Hayır! Eğer endeks sürekli artıyorsa (örneğin İşçilik), KİK Kararnamesi geciken işlerde `min(güncel, planlanan)` kuralı gereği düşük olan **planlanan ayın endeksini** kullanır. İşi tam zamanında yapsanız da zaten o ayın endeksini alacaktınız. İki senaryo da **aynı parayı, mecburen aynı endeksle çarptığı için** sonuç kuruşu kuruşuna aynı çıkar. İnanmıyorsanız 'Sadece Demir-Çelik' seçerek test edin!")
+            st.info("")
 
         st.divider()
         senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet:", placeholder="örn. 'Senaryo A'")
