@@ -47,9 +47,9 @@ def clean_decimal(val):
     if pd.isna(val): return Decimal('0.0')
     val_str = str(val).strip()
     if val_str.lower() in ['', 'none', 'nan', 'nat', '<na>']: return Decimal('0.0')
-    
+   
     val_str = val_str.replace('TL', '').replace('%', '').strip()
-    
+   
     if '.' in val_str and ',' in val_str:
         if val_str.rfind(',') > val_str.rfind('.'):
             val_str = val_str.replace('.', '').replace(',', '.')
@@ -60,7 +60,7 @@ def clean_decimal(val):
             val_str = val_str.replace(',', '.')
         elif val_str.count('.') > 1:
             val_str = val_str.replace('.', '')
-            
+           
     try:
         d = Decimal(val_str)
         if d.is_nan(): return Decimal('0.0')
@@ -88,13 +88,13 @@ def load_from_excel(file):
     xls = pd.ExcelFile(file)
     dfs = {}
     sheet_map = {'IsProgrami': 'prog_df', 'Endeks': 'endeks_df', 'AltEndeks': 'alt_df', 'B': 'b_df'}
-    
+   
     for sheet in xls.sheet_names:
         if sheet in sheet_map:
             df_temp = pd.read_excel(xls, sheet_name=sheet, nrows=5)
             skip = 0
             cols = [str(c).upper() for c in df_temp.columns]
-            
+           
             if 'AYLAR' in cols or 'AĞIRLIK' in cols:
                 skip = 0
             else:
@@ -103,7 +103,7 @@ def load_from_excel(file):
                     if 'AYLAR' in row_vals or 'AĞIRLIK' in row_vals:
                         skip = i + 1
                         break
-            
+           
             df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             df = df.astype(str).replace(['nan', 'NaN', 'None', '<NA>'], '')
@@ -139,19 +139,19 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     df_endeks = filter_empty_rows(df_endeks.copy())
     df_alt = filter_empty_rows(df_alt.copy())
     df_b = filter_empty_rows(df_b.copy())
-    
+   
     if df_prog.empty or df_endeks.empty:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        
+       
     df_prog.columns = df_prog.columns.str.strip()
-    
+   
     end_col = 'AYLAR' if 'AYLAR' in df_endeks.columns else 'Aylar'
     df_endeks['AyKodu'] = pd.to_datetime(df_endeks[end_col].apply(parse_turkish_date)).dt.to_period('M')
     df_endeks = df_endeks.dropna(subset=['AyKodu']).drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
-    
+   
     df_b['AyKodu'] = pd.to_datetime(df_b['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
     df_b = df_b.dropna(subset=['AyKodu']).drop_duplicates(subset=['AyKodu']).set_index('AyKodu')
-    
+   
     df_prog['AyKodu'] = pd.to_datetime(df_prog['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
     df_prog = df_prog.dropna(subset=['AyKodu'])
 
@@ -159,13 +159,13 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     son_endeks_ayi = df_endeks.index.max()
-    
+   
     katsayilar = {str(row['Ağırlık']).strip().lower(): clean_decimal(row['Katsayı']) for _, row in df_alt.iterrows()}
     temel_endeksler = {str(row['Ağırlık']).strip().lower(): clean_decimal(row['Temel Endeks']) for _, row in df_alt.iterrows()}
     endeks_haritasi = {'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}
 
-    prog_kum_col = df_prog.columns[1] 
-    imalat_kum_col = df_prog.columns[2] 
+    prog_kum_col = df_prog.columns[1]
+    imalat_kum_col = df_prog.columns[2]
 
     kovalar = []
     onceki_kum = Decimal('0.0')
@@ -182,37 +182,37 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
         uyg_ayi = row['AyKodu']
         guncel_imalat_kum = clean_decimal(row[imalat_kum_col])
         aylik_imalat = guncel_imalat_kum - onceki_imalat_kum
-        
+       
         if aylik_imalat <= Decimal('0.0'):
             final_ff_listesi.append(float(kümülatif_toplam_ff))
             if guncel_imalat_kum > Decimal('0.0'): onceki_imalat_kum = guncel_imalat_kum
             continue
-            
+           
         b_val = df_b.loc[uyg_ayi, 'B'] if uyg_ayi in df_b.index else Decimal('1.0')
         b_kat = clean_decimal(b_val) if clean_decimal(b_val) > Decimal('0.0') else Decimal('1.0')
-        
+       
         gercek_endeks_ayi = min(uyg_ayi, son_endeks_ayi)
         if gercek_endeks_ayi in df_endeks.index:
             endeks_uyg = df_endeks.loc[gercek_endeks_ayi]
         else:
             endeks_uyg = df_endeks.iloc[-1]
-            
+           
         toplam_ff_aylik, kalan_para = Decimal('0.0'), aylik_imalat
-        
+       
         for kova in kovalar:
-            if kalan_para <= Decimal('0.0'): break 
+            if kalan_para <= Decimal('0.0'): break
             if kova['kapasite'] > Decimal('0.0'):
                 kullanilan_tutar = min(kalan_para, kova['kapasite'])
-                
+               
                 gercek_prog_ayi = min(kova['ay'], son_endeks_ayi)
                 gecikme = kova['ay'] < uyg_ayi
-                
+               
                 if gecikme:
                     comp_ayi = min(gercek_endeks_ayi, gercek_prog_ayi)
                     endeks_prog = df_endeks.loc[comp_ayi] if comp_ayi in df_endeks.index else endeks_uyg
                 else:
                     endeks_prog = endeks_uyg
-                
+               
                 pn = Decimal('0.0')
                 for k, sutun in endeks_haritasi.items():
                     e_temel = temel_endeksler.get(k, Decimal('0.0'))
@@ -220,15 +220,15 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                     e_prog = clean_decimal(endeks_prog.get(sutun, 0))
                     e_gecerli = min(e_uyg, e_prog) if gecikme else e_uyg
                     katsayi = katsayilar.get(k, Decimal('0.0'))
-                    
+                   
                     if e_temel > Decimal('0.0'):
                         pn += katsayi * (e_gecerli / e_temel)
                     elif katsayi > Decimal('0.0'):
                         pn += katsayi
-                
+               
                 ff_dilim = kullanilan_tutar * b_kat * (pn - Decimal('1.0'))
                 ff_dilim_yuvarlanmis = ff_dilim.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                
+               
                 matris_verileri.append({
                     'Hakediş Ayı': str(uyg_ayi),
                     'İş Programı (Ödenek) Ayı': str(kova['ay']),
@@ -236,31 +236,31 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                     'Uygulanan Pn (Excel - 15 Hane)': float(pn),
                     'Fiyat Farkı Tutarı': float(ff_dilim_yuvarlanmis)
                 })
-                
+               
                 toplam_ff_aylik += ff_dilim_yuvarlanmis
                 kova['kapasite'] -= kullanilan_tutar
                 kalan_para -= kullanilan_tutar
-        
+       
         kümülatif_toplam_ff += toplam_ff_aylik
         final_ff_listesi.append(float(kümülatif_toplam_ff))
-        
+       
         # Grafik ve Simülatör Analizleri için aylık özet
         aylik_rows.append({'Ay': str(uyg_ayi), 'Aylık İmalat': float(aylik_imalat),
                             'B Katsayısı': float(b_kat),
                             'Aylık Fiyat Farkı': float(toplam_ff_aylik),
                             'Kümülatif Fiyat Farkı': float(kümülatif_toplam_ff)})
-                            
+                           
         onceki_imalat_kum = guncel_imalat_kum
 
     df_sonuc = df_prog.copy()
     df_sonuc['KÜMÜLATİF FİYAT FARKI'] = final_ff_listesi
     df_detay = pd.DataFrame(matris_verileri)
-    
+   
     if not df_detay.empty:
         df_pivot = df_detay.pivot_table(index='Hakediş Ayı', columns='İş Programı (Ödenek) Ayı', values='Kullanılan Tutar', aggfunc='sum', fill_value=0)
         df_pivot['HAKEDİŞ TUTARI (Toplam)'] = df_pivot.sum(axis=1)
         df_pivot.loc['ÖDENEK MİKTARI (Kullanılan Toplam)'] = df_pivot.sum()
-    else: 
+    else:
         df_pivot = pd.DataFrame()
 
     df_aylik = pd.DataFrame(aylik_rows)
@@ -441,9 +441,9 @@ with tab1:
 with tab2:
     try:
         df_sonuc, df_pivot, df_detay, df_aylik = hesapla(
-            st.session_state.get("prog_edited", st.session_state.prog_df), 
-            st.session_state.get("end_edited", st.session_state.endeks_df), 
-            st.session_state.get("alt_edited", st.session_state.alt_df), 
+            st.session_state.get("prog_edited", st.session_state.prog_df),
+            st.session_state.get("end_edited", st.session_state.endeks_df),
+            st.session_state.get("alt_edited", st.session_state.alt_df),
             st.session_state.get("b_df_edited", st.session_state.b_df)
         )
         if not df_aylik.empty:
@@ -607,7 +607,7 @@ with tab3:
         # 1. HACİM SINIRI: Yalnızca gerçekleşen toplam imalat kadarki hacmi test ediyoruz.
         imal_col = prog_aktif.columns[2]
         prog_col = prog_aktif.columns[1]
-        
+       
         toplam_sim_imalat = Decimal('0.0')
         if not prog_aktif.empty:
             toplam_sim_imalat = max([clean_decimal(val) for val in prog_aktif[imal_col]])
@@ -621,30 +621,46 @@ with tab3:
                 yeni_prog_kum.append(f"{float(toplam_sim_imalat):.2f}".replace('.', ','))
             else:
                 yeni_prog_kum.append(f"{float(p_val):.2f}".replace('.', ','))
-                
+               
         df_kusursuz[prog_col] = yeni_prog_kum
         df_kusursuz[imal_col] = yeni_prog_kum # İmalat tutarı iş programına KESİN olarak eşitleniyor (Tam Uyum)
-        
+       
         # 3. Teorik BAZ Durumu (Orijinal katsayılar + Kusursuz İlerleme)
         _, _, _, teorik_aylik_baz = hesapla(df_kusursuz, end_aktif, alt_aktif, b_aktif)
         toplam_teorik_baz = teorik_aylik_baz['Aylık Fiyat Farkı'].sum() if not teorik_aylik_baz.empty else 0
-        
-        # 4. Teorik SENARYO Durumu (Yeni Slider Katsayıları + Kusursuz İlerleme)
-        e_sim = endeks_uzat(end_aktif, endeks_artis)
-        b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
-        a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
-        
-        _, _, _, teorik_aylik_senaryo = hesapla(df_kusursuz, e_sim, a_sim, b_sim)
-        toplam_teorik_senaryo = teorik_aylik_senaryo['Aylık Fiyat Farkı'].sum() if not teorik_aylik_senaryo.empty else 0
-        
-        # 5. Getiri Farkı
-        fark_teorik = float(toplam_teorik_senaryo) - float(toplam_teorik_baz)
-        
+       
+        # 4. TAM UYUM GETİRİSİNİ YENİ SENARYOYA AKTAR
+        # Teorik baz ile gerçekleşen baz arasındaki fark, iş programına tam uyumun
+        # sağladığı getiridir. Sliderlarla oluşan doğru simülasyon sonucuna bu getiriyi
+        # ekleyerek yeni senaryonun tam uyumlu teorik değerini buluyoruz.
+        #
+        # Formül:
+        #   Tam Uyum Getirisi = Teorik Baz - Baz Senaryo
+        #   Teorik Yeni       = Simülasyon + Tam Uyum Getirisi
+        para_kurus = Decimal('0.01')
+        baz_ff_dec = Decimal(str(toplam_base)).quantize(para_kurus, rounding=ROUND_HALF_UP)
+        sim_ff_dec = Decimal(str(toplam_sim)).quantize(para_kurus, rounding=ROUND_HALF_UP)
+        teorik_baz_dec = Decimal(str(toplam_teorik_baz)).quantize(para_kurus, rounding=ROUND_HALF_UP)
+
+        tam_uyum_getirisi = (teorik_baz_dec - baz_ff_dec).quantize(para_kurus, rounding=ROUND_HALF_UP)
+        toplam_teorik_senaryo = (sim_ff_dec + tam_uyum_getirisi).quantize(
+            para_kurus, rounding=ROUND_HALF_UP
+        )
+
+        # 5. Yeni senaryonun teorik baz şartlara göre ek getirisi
+        fark_teorik = (toplam_teorik_senaryo - teorik_baz_dec).quantize(
+            para_kurus, rounding=ROUND_HALF_UP
+        )
+       
         # 6. Sonuçları Ekrana Basıyoruz
         t_col1, t_col2, t_col3 = st.columns(3)
-        t_col1.metric("Teorik FF (Orijinal Şartlar)", f"{tr_format(toplam_teorik_baz)} TL")
+        t_col1.metric("Teorik FF (Orijinal Şartlar)", f"{tr_format(teorik_baz_dec)} TL")
         t_col2.metric("Teorik FF (Yeni Senaryonuz)", f"{tr_format(toplam_teorik_senaryo)} TL")
-        
+        st.caption(
+            f"Hesap: {tr_format(sim_ff_dec)} TL simülasyon + "
+            f"{tr_format(tam_uyum_getirisi)} TL tam uyum getirisi"
+        )
+       
         if fark_teorik > 0:
             t_col3.metric("Fark (Yeni Senaryonun Getirisi)", f"+{tr_format(fark_teorik)} TL", delta_color="normal")
             st.success("✅ **Analiz:** Seçtiğiniz yeni ekonomik şartlar, iş programına tam uyduğunuz kusursuz bir senaryoda size DAHA FAZLA fiyat farkı getirisi sağlıyor.")
