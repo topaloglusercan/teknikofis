@@ -132,7 +132,7 @@ KOD_BILGI = {
 KOD_ETIKET = {k: v['kisa'] for k, v in KOD_BILGI.items()}
 
 # ==========================================
-# --- ANA HESAPLAMA MOTORU (idari_hakedis.py ile BİREBİR AYNI) ---
+# --- ANA HESAPLAMA MOTORU ---
 # ==========================================
 def hesapla(df_prog, df_endeks, df_alt, df_b):
     df_prog = filter_empty_rows(df_prog.copy())
@@ -372,11 +372,11 @@ tab1, tab2, tab3, tab4 = st.tabs(["📋 Veri Girişi", "📊 Baz Sonuç", "🎛�
 
 # ══════════════════════ TAB 1 — VERİ GİRİŞİ ══════════════════════
 with tab1:
-    st.info("Kendi projenizin verilerini buraya girin/yapıştırın, veya JSON/Excel dosyanızı sol menüden içe aktarın.")
+    st.info("Kendi projenizin verilerini buraya girin/yapıştırın, veya JSON/E-Tablo dosyanızı sol menüden içe aktarın.")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("📥 Proje Verisi Yükle")
-    st.sidebar.caption("JSON projenizi veya Excel şablonunuzu buradan yükleyin.")
+    st.sidebar.caption("JSON projenizi veya E-Tablo şablonunuzu buradan yükleyin.")
     uploaded_file = st.sidebar.file_uploader("Dosya Seç (.json veya .xlsx)", type=["json", "xlsx"])
 
     if uploaded_file is not None:
@@ -396,9 +396,9 @@ with tab1:
                 if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
                 if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
                 st.session_state.load_count += 1
-                st.sidebar.success("Excel şablonu başarıyla okundu!")
+                st.sidebar.success("Veri şablonu başarıyla okundu!")
             except Exception as e:
-                st.sidebar.error(f"Excel okuma hatası. Detay: {e}")
+                st.sidebar.error(f"Okuma hatası. Detay: {e}")
 
     suffix = st.session_state.load_count
 
@@ -434,7 +434,7 @@ with tab1:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📤 Mevcut Veriyi Dışa Aktar")
     st.sidebar.download_button("💾 JSON Olarak Kaydet", data=json.dumps(project_data, indent=4), file_name="hakedis_projem.json", mime="application/json", use_container_width=True)
-    st.sidebar.download_button("📊 Excel Şablonu İndir", data=excel_data, file_name="idari_hakedis_sablonu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    st.sidebar.download_button("📊 E-Tablo / Excel Şablonu İndir", data=excel_data, file_name="hakedis_sablonu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
 
 # ══════════════════════ TAB 2 — BAZ SONUÇ ══════════════════════
@@ -604,32 +604,43 @@ with tab3:
         st.subheader("💡 Teorik Kıyaslama: İş Programına Tam Uyum Senaryosunun Getirisi")
         st.info("Eğer imalatlar, İş Programı ile **birebir aynı tutarda ve zamanda** gerçekleşseydi, orijinal şartlara göre seçtiğiniz *yeni senaryonun* (örneğin İşçiliğin 100 olması) size ekstra getirisi ne olurdu?")
 
-        # 1. KESİN ÇÖZÜM: Kusursuz İş Programı (Teorik) Verisini Tamamen Yalıtıyoruz
-        # Gerçekleşen (simülasyon) imalatlarla HİÇBİR bağı kalmaması için direkt İş Programı sütununu klonluyoruz.
-        df_teorik_saf = prog_aktif.copy()
-        imal_col = df_teorik_saf.columns[2]
-        prog_col = df_teorik_saf.columns[1]
+        # 1. HACİM SINIRI: Yalnızca gerçekleşen toplam imalat kadarki hacmi test ediyoruz.
+        imal_col = prog_aktif.columns[2]
+        prog_col = prog_aktif.columns[1]
         
-        # Simülasyona ait imalatları tamamen ezip, iş programı değerlerini atıyoruz:
-        df_teorik_saf[imal_col] = df_teorik_saf[prog_col]
+        toplam_sim_imalat = Decimal('0.0')
+        if not prog_aktif.empty:
+            toplam_sim_imalat = max([clean_decimal(val) for val in prog_aktif[imal_col]])
+
+        # 2. TAM UYUMLU VE SINIRLANDIRILMIŞ KUSURSUZ VERİ SETİ
+        df_kusursuz = prog_aktif.copy()
+        yeni_prog_kum = []
+        for planlanan in df_kusursuz[prog_col]:
+            p_val = clean_decimal(planlanan)
+            if p_val > toplam_sim_imalat:
+                yeni_prog_kum.append(f"{float(toplam_sim_imalat):.2f}".replace('.', ','))
+            else:
+                yeni_prog_kum.append(f"{float(p_val):.2f}".replace('.', ','))
+                
+        df_kusursuz[prog_col] = yeni_prog_kum
+        df_kusursuz[imal_col] = yeni_prog_kum # İmalat tutarı iş programına KESİN olarak eşitleniyor (Tam Uyum)
         
-        # 2. Teorik BAZ Durumu (Hiçbir slidera dokunmadan önceki standart halin)
-        _, _, _, teorik_aylik_baz = hesapla(df_teorik_saf, end_aktif, alt_aktif, b_aktif)
+        # 3. Teorik BAZ Durumu (Orijinal katsayılar + Kusursuz İlerleme)
+        _, _, _, teorik_aylik_baz = hesapla(df_kusursuz, end_aktif, alt_aktif, b_aktif)
         toplam_teorik_baz = teorik_aylik_baz['Aylık Fiyat Farkı'].sum() if not teorik_aylik_baz.empty else 0
         
-        # 3. Teorik SENARYO Durumu (Sadece senin slider kısıtların uygulandığında)
+        # 4. Teorik SENARYO Durumu (Yeni Slider Katsayıları + Kusursuz İlerleme)
         e_sim = endeks_uzat(end_aktif, endeks_artis)
         b_sim = b_override_uygula(b_aktif, b_ovr) if b_ovr is not None else b_aktif
         a_sim = katsayi_override_uygula(alt_aktif, katsayi_override) if katsayi_override else alt_aktif
         
-        # YALITILMIŞ df_teorik_saf değişkeni ile YENİ senaryo hesaplamasını yapıyoruz
-        _, _, _, teorik_aylik_senaryo = hesapla(df_teorik_saf, e_sim, a_sim, b_sim)
+        _, _, _, teorik_aylik_senaryo = hesapla(df_kusursuz, e_sim, a_sim, b_sim)
         toplam_teorik_senaryo = teorik_aylik_senaryo['Aylık Fiyat Farkı'].sum() if not teorik_aylik_senaryo.empty else 0
         
-        # 4. Getiri Farkı
+        # 5. Getiri Farkı
         fark_teorik = float(toplam_teorik_senaryo) - float(toplam_teorik_baz)
         
-        # 5. Sonuçları Ekrana Basıyoruz
+        # 6. Sonuçları Ekrana Basıyoruz
         t_col1, t_col2, t_col3 = st.columns(3)
         t_col1.metric("Teorik FF (Orijinal Şartlar)", f"{tr_format(toplam_teorik_baz)} TL")
         t_col2.metric("Teorik FF (Yeni Senaryonuz)", f"{tr_format(toplam_teorik_senaryo)} TL")
@@ -642,7 +653,7 @@ with tab3:
             st.error("⚠️ **Analiz:** Seçtiğiniz yeni ekonomik şartlar, iş programına tam uyduğunuz senaryoda fiyat farkı getirisini DÜŞÜRÜYOR.")
         else:
             t_col3.metric("Fark", "0,00 TL")
-            st.caption("Orijinal sözleşme katsayıları devrede.")
+            st.caption("Orijinal sözleşme katsayıları veya sabit endeks devrede.")
 
         st.divider()
         senaryo_adi = st.text_input("Bu ayarları senaryo olarak kaydet:", placeholder="örn. 'Senaryo A'")
