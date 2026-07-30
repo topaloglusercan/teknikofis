@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import warnings
 import json
-import io
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 
 getcontext().prec = 28 
@@ -63,48 +62,6 @@ def filter_empty_rows(df):
     if df.empty: return df
     mask = df.iloc[:, 0].astype(str).str.strip().str.lower().isin(['', 'none', 'nan', 'nat', '<na>'])
     return df[~mask]
-
-# --- EXCEL YÜKLEME VE İNDİRME FONKSİYONLARI ---
-def load_from_excel(file):
-    xls = pd.ExcelFile(file)
-    dfs = {}
-    sheet_map = {
-        'IsProgrami': 'prog_df',
-        'Endeks': 'endeks_df',
-        'AltEndeks': 'alt_df',
-        'B': 'b_df'
-    }
-    
-    for sheet in xls.sheet_names:
-        if sheet in sheet_map:
-            df_temp = pd.read_excel(xls, sheet_name=sheet, nrows=5)
-            skip = 0
-            cols = [str(c).upper() for c in df_temp.columns]
-            
-            if 'AYLAR' in cols or 'AĞIRLIK' in cols:
-                skip = 0
-            else:
-                for i, row in df_temp.iterrows():
-                    row_vals = [str(v).upper() for v in row.values]
-                    if 'AYLAR' in row_vals or 'AĞIRLIK' in row_vals:
-                        skip = i + 1
-                        break
-            
-            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
-            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-            df = df.astype(str).replace(['nan', 'NaN', 'None', '<NA>'], '')
-            dfs[sheet_map[sheet]] = df
-            
-    return dfs
-
-def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_prog.to_excel(writer, sheet_name='IsProgrami', index=False)
-        df_endeks.to_excel(writer, sheet_name='Endeks', index=False)
-        df_alt.to_excel(writer, sheet_name='AltEndeks', index=False)
-        df_b.to_excel(writer, sheet_name='B', index=False)
-    return output.getvalue()
 
 # --- ANA HESAPLAMA MOTORU ---
 def hesapla(df_prog, df_endeks, df_alt, df_b):
@@ -245,89 +202,57 @@ if 'b_df' not in st.session_state:
     st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 
 st.title("📂 İdari Hakediş & Teyit Matrisi")
-st.markdown("*Bu modül, fiyat farkı kararnamelerine uygun olarak kova sistemi ve gecikme matrisi mantığıyla hakedişlerinizi hesaplamanızı ve analiz etmenizi sağlayan gelişmiş bir teknik ofis aracıdır.*")
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("📥 Proje Verisi Yükle")
-st.sidebar.caption("JSON projenizi veya Excel şablonunuzu buradan yükleyin.")
-
-uploaded_file = st.sidebar.file_uploader("Dosya Seç (.json veya .xlsx)", type=["json", "xlsx"])
+st.sidebar.subheader("📥 Hakediş Projesi Yönetimi")
+uploaded_file = st.sidebar.file_uploader("Önceki Projeyi Yükle (.json)", type=["json"])
 
 if uploaded_file is not None:
-    if uploaded_file.name.endswith('.json'):
-        data = json.load(uploaded_file)
-        st.session_state.prog_df = pd.DataFrame(data['prog']).map(str)
-        st.session_state.endeks_df = pd.DataFrame(data['endeks']).map(str)
-        st.session_state.alt_df = pd.DataFrame(data['alt']).map(str)
-        st.session_state.b_df = pd.DataFrame(data['b']).map(str)
-        st.session_state.load_count += 1
-        st.sidebar.success("JSON projesi başarıyla yüklendi!")
-    elif uploaded_file.name.endswith('.xlsx'):
-        try:
-            dfs = load_from_excel(uploaded_file)
-            if 'prog_df' in dfs: st.session_state.prog_df = dfs['prog_df']
-            if 'endeks_df' in dfs: st.session_state.endeks_df = dfs['endeks_df']
-            if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
-            if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
-            st.session_state.load_count += 1
-            st.sidebar.success("Excel şablonu başarıyla okundu!")
-        except Exception as e:
-            st.sidebar.error(f"Excel okuma hatası: Lütfen dosya yapısının doğru olduğundan emin olun. Detay: {e}")
+    data = json.load(uploaded_file)
+    st.session_state.prog_df = pd.DataFrame(data['prog']).map(str)
+    st.session_state.endeks_df = pd.DataFrame(data['endeks']).map(str)
+    st.session_state.alt_df = pd.DataFrame(data['alt']).map(str)
+    st.session_state.b_df = pd.DataFrame(data['b']).map(str)
+    st.session_state.load_count += 1
+    st.sidebar.success("Proje başarıyla yüklendi!")
 
 suffix = st.session_state.load_count
 
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    # Girdi ve Çıktı koparıldı: Veri "edited_prog" içine kaydedilir, ekrandan atmaz, yeni satır eklenir.
     edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
-    
     st.subheader("3. Alt Endeks Ağırlıkları")
     edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
-
 with col2:
     st.subheader("2. Endeks Tablosu")
     edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
-    
     st.subheader("4. B Katsayısı Tablosu")
     edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
 
-# --- ÇİFT İNDİRME BUTONLARI (JSON & EXCEL) ---
 project_data = {
     'prog': edited_prog.to_dict(orient='records'),
     'endeks': edited_endeks.to_dict(orient='records'),
     'alt': edited_alt.to_dict(orient='records'),
     'b': edited_b.to_dict(orient='records')
 }
-excel_data = generate_excel_download(edited_prog, edited_endeks, edited_alt, edited_b)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("📤 Mevcut Veriyi Dışa Aktar")
 st.sidebar.download_button(
-    label="💾 JSON Olarak Kaydet (Hızlı Yükleme)",
+    label="💾 Mevcut Veriyi Bilgisayara İndir",
     data=json.dumps(project_data, indent=4),
     file_name="hakedis_projem.json",
     mime="application/json",
     use_container_width=True
 )
-st.sidebar.download_button(
-    label="📊 Excel Olarak İndir / Şablon Al",
-    data=excel_data,
-    file_name="idari_hakedis_sablonu.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    use_container_width=True
-)
 
 st.markdown("---")
-if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True, type="primary"):
+if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True):
     try:
         p = edited_prog.copy()
         e = edited_endeks.copy()
         a = edited_alt.copy()
         b = edited_b.copy()
         
-        with st.spinner("Matematiksel motor çalışıyor..."):
-            df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
+        df_sonuc, df_pivot, df_detay = hesapla(p, e, a, b)
         
         if df_sonuc.empty:
             st.warning("⚠️ Lütfen tablolara geçerli hakediş ve endeks verilerini giriniz.")
@@ -348,6 +273,5 @@ if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True, type="
                 if any(x in col.upper() for x in ['TUTAR', 'PROGRAM', 'FARKI']):
                     df_sonuc[col] = df_sonuc[col].apply(tr_format)
             st.dataframe(df_sonuc, use_container_width=True)
-            
     except Exception as ex:
         st.error(f"🚨 Hesaplama Sırasında Hata Oluştu: {ex}")
