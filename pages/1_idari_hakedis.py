@@ -2,7 +2,9 @@
 İdari Hakediş & Teyit Matrisi - Web Modülü (Streamlit)
 Orijinal Tkinter masaüstü uygulamasının birebir web uyarlamasıdır.
 - Rerun (çift tıklama/odak kaybı) sorunu çözülmüştür.
-- Matematiksel motor orijinal .pyc dosyasından alınmıştır.
+- Excel Tarih (Datetime) formatı okuma hatası yamalandı.
+- Profesyonel, Renkli, Kılavuzlu Excel Şablon İndirme Motoru eklendi.
+- Eksik sütunlarla yüklenen Excel'ler için Otomatik Tamamlama eklendi.
 """
 
 import streamlit as st
@@ -11,8 +13,11 @@ import json
 import io
 import warnings
 from decimal import Decimal, ROUND_HALF_UP, getcontext
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
-# Hassasiyet ve uyarı ayarları (Orijinal koddaki gibi)
+# Hassasiyet ve uyarı ayarları 
 getcontext().prec = 28 
 warnings.filterwarnings("ignore")
 
@@ -28,7 +33,13 @@ def parse_turkish_date(date_str):
     if s in ['none', 'nan', 'nat', '<na>']: 
         return pd.NaT
     
-    # Decompile sırasındaki mask_37 hatası düzeltildi
+    # YENİ YAMA: Excel'den gelen standart datetime objelerini korur
+    try:
+        dt = pd.to_datetime(s)
+        return dt.strftime('%Y-%m')
+    except:
+        pass
+
     months = {
         'oca': '01', 'ocak': '01', 'şub': '02', 'şubat': '02', 
         'mar': '03', 'mart': '03', 'nis': '04', 'nisan': '04', 
@@ -39,7 +50,7 @@ def parse_turkish_date(date_str):
     }
     
     parts = s.split()
-    if len(parts) == 2:
+    if len(parts) >= 2:
         m_num = months.get(parts[0], '01')
         y_num = parts[1] if len(parts[1]) == 4 else f"20{parts[1]}"
         return f"{y_num}-{m_num}"
@@ -51,15 +62,11 @@ def clean_decimal(val):
     if s.lower() in ['', 'none', 'nan', 'nat', '<na>']: return Decimal('0.0')
     
     if '.' in s and ',' in s:
-        if s.rfind(',') > s.rfind('.'):
-            s = s.replace('.', '').replace(',', '.')
-        else:
-            s = s.replace(',', '')
+        if s.rfind(',') > s.rfind('.'): s = s.replace('.', '').replace(',', '.')
+        else: s = s.replace(',', '')
     else:
-        if ',' in s:
-            s = s.replace(',', '.')
-        elif s.count('.') > 1:
-            s = s.replace('.', '')
+        if ',' in s: s = s.replace(',', '.')
+        elif s.count('.') > 1: s = s.replace('.', '')
             
     try:
         d = Decimal(s)
@@ -82,7 +89,7 @@ def filter_empty_rows(df):
     return df[~mask]
 
 # ==========================================
-# 2. HESAPLAMA MOTORU (Orijinal Tkinter Core)
+# 2. HESAPLAMA MOTORU 
 # ==========================================
 def hesapla(df_prog, df_endeks, df_alt, df_b):
     df_prog = filter_empty_rows(df_prog.copy())
@@ -217,7 +224,7 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     return df_sonuc, df_pivot, df_detay
 
 # ==========================================
-# 3. VERİ YÜKLEME VE HAFIZA (STATE)
+# 3. EXCEL YÜKLEME VE ŞABLON ÜRETME MOTURU
 # ==========================================
 def load_from_excel(file):
     xls = pd.ExcelFile(file)
@@ -239,9 +246,121 @@ def load_from_excel(file):
             df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             df = df.astype(str).replace(['nan', 'NaN', 'None', '<NA>'], '')
+            
+            # YENİ YAMA: Eğer kullanıcı AltEndeks sayfasında "Endeks Sütunu" eklemeyi unutmuşsa, sistem otomatik doldurur.
+            if sheet == 'AltEndeks' and 'Endeks Sütunu' not in df.columns:
+                default_map = {'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}
+                df['Endeks Sütunu'] = df['Ağırlık'].str.strip().str.lower().map(default_map).fillna('')
+                
             dfs[sheet_map[sheet]] = df
     return dfs
 
+def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
+    """ Ekranda bulunan tabloların verilerini kullanarak renkli ve kilitli profesyonel bir şablon üretir. """
+    wb = Workbook()
+    thin = Side(style='thin', color='B0C4DE')
+    def brd(): return Border(top=thin, left=thin, right=thin, bottom=thin)
+    def fill(c): return PatternFill('solid', fgColor=c)
+    def fnt(c='1A1A2E', bold=False, sz=10): return Font(color=c, bold=bold, size=sz, name='Calibri')
+    def aln(h='left', wrap=False): return Alignment(horizontal=h, vertical='center', wrap_text=wrap)
+    
+    HEADER = '2C5F8A'; WHITE = 'FFFFFF'; YELLOW = 'FFFDE7'; LIGHT = 'EAF4FB'; NOTE = 'FFF9C4'
+    
+    def make_header(ws, title, note=''):
+        ws.sheet_view.showGridLines = False
+        ws.merge_cells('A1:Z1')
+        ws['A1'] = title; ws['A1'].fill = fill(HEADER); ws['A1'].font = fnt(WHITE, True, 12); ws['A1'].alignment = aln('center')
+        ws.row_dimensions[1].height = 22
+        if note:
+            ws.merge_cells('A2:Z2')
+            ws['A2'] = note; ws['A2'].fill = fill(NOTE); ws['A2'].font = fnt('7B5800', False, 9); ws['A2'].alignment = aln('center')
+            ws.row_dimensions[2].height = 14
+            
+    def col_header(ws, row, headers, widths):
+        for ci, (h, w) in enumerate(zip(headers, widths), 1):
+            c = ws.cell(row, ci, h)
+            c.fill = fill(HEADER); c.font = fnt(WHITE, True, 9); c.alignment = aln('center'); c.border = brd()
+            ws.column_dimensions[get_column_letter(ci)].width = w
+        ws.row_dimensions[row].height = 16
+        
+    def write_df(ws, df, start_row, yellow_cols):
+        for ri, row in enumerate(df.values, start_row):
+            bg = YELLOW if ri % 2 == 0 else 'FFFEF0'
+            for ci, val in enumerate(row, 1):
+                c = ws.cell(ri, ci, str(val) if pd.notna(val) and str(val)!='nan' else '')
+                c.fill = fill(YELLOW if ci in yellow_cols else bg)
+                c.font = fnt('1A1A2E', False, 9); c.alignment = aln('right' if ci > 1 else 'left'); c.border = brd()
+        
+        # Gelecek aylar için 10 adet boş sarı giriş satırı ekle
+        for ri in range(start_row + len(df), start_row + len(df) + 10):
+            bg = YELLOW if ri % 2 == 0 else 'FFFEF0'
+            for ci in range(1, len(df.columns) + 1):
+                c = ws.cell(ri, ci, '')
+                c.fill = fill(YELLOW if ci in yellow_cols else bg)
+                c.font = fnt('1A1A2E', False, 9); c.alignment = aln('right' if ci > 1 else 'left'); c.border = brd()
+
+    # Sayfa 1: İş Programı
+    ws1 = wb.active; ws1.title = 'IsProgrami'
+    make_header(ws1, '1. İŞ PROGRAMI VE İMALATLAR', 'Sarı hücrelere verileri girin. Ay formatı: Oca 22, Şub 22, ... / Tüm tutarlar TL')
+    col_header(ws1, 3, list(df_prog.columns), [16, 30, 30])
+    write_df(ws1, df_prog, 4, yellow_cols=[1, 2, 3])
+    
+    # Sayfa 2: Endeks
+    ws2 = wb.create_sheet('Endeks')
+    make_header(ws2, '2. ENDEKS TABLOSU', 'Kaynak: TÜİK / Çevre ve Şehircilik Bakanlığı yayınları')
+    col_header(ws2, 3, list(df_endeks.columns), [16] + [12]*(len(df_endeks.columns)-1))
+    write_df(ws2, df_endeks, 4, yellow_cols=list(range(1, len(df_endeks.columns)+1)))
+    
+    # Sayfa 3: AltEndeks
+    ws3 = wb.create_sheet('AltEndeks')
+    make_header(ws3, '3. ALT ENDEKS AĞIRLIKLARI', 'Katsayılar toplamı = 1.00 olmalıdır. Temel Endeks = sözleşme tarihindeki endeks değeri.')
+    col_header(ws3, 3, list(df_alt.columns), [12, 14, 16, 16][:len(df_alt.columns)])
+    write_df(ws3, df_alt, 4, yellow_cols=list(range(1, len(df_alt.columns)+1)))
+    
+    # Sayfa 4: B Katsayısı
+    ws4 = wb.create_sheet('B')
+    make_header(ws4, '4. B KATSAYISI TABLOSU', 'Müteahhit fiyat farkı katsayısı (genellikle 1.00).')
+    col_header(ws4, 3, list(df_b.columns), [16, 14])
+    write_df(ws4, df_b, 4, yellow_cols=[1, 2])
+    
+    # Sayfa 5: Kullanım Kılavuzu (Şablon Eğitimi)
+    ws5 = wb.create_sheet('Kilavuz')
+    ws5.sheet_view.showGridLines = False
+    ws5.column_dimensions['A'].width = 90
+    ws5['A1'] = 'İDARİ HAKEDİŞ ŞABLONU — KULLANIM KILAVUZU'
+    ws5['A1'].fill = fill(HEADER); ws5['A1'].font = fnt(WHITE, True, 14); ws5['A1'].alignment = aln('center')
+    ws5.row_dimensions[1].height = 28
+    
+    help_text = [
+        "",
+        "💡 EXCEL ŞABLONU İLE VERİ GİRİŞİ (YENİ ÖZELLİK)",
+        "1. Bu Excel dosyasındaki sarı alanları kendi projenizin değerleriyle doldurun.",
+        "2. Programın sol menüsündeki 'Excel Dosyası Seç (.xlsx)' bölümünden bu dosyayı yükleyin.",
+        "3. Verileriniz anında tabloya aktarılacaktır. Ardından 'Hesapla' butonuna basabilirsiniz.",
+        "",
+        "⚠️ ÖNEMLİ FORMAT KURALLARI:",
+        "• Tarihler: 'Eylül 25' şeklinde metin olarak YAZABİLİRSİNİZ veya Excel'in kendi 'Tarih' formatıyla (30.09.2025 vb.) seçebilirsiniz. Sistem her ikisini de çözebilir.",
+        "• Sayılar: Türk lirası formatında (1.500.000,00) yazmaya özen gösterin.",
+        "• Kümülatif: İş programı ve imalat tutarları aylık değil, o aya kadarki toplam tutar (Kümülatif) olarak yazılmalıdır.",
+        "• Endeks Sütunu: 'AltEndeks' sayfasında 'Endeks Sütunu' başlığı mutlaka olmalıdır. Olmasa bile sistem varsayılan harflere göre eşleştirme yapacaktır."
+    ]
+    for i, text in enumerate(help_text, 2):
+        c = ws5.cell(i, 1, text)
+        if text.startswith("💡") or text.startswith("⚠️"):
+            c.font = fnt('1A3A6E', True, 11)
+            c.fill = fill('D6E4F0')
+        else:
+            c.font = fnt('1A1A2E', False, 10)
+        ws5.row_dimensions[i].height = 18
+
+    output = io.BytesIO()
+    wb.save(output)
+    return output.getvalue()
+
+
+# ==========================================
+# 4. HAFIZA YÖNETİMİ (STATE)
+# ==========================================
 def init_state():
     if 'load_count' not in st.session_state: st.session_state.load_count = 0
     if 'prog_df' not in st.session_state:
@@ -256,9 +375,10 @@ def init_state():
 init_state()
 
 # ==========================================
-# 4. ARAYÜZ TASARIMI (UI)
+# 5. ARAYÜZ TASARIMI (UI)
 # ==========================================
 st.title("📂 İdari Hakediş & Teyit Matrisi")
+st.markdown("*Fiyat farkı kararnamelerine uygun olarak kova sistemi ve gecikme matrisi mantığıyla hesaplama yapan teknik ofis aracıdır.*")
 
 # -- YAN MENÜ (SIDEBAR) --
 st.sidebar.markdown("### 📥 Excel ile Proje Yükle")
@@ -273,13 +393,13 @@ if uploaded_excel is not None:
         if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
         if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
         st.session_state.load_count += 1
-        st.sidebar.success("Excel başarıyla yüklendi!")
+        st.sidebar.success("✅ Excel başarıyla yüklendi!")
     except Exception as e:
         st.sidebar.error(f"Hata: {e}")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📥 Önceki Projeyi Yükle (.json)")
-st.sidebar.caption("Projeyi Yükle (.json)")
+st.sidebar.caption("JSON dosyanızı buradan yükleyin.")
 uploaded_json = st.sidebar.file_uploader("JSON Dosyası Seç", type=["json"], key="json_uploader")
 
 if uploaded_json is not None:
@@ -289,52 +409,68 @@ if uploaded_json is not None:
     if 'alt' in data: st.session_state.alt_df = pd.DataFrame(data['alt']).astype(str)
     if 'b' in data: st.session_state.b_df = pd.DataFrame(data['b']).astype(str)
     st.session_state.load_count += 1
-    st.sidebar.success("Proje başarıyla yüklendi!")
+    st.sidebar.success("✅ JSON Projesi başarıyla yüklendi!")
 
 # -- ANA EKRAN TABLOLARI --
 suffix = st.session_state.load_count
-
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    # Veriyi st.session_state'den alır, tablo üzerinde yapılan değişiklikler 'edited_prog' a aktarılır.
-    # Bu sayede focus kaybı/Rerun döngüsü kırılmış olur.
-    edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
+    st.session_state.prog_df = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
     
     st.subheader("3. Alt Endeks Ağırlıkları")
-    edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
+    st.session_state.alt_df = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
 
 with col2:
     st.subheader("2. Endeks Tablosu")
-    edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
+    st.session_state.endeks_df = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
     
     st.subheader("4. B Katsayısı Tablosu")
-    edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
+    st.session_state.b_df = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
+
 
 # -- İNDİRME VE KAYDETME BUTONLARI --
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📤 Dışa Aktar")
+st.sidebar.markdown("### 📤 Projeyi Dışa Aktar / Şablon Al")
 project_data = {
-    'prog': edited_prog.to_dict(orient='records'),
-    'endeks': edited_endeks.to_dict(orient='records'),
-    'alt': edited_alt.to_dict(orient='records'),
-    'b': edited_b.to_dict(orient='records')
+    'prog': st.session_state.prog_df.to_dict(orient='records'),
+    'endeks': st.session_state.endeks_df.to_dict(orient='records'),
+    'alt': st.session_state.alt_df.to_dict(orient='records'),
+    'b': st.session_state.b_df.to_dict(orient='records')
 }
-st.sidebar.download_button(
-    label="💾 JSON Olarak Kaydet",
-    data=json.dumps(project_data, indent=4),
-    file_name="hakedis_projesi.json",
-    mime="application/json",
-    use_container_width=True
-)
+
+col_s1, col_s2 = st.sidebar.columns(2)
+with col_s1:
+    st.download_button(
+        label="💾 JSON",
+        data=json.dumps(project_data, indent=4),
+        file_name="hakedis_projesi.json",
+        mime="application/json",
+        use_container_width=True,
+        help="Sisteme geri yüklemek için en hızlı ve güvenli formattır."
+    )
+with col_s2:
+    st.download_button(
+        label="📊 EXCEL (Şablon)",
+        data=generate_excel_download(st.session_state.prog_df, st.session_state.endeks_df, st.session_state.alt_df, st.session_state.b_df),
+        file_name="idari_hakedis_sablonu.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        help="Verilerinizi Excel üzerinden doldurmak için kullanabileceğiniz Kılavuzlu şablondur."
+    )
 
 st.markdown("---")
 
 # -- HESAPLAMA BUTONU --
 if st.button("🚀 Hesapla ve Matrisi Çıkar", use_container_width=True, type="primary"):
     with st.spinner("Matematiksel motor çalışıyor..."):
-        df_sonuc, df_pivot, df_detay = hesapla(edited_prog, edited_endeks, edited_alt, edited_b)
+        df_sonuc, df_pivot, df_detay = hesapla(
+            st.session_state.prog_df, 
+            st.session_state.endeks_df, 
+            st.session_state.alt_df, 
+            st.session_state.b_df
+        )
     
     if df_sonuc.empty:
         st.warning("⚠️ Lütfen tablolara geçerli veri giriniz (İş Programı ve Endeks boş olamaz).")
