@@ -292,21 +292,83 @@ st.sidebar.subheader("📥 Excel ile Proje Yükle")
 st.sidebar.caption("💡 Excel şablonunuzu (`.xlsx`) buradan yükleyin.")
 uploaded_xlsx = st.sidebar.file_uploader("Excel Dosyası Seç (.xlsx)", type=["xlsx"] , key='xlsx_upload')
 
+# Sheet eşleştirme UI
 if uploaded_xlsx is not None:
     try:
-        dfs = load_from_excel(uploaded_xlsx)
-        if 'prog_df' in dfs:
-            st.session_state.prog_df = dfs['prog_df']
-        if 'endeks_df' in dfs:
-            st.session_state.endeks_df = dfs['endeks_df']
-        if 'alt_df' in dfs:
-            st.session_state.alt_df = dfs['alt_df']
-        if 'b_df' in dfs:
-            st.session_state.b_df = dfs['b_df']
-        st.session_state.load_count += 1
-        st.sidebar.success("Excel başarıyla okundu!")
+        xls = pd.ExcelFile(uploaded_xlsx)
+        sheet_names = xls.sheet_names
+
+        st.sidebar.markdown("**Sheet ↔ Tablo Eşleştirme (İsteğe Bağlı)**")
+        with st.sidebar.expander("Eşleştirme Ayarları", expanded=True):
+            # Önerilen seçimler için basit fuzzy eşleme
+            def guess(sheet_list, candidates):
+                for c in candidates:
+                    for s in sheet_list:
+                        if c.lower() in s.lower() or (c == 'IsProgrami' and ('program' in s.lower() or 'iş' in s.lower())):
+                            return s
+                return ""
+
+            prog_def = guess(sheet_names, ['IsProgrami','Program','İş Programı','İşProgrami'])
+            endeks_def = guess(sheet_names, ['Endeks','Endeksler'])
+            alt_def = guess(sheet_names, ['AltEndeks','Alt','Ağırlık'])
+            b_def = guess(sheet_names, ['B'])
+
+            sel_prog = st.selectbox("IsProgrami ->", options=[""] + sheet_names, index=(1 + sheet_names.index(prog_def) if prog_def in sheet_names else 0), key='map_prog')
+            sel_endeks = st.selectbox("Endeks ->", options=[""] + sheet_names, index=(1 + sheet_names.index(endeks_def) if endeks_def in sheet_names else 0), key='map_endeks')
+            sel_alt = st.selectbox("AltEndeks ->", options=[""] + sheet_names, index=(1 + sheet_names.index(alt_def) if alt_def in sheet_names else 0), key='map_alt')
+            sel_b = st.selectbox("B ->", options=[""] + sheet_names, index=(1 + sheet_names.index(b_def) if b_def in sheet_names else 0), key='map_b')
+
+            st.caption("Eğer otomatik eşleşme isterseniz tüm seçimleri boş bırakın; uygulama otomatik algılamayı dener.")
+            if st.button("Eşleştir ve Yükle", key='apply_mapping'):
+                dfs = {}
+                # Güvenli okuma: seçili her sheet için aynı skip algortimasını uygula
+                def read_sheet(s):
+                    try:
+                        df_temp = pd.read_excel(xls, sheet_name=s, nrows=5)
+                        skip = 0
+                        cols = [str(c).upper() for c in df_temp.columns]
+                        if 'AYLAR' in cols or 'AĞIRLIK' in cols:
+                            skip = 0
+                        else:
+                            for i, row in df_temp.iterrows():
+                                row_vals = [str(v).upper() for v in row.values]
+                                if 'AYLAR' in row_vals or 'AĞIRLIK' in row_vals:
+                                    skip = i + 1
+                                    break
+                        df = pd.read_excel(xls, sheet_name=s, skiprows=skip)
+                        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+                        df = df.astype(str).replace(['nan', 'NaN', 'None', '<NA>'], '')
+                        return df
+                    except Exception:
+                        return pd.DataFrame()
+
+                if sel_prog:
+                    dfs['prog_df'] = read_sheet(sel_prog)
+                if sel_endeks:
+                    dfs['endeks_df'] = read_sheet(sel_endeks)
+                if sel_alt:
+                    dfs['alt_df'] = read_sheet(sel_alt)
+                if sel_b:
+                    dfs['b_df'] = read_sheet(sel_b)
+
+                # Eğer hiç seçim yapılmadıysa veya okunamayanlar varsa fallback
+                if not dfs:
+                    dfs = load_from_excel(uploaded_xlsx)
+
+                # Stok session_state güncelle
+                if 'prog_df' in dfs and not dfs['prog_df'].empty:
+                    st.session_state.prog_df = dfs['prog_df']
+                if 'endeks_df' in dfs and not dfs['endeks_df'].empty:
+                    st.session_state.endeks_df = dfs['endeks_df']
+                if 'alt_df' in dfs and not dfs['alt_df'].empty:
+                    st.session_state.alt_df = dfs['alt_df']
+                if 'b_df' in dfs and not dfs['b_df'].empty:
+                    st.session_state.b_df = dfs['b_df']
+
+                st.session_state.load_count += 1
+                st.sidebar.success("Excel başarıyla okundu (eşleştirme uygulandı)!")
     except Exception as e:
-        st.sidebar.error(f"Dosya okuma hatası: Lütfen dosya yapısının doğru olduğundan emin olun. Detay: {e}")
+        st.sidebar.error(f"Dosya okuma hatası: {e}")
 
 # JSON proje yükleme / indirme (eski akış korunuyor)
 st.sidebar.subheader("📥 Önceki Projeyi Yükle (.json)")
