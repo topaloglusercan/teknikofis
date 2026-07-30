@@ -251,7 +251,6 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("📥 Proje Verisi Yükle")
 st.sidebar.caption("JSON projenizi veya Excel şablonunuzu buradan yükleyin.")
 
-# Akıllı Yükleyici: Hem JSON hem Excel destekler
 uploaded_file = st.sidebar.file_uploader("Dosya Seç (.json veya .xlsx)", type=["json", "xlsx"])
 
 if uploaded_file is not None:
@@ -280,22 +279,18 @@ suffix = st.session_state.load_count
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    # Tablodaki değişiklikler direkt olarak session_state'e aktarılır, böylece ekran yenilendiğinde veriler kaybolmaz.
-    st.session_state.prog_df = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
-    edited_prog = st.session_state.prog_df
+    # Girdi ve Çıktı koparıldı: Veri "edited_prog" içine kaydedilir, ekrandan atmaz, yeni satır eklenir.
+    edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
     
     st.subheader("3. Alt Endeks Ağırlıkları")
-    st.session_state.alt_df = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
-    edited_alt = st.session_state.alt_df
+    edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
 
 with col2:
     st.subheader("2. Endeks Tablosu")
-    st.session_state.endeks_df = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
-    edited_endeks = st.session_state.endeks_df
+    edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
     
     st.subheader("4. B Katsayısı Tablosu")
-    st.session_state.b_df = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
-    edited_b = st.session_state.b_df
+    edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
 
 # --- ÇİFT İNDİRME BUTONLARI (JSON & EXCEL) ---
 project_data = {
