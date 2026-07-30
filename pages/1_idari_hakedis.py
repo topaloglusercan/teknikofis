@@ -1,15 +1,15 @@
 """
-İdari Hakediş & Teyit Matrisi - Web Modülü (Nihai Stabil Sürüm)
-- Tablolara manuel veri girme (Focus/Rerun döngüsü) KESİN olarak çözüldü.
-- Excel'den gelen "None", "00:00:00" ve nokta/virgül karmaşası görsel olarak temizlendi.
-- Eski masaüstü uygulamasındaki Koyu Temalı Analiz Grafiği sisteme geri eklendi.
+İdari Hakediş & Teyit Matrisi - Web Modülü (Kusursuz Sürüm)
+- Tablolara veri girerken yaşanan kilitlenme / silişme sorunu 'TextColumn' ile çözüldü.
+- Excel'den gelen gizli tarihler (00:00:00) ve ham sayılar (2220000.0) Türk formatına dönüştürüldü.
+- Koyu temalı Analiz Grafiği sisteme entegre edildi.
 """
 
 import streamlit as st
 import pandas as pd
 import json
 import io
-import re
+import datetime
 import warnings
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 import matplotlib.pyplot as plt
@@ -26,29 +26,51 @@ st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_ic
 # ==========================================
 # 1. GÖRSEL TEMİZLİK VE FORMATLAMA (YENİ)
 # ==========================================
-def format_for_ui(val):
-    """Excel'den gelen ham veriyi (None, 00:00:00, 4972.2) insan okuyabilir Türk formatına çevirir."""
-    if pd.isna(val) or val is None: return ""
-    s = str(val).strip()
-    if s.lower() in ['nan', 'none', 'nat', '<na>', '']: return ""
-    
-    # Tarihlerdeki saat eklerini temizle
-    if s.endswith(" 00:00:00"): s = s.replace(" 00:00:00", "")
-        
-    # Noktalı ham float sayıları (örn: 4972.28) Türk Lirası formatına (4.972,28) çevir
-    if re.match(r'^-?\d+\.\d+$', s):
-        try:
-            return "{:,.2f}".format(float(s)).replace(",", "X").replace(".", ",").replace("X", ".")
-        except:
-            pass
-    return s
-
 def clean_df_for_ui(df):
-    """Tüm DataFrame'i görsel olarak temizler."""
+    """Excel/JSON verilerini ekrana basmadan önce insan okunabilir Türk formatına çevirir."""
     df_clean = df.copy()
+    months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+    
     for col in df_clean.columns:
-        df_clean[col] = df_clean[col].apply(format_for_ui)
-    return df_clean
+        is_numeric = str(col).upper() not in ['AYLAR', 'AĞIRLIK', 'ENDEKS SÜTUNU']
+        new_vals = []
+        for val in df_clean[col]:
+            if pd.isna(val) or val is None:
+                new_vals.append("")
+                continue
+                
+            # Excel'den gelen direkt Datetime (Tarih) objelerini "Temmuz 26" formatına çevir
+            if isinstance(val, (pd.Timestamp, datetime.datetime)):
+                new_vals.append(f"{months[val.month]} {str(val.year)[-2:]}")
+                continue
+            
+            s = str(val).strip()
+            if s.lower() in ['nan', 'none', 'nat', '<na>', '']:
+                new_vals.append("")
+                continue
+                
+            # Metin içindeki 00:00:00 saat kalıntılarını temizle
+            if s.endswith(" 00:00:00"):
+                s = s.replace(" 00:00:00", "")
+                try: # Tarihi çözümlemeyi dene
+                    dt = pd.to_datetime(s)
+                    s = f"{months[dt.month]} {str(dt.year)[-2:]}"
+                except: pass
+            else:
+                # Eğer sütun sayısal bir sütunsa ve içinde virgül yoksa (Excel'in ham float formatıysa)
+                if is_numeric and "," not in s:
+                    try:
+                        fval = float(s)
+                        if fval != 0 or "." in s: # Yılları bozmamak için sadece ondalıklı veya büyük sayıları düzelt
+                            s = "{:,.2f}".format(fval).replace(",", "X").replace(".", ",").replace("X", ".")
+                    except: pass
+            new_vals.append(s)
+        df_clean[col] = new_vals
+    return df_clean.astype(str)
+
+def get_text_config(df):
+    """Streamlit'in tabloları otomatik kilitmesini önler, tüm hücreleri özgür metin kutusu yapar."""
+    return {col: st.column_config.TextColumn(col) for col in df.columns}
 
 # ==========================================
 # 2. MATEMATİK VE YARDIMCI FONKSİYONLAR
@@ -57,10 +79,9 @@ def parse_turkish_date(date_str):
     if pd.isna(date_str) or str(date_str).strip() == '': return pd.NaT
     s = str(date_str).strip().replace('.', ' ').lower()
     if s in ['none', 'nan', 'nat', '<na>']: return pd.NaT
-    try:
-        return pd.to_datetime(s).strftime('%Y-%m')
+    try: return pd.to_datetime(s).strftime('%Y-%m')
     except: pass
-
+    
     months = {'oca': '01', 'ocak': '01', 'şub': '02', 'şubat': '02', 'mar': '03', 'mart': '03', 
               'nis': '04', 'nisan': '04', 'may': '05', 'mayıs': '05', 'haz': '06', 'haziran': '06', 
               'tem': '07', 'temmuz': '07', 'ağu': '08', 'ağustos': '08', 'eyl': '09', 'eylül': '09', 
@@ -94,8 +115,7 @@ def tr_format(val):
     if pd.isna(val) or val == "": return ""
     try:
         return "{:,.2f}".format(float(val)).replace(",", "X").replace(".", ",").replace("X", ".")
-    except:
-        return str(val)
+    except: return str(val)
 
 def filter_empty_rows(df):
     if df.empty: return df
@@ -137,9 +157,9 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     else: endeks_haritasi = _default_harita
 
     prog_kum_col = df_prog.columns[1]; imalat_kum_col = df_prog.columns[2] 
-
     kovalar = []
     onceki_kum = Decimal('0.0')
+    
     for _, row in df_prog.iterrows():
         kum = clean_decimal(row[prog_kum_col])
         cap = kum - onceki_kum
@@ -192,7 +212,6 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
                     elif katsayi > Decimal('0.0'): pn += katsayi
                 
                 ff_dilim = (kullanilan * b_kat * (pn - Decimal('1.0'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                
                 matris.append({
                     'Hakediş Ayı': str(uyg_ayi), 'İş Programı (Ödenek) Ayı': str(kova['ay']),
                     'Kullanılan Tutar': float(kullanilan), 'Uygulanan Pn (15 Hane)': float(pn), 'Fiyat Farkı Tutarı': float(ff_dilim)
@@ -229,10 +248,12 @@ def load_from_excel(file):
                     if 'AYLAR' in [str(v).upper() for v in row.values] or 'AĞIRLIK' in [str(v).upper() for v in row.values]:
                         skip = i + 1; break
             df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
-            df = df.loc[:, ~df.columns.str.contains('^Unnamed')].astype(str)
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            
             if sheet == 'AltEndeks' and 'Endeks Sütunu' not in df.columns:
-                df['Endeks Sütunu'] = df['Ağırlık'].str.strip().str.lower().map({'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}).fillna('')
-            # Görsel filtreyi uygulayarak kaydet
+                df['Endeks Sütunu'] = df['Ağırlık'].astype(str).str.strip().str.lower().map({'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}).fillna('')
+            
+            # Görsel filtreyi uygulayarak arayüzde temiz görünmesini sağla
             dfs[sheet_map[sheet]] = clean_df_for_ui(df)
     return dfs
 
@@ -262,7 +283,7 @@ if uploaded_excel is not None:
         if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
         if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
         st.session_state.load_count += 1
-        st.sidebar.success("✅ Veriler yüklendi ve temizlendi!")
+        st.sidebar.success("✅ Veriler yüklendi ve formatlandı!")
     except Exception as e: st.sidebar.error(f"Hata: {e}")
 
 st.sidebar.markdown("---")
@@ -277,21 +298,21 @@ if uploaded_json is not None:
     st.session_state.load_count += 1
     st.sidebar.success("✅ Proje yüklendi!")
 
-# -- ANA EKRAN TABLOLARI (MANUEL GİRİŞ İÇİN BAĞIMSIZ DEĞİŞKENLER) --
+# -- ANA EKRAN TABLOLARI (TÜM HÜCRELER ÖZGÜR METİN KUTUSU YAPILDI) --
 suffix = st.session_state.load_count
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
+    edited_prog = st.data_editor(st.session_state.prog_df, column_config=get_text_config(st.session_state.prog_df), num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
     st.subheader("3. Alt Endeks Ağırlıkları")
-    edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
+    edited_alt = st.data_editor(st.session_state.alt_df, column_config=get_text_config(st.session_state.alt_df), num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
 
 with col2:
     st.subheader("2. Endeks Tablosu")
-    edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
+    edited_endeks = st.data_editor(st.session_state.endeks_df, column_config=get_text_config(st.session_state.endeks_df), num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
     st.subheader("4. B Katsayısı Tablosu")
-    edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
+    edited_b = st.data_editor(st.session_state.b_df, column_config=get_text_config(st.session_state.b_df), num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
 
 # -- İNDİRME BUTONU --
 st.sidebar.markdown("---")
@@ -308,14 +329,12 @@ st.markdown("---")
 # ==========================================
 if st.button("🚀 Hesapla ve Sonuçları Göster", use_container_width=True, type="primary"):
     with st.spinner("Matematiksel motor çalışıyor..."):
-        # Hesaplama motoruna "edited_..." değişkenleri gidiyor. Manuel girdiklerin silinmez!
         df_sonuc, df_pivot, df_detay = hesapla(edited_prog, edited_endeks, edited_alt, edited_b)
     
     if df_sonuc.empty:
         st.warning("⚠️ Lütfen tablolara geçerli veri giriniz (İş Programı ve Endeks boş olamaz).")
     else:
         st.success("✅ Hesaplama Başarılı!")
-        
         tab1, tab2, tab3, tab4 = st.tabs(["🔍 Dilim Detay", "📊 Teyit Matrisi", "📑 Kümülatif Sonuç", "📈 Analiz Grafiği"])
         
         with tab1:
@@ -336,7 +355,6 @@ if st.button("🚀 Hesapla ve Sonuçları Göster", use_container_width=True, ty
             st.dataframe(df_sonuc, use_container_width=True)
             
         with tab4:
-            # --- Eski Tkinter Grafik Motorunun Web Uyarlaması ---
             try:
                 df_prog_raw = filter_empty_rows(edited_prog.copy())
                 df_prog_raw['AyKodu'] = pd.to_datetime(df_prog_raw['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
