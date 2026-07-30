@@ -245,6 +245,7 @@ if 'b_df' not in st.session_state:
     st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 
 st.title("📂 İdari Hakediş & Teyit Matrisi")
+st.markdown("*Bu modül, fiyat farkı kararnamelerine uygun olarak kova sistemi ve gecikme matrisi mantığıyla hakedişlerinizi hesaplamanızı ve analiz etmenizi sağlayan gelişmiş bir teknik ofis aracıdır.*")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📥 Proje Verisi Yükle")
@@ -279,14 +280,22 @@ suffix = st.session_state.load_count
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    edited_prog = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
+    # Tablodaki değişiklikler direkt olarak session_state'e aktarılır, böylece ekran yenilendiğinde veriler kaybolmaz.
+    st.session_state.prog_df = st.data_editor(st.session_state.prog_df, num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
+    edited_prog = st.session_state.prog_df
+    
     st.subheader("3. Alt Endeks Ağırlıkları")
-    edited_alt = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
+    st.session_state.alt_df = st.data_editor(st.session_state.alt_df, num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
+    edited_alt = st.session_state.alt_df
+
 with col2:
     st.subheader("2. Endeks Tablosu")
-    edited_endeks = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
+    st.session_state.endeks_df = st.data_editor(st.session_state.endeks_df, num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
+    edited_endeks = st.session_state.endeks_df
+    
     st.subheader("4. B Katsayısı Tablosu")
-    edited_b = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
+    st.session_state.b_df = st.data_editor(st.session_state.b_df, num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
+    edited_b = st.session_state.b_df
 
 # --- ÇİFT İNDİRME BUTONLARI (JSON & EXCEL) ---
 project_data = {
