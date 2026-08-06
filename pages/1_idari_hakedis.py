@@ -1,9 +1,9 @@
 """
 İdari Hakediş & Teyit Matrisi - Web Modülü
+- Sütun bazlı (Endeks 6 hane, Tutar 2 hane) kesin formatlama eklendi.
+- Excel okuma motoru 'float' yuvarlamalarına karşı string'e zorlandı.
 - Dosya Yükleyici sonsuz döngü (üzerine yazma) hatası giderildi.
-- Excel Şablon İndirme motoru aktif.
 - Görsel temizlik ve kilitlenme karşıtı 'TextColumn' aktif.
-- Koyu temalı analiz grafiği aktif.
 """
 
 import streamlit as st
@@ -28,13 +28,48 @@ st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_ic
 # ==========================================
 # 1. GÖRSEL TEMİZLİK VE FORMATLAMA
 # ==========================================
+def format_tr_number(val, target_decimals=None):
+    """Sayıları Türkçe formata (binlik nokta, ondalık virgül) ve hedeflenen haneye çevirir."""
+    if pd.isna(val) or str(val).strip().lower() in ['', 'nan', 'none', 'nat', '<na>']:
+        return ""
+    try:
+        # Önce sayıyı temiz bir Decimal objesine çeviriyoruz
+        dval = clean_decimal(str(val))
+        
+        if target_decimals is not None:
+            # Sütun tipine göre sabit hane dayatması (Örn: Endeksler için 6)
+            s = f"{dval:.{target_decimals}f}"
+        else:
+            # Hedef yoksa orijinal hassasiyeti koru
+            dval = dval.normalize()
+            s = f"{dval:f}"
+            
+        if "." in s:
+            int_part, dec_part = s.split(".")
+            int_part = "{:,}".format(int(int_part)).replace(",", ".")
+            return f"{int_part},{dec_part}"
+        else:
+            return "{:,}".format(int(s)).replace(",", ".")
+    except:
+        return str(val)
+
 def clean_df_for_ui(df):
-    """Excel/JSON verilerini ekrana basmadan önce insan okunabilir Türk formatına çevirir."""
+    """Verileri ekrana basmadan önce sütun adlarına bakarak kurallı Türk formatına çevirir."""
     df_clean = df.copy()
     months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
     
     for col in df_clean.columns:
-        is_numeric = str(col).upper() not in ['AYLAR', 'AĞIRLIK', 'ENDEKS SÜTUNU']
+        col_name = str(col).upper()
+        is_numeric = col_name not in ['AYLAR', 'AĞIRLIK', 'ENDEKS SÜTUNU']
+        
+        # Sütun isminden hakediş mantığına göre hane sayısını belirliyoruz
+        target_decimals = None
+        if is_numeric:
+            if any(x in col_name for x in ['TUTAR', 'PROGRAM', 'FARK']):
+                target_decimals = 2
+            elif any(x in col_name for x in ['I O', 'Ç O', 'D O', 'Y O', 'K O', 'G O', 'M O', 'TEMEL ENDEKS']):
+                target_decimals = 6
+        
         new_vals = []
         for val in df_clean[col]:
             if pd.isna(val) or val is None:
@@ -57,17 +92,9 @@ def clean_df_for_ui(df):
                     s = f"{months[dt.month]} {str(dt.year)[-2:]}"
                 except: pass
             else:
-                if is_numeric and "," not in s:
-                    try:
-                        dval = Decimal(s).normalize()
-                        s_val = f"{dval:f}"
-                        if "." in s_val:
-                            int_part, dec_part = s_val.split(".")
-                            int_part = "{:,}".format(int(int_part)).replace(",", ".")
-                            s = f"{int_part},{dec_part}"
-                        else:
-                            s = "{:,}".format(int(s_val)).replace(",", ".")
-                    except: pass
+                if is_numeric:
+                    # Virgül olup olmadığına bakmaksızın tüm sayıları kurallı formattan geçiriyoruz
+                    s = format_tr_number(s, target_decimals)
             new_vals.append(s)
         df_clean[col] = new_vals
     return df_clean.astype(str)
@@ -338,7 +365,9 @@ def load_from_excel(file):
                 for i, row in df_temp.iterrows():
                     if 'AYLAR' in [str(v).upper() for v in row.values] or 'AĞIRLIK' in [str(v).upper() for v in row.values]:
                         skip = i + 1; break
-            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
+            
+            # Pandas'ı sayıları float olarak okuyup sıfırları yutmaması için 'dtype=str' ile string okumaya zorluyoruz
+            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip, dtype=str)
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             
             if sheet == 'AltEndeks' and 'Endeks Sütunu' not in df.columns:
@@ -354,9 +383,9 @@ if 'load_count' not in st.session_state: st.session_state.load_count = 0
 if 'prog_df' not in st.session_state:
     st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": ["0,00"], "İMALAT TUTARI KÜMÜLATİF": ["0,00"]})
 if 'endeks_df' not in st.session_state:
-    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": ["0,00"], "Ç o": ["0,00"], "D o": ["0,00"], "Y o": ["0,00"], "K o": ["0,00"], "G o": ["0,00"], "M o": ["0,00"]})
+    st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": ["0,000000"], "Ç o": ["0,000000"], "D o": ["0,000000"], "Y o": ["0,000000"], "K o": ["0,000000"], "G o": ["0,000000"], "M o": ["0,000000"]})
 if 'alt_df' not in st.session_state:
-    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00"] * 7, "Temel Endeks": ["0,00"] * 7, "Endeks Sütunu": ["I o", "Ç o", "D o", "Y o", "K o", "G o", "M o"]})
+    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00"] * 7, "Temel Endeks": ["0,000000"] * 7, "Endeks Sütunu": ["I o", "Ç o", "D o", "Y o", "K o", "G o", "M o"]})
 if 'b_df' not in st.session_state:
     st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 
@@ -367,7 +396,6 @@ st.sidebar.markdown("### 📥 Excel ile Proje Yükle")
 uploaded_excel = st.sidebar.file_uploader("Excel Dosyası Seç (.xlsx)", type=["xlsx"])
 if uploaded_excel is not None:
     file_bytes = uploaded_excel.getvalue()
-    # Yalnızca dosya İLK KEZ yüklendiğinde çalışmasını sağlayan bayt/hafıza kontrolü
     if st.session_state.get('last_excel_bytes') != file_bytes:
         try:
             dfs = load_from_excel(uploaded_excel)
@@ -385,7 +413,6 @@ st.sidebar.markdown("### 📥 Önceki Projeyi Yükle (.json)")
 uploaded_json = st.sidebar.file_uploader("JSON Dosyası Seç", type=["json"])
 if uploaded_json is not None:
     file_bytes_json = uploaded_json.getvalue()
-    # Yalnızca JSON dosyası İLK KEZ yüklendiğinde çalışmasını sağlayan kontrol
     if st.session_state.get('last_json_bytes') != file_bytes_json:
         data = json.load(uploaded_json)
         if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']))
