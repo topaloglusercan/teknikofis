@@ -1,6 +1,6 @@
 """
 İdari Hakediş & Teyit Matrisi - Web Modülü
-- Sütun bazlı (Endeks 6 hane, Tutar 2 hane) kesin formatlama eklendi.
+- Sunucu karakter farklılıklarına karşı 'Tablo Bazlı' kesin ondalık (precision) formatlama eklendi.
 - Excel okuma motoru 'float' yuvarlamalarına karşı string'e zorlandı.
 - Dosya Yükleyici sonsuz döngü (üzerine yazma) hatası giderildi.
 - Görsel temizlik ve kilitlenme karşıtı 'TextColumn' aktif.
@@ -28,22 +28,15 @@ st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_ic
 # ==========================================
 # 1. GÖRSEL TEMİZLİK VE FORMATLAMA
 # ==========================================
-def format_tr_number(val, target_decimals=None):
+def format_tr_number(val, target_decimals=2):
     """Sayıları Türkçe formata (binlik nokta, ondalık virgül) ve hedeflenen haneye çevirir."""
     if pd.isna(val) or str(val).strip().lower() in ['', 'nan', 'none', 'nat', '<na>']:
         return ""
     try:
-        # Önce sayıyı temiz bir Decimal objesine çeviriyoruz
         dval = clean_decimal(str(val))
+        # Hedeflenen basamak sayısına göre zorunlu formatlama
+        s = f"{dval:.{target_decimals}f}"
         
-        if target_decimals is not None:
-            # Sütun tipine göre sabit hane dayatması (Örn: Endeksler için 6)
-            s = f"{dval:.{target_decimals}f}"
-        else:
-            # Hedef yoksa orijinal hassasiyeti koru
-            dval = dval.normalize()
-            s = f"{dval:f}"
-            
         if "." in s:
             int_part, dec_part = s.split(".")
             int_part = "{:,}".format(int(int_part)).replace(",", ".")
@@ -53,22 +46,13 @@ def format_tr_number(val, target_decimals=None):
     except:
         return str(val)
 
-def clean_df_for_ui(df):
-    """Verileri ekrana basmadan önce sütun adlarına bakarak kurallı Türk formatına çevirir."""
+def clean_df_for_ui(df, target_decimals=2):
+    """Tablonun kimliğine (hedef ondalık sayısına) göre verileri formatlar."""
     df_clean = df.copy()
     months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
     
     for col in df_clean.columns:
-        col_name = str(col).upper()
-        is_numeric = col_name not in ['AYLAR', 'AĞIRLIK', 'ENDEKS SÜTUNU']
-        
-        # Sütun isminden hakediş mantığına göre hane sayısını belirliyoruz
-        target_decimals = None
-        if is_numeric:
-            if any(x in col_name for x in ['TUTAR', 'PROGRAM', 'FARK']):
-                target_decimals = 2
-            elif any(x in col_name for x in ['I O', 'Ç O', 'D O', 'Y O', 'K O', 'G O', 'M O', 'TEMEL ENDEKS']):
-                target_decimals = 6
+        is_numeric = str(col).upper() not in ['AYLAR', 'AĞIRLIK', 'ENDEKS SÜTUNU']
         
         new_vals = []
         for val in df_clean[col]:
@@ -93,7 +77,7 @@ def clean_df_for_ui(df):
                 except: pass
             else:
                 if is_numeric:
-                    # Virgül olup olmadığına bakmaksızın tüm sayıları kurallı formattan geçiriyoruz
+                    # Tablo için belirlenen hedef hane sayısı ile formatla
                     s = format_tr_number(s, target_decimals)
             new_vals.append(s)
         df_clean[col] = new_vals
@@ -356,24 +340,35 @@ def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
 def load_from_excel(file):
     xls = pd.ExcelFile(file)
     dfs = {}
-    sheet_map = {'IsProgrami': 'prog_df', 'Endeks': 'endeks_df', 'AltEndeks': 'alt_df', 'B': 'b_df'}
+    
+    # Hangi Excel tablosunun kaç haneli işleneceğini doğrudan (hardcoded) belirliyoruz.
+    sheet_map = {
+        'IsProgrami': ('prog_df', 2), 
+        'Endeks': ('endeks_df', 6), 
+        'AltEndeks': ('alt_df', 6), 
+        'B': ('b_df', 2)
+    }
+    
     for sheet in xls.sheet_names:
         if sheet in sheet_map:
+            target_var, target_dec = sheet_map[sheet]
             df_temp = pd.read_excel(xls, sheet_name=sheet, nrows=5)
             skip = 0; cols = [str(c).upper() for c in df_temp.columns]
+            
             if 'AYLAR' not in cols and 'AĞIRLIK' not in cols:
                 for i, row in df_temp.iterrows():
                     if 'AYLAR' in [str(v).upper() for v in row.values] or 'AĞIRLIK' in [str(v).upper() for v in row.values]:
                         skip = i + 1; break
             
-            # Pandas'ı sayıları float olarak okuyup sıfırları yutmaması için 'dtype=str' ile string okumaya zorluyoruz
+            # Pandas'ı sayıları float olarak okuyup sıfırları yutmaması için dtype=str ile zorluyoruz
             df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip, dtype=str)
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             
             if sheet == 'AltEndeks' and 'Endeks Sütunu' not in df.columns:
                 df['Endeks Sütunu'] = df['Ağırlık'].astype(str).str.strip().str.lower().map({'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}).fillna('')
             
-            dfs[sheet_map[sheet]] = clean_df_for_ui(df)
+            # Formata ilgili haneyi zorla gönderiyoruz
+            dfs[target_var] = clean_df_for_ui(df, target_decimals=target_dec)
     return dfs
 
 # ==========================================
@@ -385,7 +380,7 @@ if 'prog_df' not in st.session_state:
 if 'endeks_df' not in st.session_state:
     st.session_state.endeks_df = pd.DataFrame({"AYLAR": ["Oca 22"], "I o": ["0,000000"], "Ç o": ["0,000000"], "D o": ["0,000000"], "Y o": ["0,000000"], "K o": ["0,000000"], "G o": ["0,000000"], "M o": ["0,000000"]})
 if 'alt_df' not in st.session_state:
-    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00"] * 7, "Temel Endeks": ["0,000000"] * 7, "Endeks Sütunu": ["I o", "Ç o", "D o", "Y o", "K o", "G o", "M o"]})
+    st.session_state.alt_df = pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,000000"] * 7, "Temel Endeks": ["0,000000"] * 7, "Endeks Sütunu": ["I o", "Ç o", "D o", "Y o", "K o", "G o", "M o"]})
 if 'b_df' not in st.session_state:
     st.session_state.b_df = pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]})
 
@@ -415,10 +410,12 @@ if uploaded_json is not None:
     file_bytes_json = uploaded_json.getvalue()
     if st.session_state.get('last_json_bytes') != file_bytes_json:
         data = json.load(uploaded_json)
-        if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']))
-        if 'endeks' in data: st.session_state.endeks_df = clean_df_for_ui(pd.DataFrame(data['endeks']))
-        if 'alt' in data: st.session_state.alt_df = clean_df_for_ui(pd.DataFrame(data['alt']))
-        if 'b' in data: st.session_state.b_df = clean_df_for_ui(pd.DataFrame(data['b']))
+        # JSON'dan okunan ham değerlere de ait oldukları haneleri zorluyoruz
+        if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']), target_decimals=2)
+        if 'endeks' in data: st.session_state.endeks_df = clean_df_for_ui(pd.DataFrame(data['endeks']), target_decimals=6)
+        if 'alt' in data: st.session_state.alt_df = clean_df_for_ui(pd.DataFrame(data['alt']), target_decimals=6)
+        if 'b' in data: st.session_state.b_df = clean_df_for_ui(pd.DataFrame(data['b']), target_decimals=2)
+        
         st.session_state.load_count += 1
         st.session_state.last_json_bytes = file_bytes_json
         st.sidebar.success("✅ Proje yüklendi!")
