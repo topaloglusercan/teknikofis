@@ -1,6 +1,7 @@
 """
 İdari Hakediş & Teyit Matrisi - Web Modülü
-- Excel Şablon İndirme motoru geri eklendi.
+- Dosya Yükleyici sonsuz döngü (üzerine yazma) hatası giderildi.
+- Excel Şablon İndirme motoru aktif.
 - Görsel temizlik ve kilitlenme karşıtı 'TextColumn' aktif.
 - Koyu temalı analiz grafiği aktif.
 """
@@ -14,6 +15,7 @@ import warnings
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -57,9 +59,14 @@ def clean_df_for_ui(df):
             else:
                 if is_numeric and "," not in s:
                     try:
-                        fval = float(s)
-                        if fval != 0 or "." in s: 
-                            s = "{:,.2f}".format(fval).replace(",", "X").replace(".", ",").replace("X", ".")
+                        dval = Decimal(s).normalize()
+                        s_val = f"{dval:f}"
+                        if "." in s_val:
+                            int_part, dec_part = s_val.split(".")
+                            int_part = "{:,}".format(int(int_part)).replace(",", ".")
+                            s = f"{int_part},{dec_part}"
+                        else:
+                            s = "{:,}".format(int(s_val)).replace(",", ".")
                     except: pass
             new_vals.append(s)
         df_clean[col] = new_vals
@@ -229,10 +236,9 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
     return df_sonuc, df_pivot, df_detay
 
 # ==========================================
-# 4. EXCEL ŞABLON MOTORU (GERİ EKLENDİ)
+# 4. EXCEL ŞABLON MOTORU
 # ==========================================
 def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
-    """ Ekranda bulunan tabloların verilerini kullanarak renkli ve kilitli profesyonel bir şablon üretir. """
     wb = Workbook()
     thin = Side(style='thin', color='B0C4DE')
     def brd(): return Border(top=thin, left=thin, right=thin, bottom=thin)
@@ -267,7 +273,6 @@ def generate_excel_download(df_prog, df_endeks, df_alt, df_b):
                 c.fill = fill(YELLOW if ci in yellow_cols else bg)
                 c.font = fnt('1A1A2E', False, 9); c.alignment = aln('right' if ci > 1 else 'left'); c.border = brd()
         
-        # Gelecek aylar için 10 adet boş sarı giriş satırı ekle
         for ri in range(start_row + len(df), start_row + len(df) + 10):
             bg = YELLOW if ri % 2 == 0 else 'FFFEF0'
             for ci in range(1, len(df.columns) + 1):
@@ -361,27 +366,35 @@ st.title("📂 İdari Hakediş & Teyit Matrisi")
 st.sidebar.markdown("### 📥 Excel ile Proje Yükle")
 uploaded_excel = st.sidebar.file_uploader("Excel Dosyası Seç (.xlsx)", type=["xlsx"])
 if uploaded_excel is not None:
-    try:
-        dfs = load_from_excel(uploaded_excel)
-        if 'prog_df' in dfs: st.session_state.prog_df = dfs['prog_df']
-        if 'endeks_df' in dfs: st.session_state.endeks_df = dfs['endeks_df']
-        if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
-        if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
-        st.session_state.load_count += 1
-        st.sidebar.success("✅ Veriler yüklendi ve formatlandı!")
-    except Exception as e: st.sidebar.error(f"Hata: {e}")
+    file_bytes = uploaded_excel.getvalue()
+    # Yalnızca dosya İLK KEZ yüklendiğinde çalışmasını sağlayan bayt/hafıza kontrolü
+    if st.session_state.get('last_excel_bytes') != file_bytes:
+        try:
+            dfs = load_from_excel(uploaded_excel)
+            if 'prog_df' in dfs: st.session_state.prog_df = dfs['prog_df']
+            if 'endeks_df' in dfs: st.session_state.endeks_df = dfs['endeks_df']
+            if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
+            if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
+            st.session_state.load_count += 1
+            st.session_state.last_excel_bytes = file_bytes
+            st.sidebar.success("✅ Veriler yüklendi ve formatlandı!")
+        except Exception as e: st.sidebar.error(f"Hata: {e}")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📥 Önceki Projeyi Yükle (.json)")
 uploaded_json = st.sidebar.file_uploader("JSON Dosyası Seç", type=["json"])
 if uploaded_json is not None:
-    data = json.load(uploaded_json)
-    if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']))
-    if 'endeks' in data: st.session_state.endeks_df = clean_df_for_ui(pd.DataFrame(data['endeks']))
-    if 'alt' in data: st.session_state.alt_df = clean_df_for_ui(pd.DataFrame(data['alt']))
-    if 'b' in data: st.session_state.b_df = clean_df_for_ui(pd.DataFrame(data['b']))
-    st.session_state.load_count += 1
-    st.sidebar.success("✅ Proje yüklendi!")
+    file_bytes_json = uploaded_json.getvalue()
+    # Yalnızca JSON dosyası İLK KEZ yüklendiğinde çalışmasını sağlayan kontrol
+    if st.session_state.get('last_json_bytes') != file_bytes_json:
+        data = json.load(uploaded_json)
+        if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']))
+        if 'endeks' in data: st.session_state.endeks_df = clean_df_for_ui(pd.DataFrame(data['endeks']))
+        if 'alt' in data: st.session_state.alt_df = clean_df_for_ui(pd.DataFrame(data['alt']))
+        if 'b' in data: st.session_state.b_df = clean_df_for_ui(pd.DataFrame(data['b']))
+        st.session_state.load_count += 1
+        st.session_state.last_json_bytes = file_bytes_json
+        st.sidebar.success("✅ Proje yüklendi!")
 
 # -- ANA EKRAN TABLOLARI --
 suffix = st.session_state.load_count
@@ -426,7 +439,11 @@ st.markdown("---")
 # ==========================================
 if st.button("🚀 Hesapla ve Sonuçları Göster", use_container_width=True, type="primary"):
     with st.spinner("Matematiksel motor çalışıyor..."):
-        df_sonuc, df_pivot, df_detay = hesapla(edited_prog, edited_endeks, edited_alt, edited_b)
+        st.session_state.hesap_sonuc = hesapla(edited_prog, edited_endeks, edited_alt, edited_b)
+        st.session_state.hesap_yapildi = True
+
+if st.session_state.get('hesap_yapildi', False):
+    df_sonuc, df_pivot, df_detay = st.session_state.hesap_sonuc
     
     if df_sonuc.empty:
         st.warning("⚠️ Lütfen tablolara geçerli veri giriniz (İş Programı ve Endeks boş olamaz).")
@@ -453,7 +470,7 @@ if st.button("🚀 Hesapla ve Sonuçları Göster", use_container_width=True, ty
             
         with tab4:
             try:
-                df_prog_raw = filter_empty_rows(edited_prog.copy())
+                df_prog_raw = filter_empty_rows(df_sonuc.copy())
                 df_prog_raw['AyKodu'] = pd.to_datetime(df_prog_raw['AYLAR'].apply(parse_turkish_date)).dt.to_period('M')
                 df_prog_raw = df_prog_raw.dropna(subset=['AyKodu'])
                 
@@ -476,8 +493,12 @@ if st.button("🚀 Hesapla ve Sonuçları Göster", use_container_width=True, ty
                     
                 ax1.plot(x, prog_vals, color='#58a6ff', linewidth=2.5, marker='o', markersize=5, label='İş Programı (Kümülatif)')
                 ax1.plot(x, iml_vals, color='#3fb950', linewidth=2.5, marker='s', markersize=5, linestyle='--', label='İmalat Tutarı (Kümülatif)')
-                ax1.fill_between(x, prog_vals, iml_vals, where=[p >= i for p, i in zip(prog_vals, iml_vals)], alpha=0.15, color='#f85149', label='Gecikme')
-                ax1.fill_between(x, prog_vals, iml_vals, where=[p < i for p, i in zip(prog_vals, iml_vals)], alpha=0.15, color='#3fb950', label='Öne Geçme')
+                
+                where_gecikme = np.array([p >= i for p, i in zip(prog_vals, iml_vals)])
+                where_one_gecme = np.array([p < i for p, i in zip(prog_vals, iml_vals)])
+                
+                ax1.fill_between(x, prog_vals, iml_vals, where=where_gecikme, alpha=0.15, color='#f85149', label='Gecikme')
+                ax1.fill_between(x, prog_vals, iml_vals, where=where_one_gecme, alpha=0.15, color='#3fb950', label='Öne Geçme')
                 
                 ax1.set_ylabel('Tutar (TL)', color='#8b949e', fontsize=10)
                 ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: tr_format(v)))
