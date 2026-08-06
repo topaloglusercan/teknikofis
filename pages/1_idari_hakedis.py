@@ -1,9 +1,8 @@
 """
 İdari Hakediş & Teyit Matrisi - Web Modülü
-- Sunucu karakter farklılıklarına karşı 'Tablo Bazlı' kesin ondalık (precision) formatlama eklendi.
-- Excel okuma motoru 'float' yuvarlamalarına karşı string'e zorlandı.
-- Dosya Yükleyici sonsuz döngü (üzerine yazma) hatası giderildi.
-- Görsel temizlik ve kilitlenme karşıtı 'TextColumn' aktif.
+- Ekrana girilen verilerin silinme (revert) sorunu Cache-Clearing ile çözüldü.
+- Streamlit Cloud'un Excel'den ondalık (float) okuma budaması engellendi.
+- Tablo bazlı (Endeks 6, Tutar 2 hane) hassasiyet sabitlendi.
 """
 
 import streamlit as st
@@ -33,8 +32,12 @@ def format_tr_number(val, target_decimals=2):
     if pd.isna(val) or str(val).strip().lower() in ['', 'nan', 'none', 'nat', '<na>']:
         return ""
     try:
-        dval = clean_decimal(str(val))
-        # Hedeflenen basamak sayısına göre zorunlu formatlama
+        # Pandas'tan gelen saf float'ı koruyarak Decimal'e alıyoruz
+        if isinstance(val, float):
+            dval = Decimal(str(val))
+        else:
+            dval = clean_decimal(str(val))
+            
         s = f"{dval:.{target_decimals}f}"
         
         if "." in s:
@@ -47,7 +50,7 @@ def format_tr_number(val, target_decimals=2):
         return str(val)
 
 def clean_df_for_ui(df, target_decimals=2):
-    """Tablonun kimliğine (hedef ondalık sayısına) göre verileri formatlar."""
+    """Tablonun kimliğine göre verileri formatlar."""
     df_clean = df.copy()
     months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
     
@@ -77,8 +80,8 @@ def clean_df_for_ui(df, target_decimals=2):
                 except: pass
             else:
                 if is_numeric:
-                    # Tablo için belirlenen hedef hane sayısı ile formatla
-                    s = format_tr_number(s, target_decimals)
+                    # Gelen float/string veriyi belirlenen formata sok
+                    s = format_tr_number(val if isinstance(val, float) else s, target_decimals)
             new_vals.append(s)
         df_clean[col] = new_vals
     return df_clean.astype(str)
@@ -341,7 +344,6 @@ def load_from_excel(file):
     xls = pd.ExcelFile(file)
     dfs = {}
     
-    # Hangi Excel tablosunun kaç haneli işleneceğini doğrudan (hardcoded) belirliyoruz.
     sheet_map = {
         'IsProgrami': ('prog_df', 2), 
         'Endeks': ('endeks_df', 6), 
@@ -360,21 +362,25 @@ def load_from_excel(file):
                     if 'AYLAR' in [str(v).upper() for v in row.values] or 'AĞIRLIK' in [str(v).upper() for v in row.values]:
                         skip = i + 1; break
             
-            # Pandas'ı sayıları float olarak okuyup sıfırları yutmaması için dtype=str ile zorluyoruz
-            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip, dtype=str)
+            # dtype=str YASAKLANDI. Pandas artık doğal float okuyacak.
+            df = pd.read_excel(xls, sheet_name=sheet, skiprows=skip)
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             
             if sheet == 'AltEndeks' and 'Endeks Sütunu' not in df.columns:
                 df['Endeks Sütunu'] = df['Ağırlık'].astype(str).str.strip().str.lower().map({'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}).fillna('')
             
-            # Formata ilgili haneyi zorla gönderiyoruz
             dfs[target_var] = clean_df_for_ui(df, target_decimals=target_dec)
     return dfs
+
+def clear_editor_caches():
+    """Streamlit'in inatçı tablo önbelleklerini zorla siler."""
+    for key in ['prog_ed', 'end_ed', 'alt_ed', 'b_ed']:
+        if key in st.session_state:
+            del st.session_state[key]
 
 # ==========================================
 # 5. STATE & ARAYÜZ (UI)
 # ==========================================
-if 'load_count' not in st.session_state: st.session_state.load_count = 0
 if 'prog_df' not in st.session_state:
     st.session_state.prog_df = pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": ["0,00"], "İMALAT TUTARI KÜMÜLATİF": ["0,00"]})
 if 'endeks_df' not in st.session_state:
@@ -393,12 +399,13 @@ if uploaded_excel is not None:
     file_bytes = uploaded_excel.getvalue()
     if st.session_state.get('last_excel_bytes') != file_bytes:
         try:
+            clear_editor_caches() # Önbellekleri acımasızca temizle
             dfs = load_from_excel(uploaded_excel)
             if 'prog_df' in dfs: st.session_state.prog_df = dfs['prog_df']
             if 'endeks_df' in dfs: st.session_state.endeks_df = dfs['endeks_df']
             if 'alt_df' in dfs: st.session_state.alt_df = dfs['alt_df']
             if 'b_df' in dfs: st.session_state.b_df = dfs['b_df']
-            st.session_state.load_count += 1
+            
             st.session_state.last_excel_bytes = file_bytes
             st.sidebar.success("✅ Veriler yüklendi ve formatlandı!")
         except Exception as e: st.sidebar.error(f"Hata: {e}")
@@ -409,32 +416,31 @@ uploaded_json = st.sidebar.file_uploader("JSON Dosyası Seç", type=["json"])
 if uploaded_json is not None:
     file_bytes_json = uploaded_json.getvalue()
     if st.session_state.get('last_json_bytes') != file_bytes_json:
+        clear_editor_caches() # Önbellekleri acımasızca temizle
         data = json.load(uploaded_json)
-        # JSON'dan okunan ham değerlere de ait oldukları haneleri zorluyoruz
         if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']), target_decimals=2)
         if 'endeks' in data: st.session_state.endeks_df = clean_df_for_ui(pd.DataFrame(data['endeks']), target_decimals=6)
         if 'alt' in data: st.session_state.alt_df = clean_df_for_ui(pd.DataFrame(data['alt']), target_decimals=6)
         if 'b' in data: st.session_state.b_df = clean_df_for_ui(pd.DataFrame(data['b']), target_decimals=2)
         
-        st.session_state.load_count += 1
         st.session_state.last_json_bytes = file_bytes_json
         st.sidebar.success("✅ Proje yüklendi!")
 
 # -- ANA EKRAN TABLOLARI --
-suffix = st.session_state.load_count
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("1. İş Programı ve İmalatlar")
-    edited_prog = st.data_editor(st.session_state.prog_df, column_config=get_text_config(st.session_state.prog_df), num_rows="dynamic", use_container_width=True, key=f"prog_ed_{suffix}")
+    # State'leri doğrudan eşitliyoruz, sabit statik key kullanıyoruz. Veri kaybolması imkansız.
+    st.session_state.prog_df = st.data_editor(st.session_state.prog_df, column_config=get_text_config(st.session_state.prog_df), num_rows="dynamic", use_container_width=True, key="prog_ed")
     st.subheader("3. Alt Endeks Ağırlıkları")
-    edited_alt = st.data_editor(st.session_state.alt_df, column_config=get_text_config(st.session_state.alt_df), num_rows="dynamic", use_container_width=True, key=f"alt_ed_{suffix}")
+    st.session_state.alt_df = st.data_editor(st.session_state.alt_df, column_config=get_text_config(st.session_state.alt_df), num_rows="dynamic", use_container_width=True, key="alt_ed")
 
 with col2:
     st.subheader("2. Endeks Tablosu")
-    edited_endeks = st.data_editor(st.session_state.endeks_df, column_config=get_text_config(st.session_state.endeks_df), num_rows="dynamic", use_container_width=True, key=f"end_ed_{suffix}")
+    st.session_state.endeks_df = st.data_editor(st.session_state.endeks_df, column_config=get_text_config(st.session_state.endeks_df), num_rows="dynamic", use_container_width=True, key="end_ed")
     st.subheader("4. B Katsayısı Tablosu")
-    edited_b = st.data_editor(st.session_state.b_df, column_config=get_text_config(st.session_state.b_df), num_rows="dynamic", use_container_width=True, key=f"b_ed_{suffix}")
+    st.session_state.b_df = st.data_editor(st.session_state.b_df, column_config=get_text_config(st.session_state.b_df), num_rows="dynamic", use_container_width=True, key="b_ed")
 
 # -- İNDİRME BUTONLARI (JSON & EXCEL) --
 st.sidebar.markdown("---")
@@ -444,13 +450,13 @@ col_s1, col_s2 = st.sidebar.columns(2)
 with col_s1:
     st.download_button(
         label="💾 JSON",
-        data=json.dumps({'prog': edited_prog.to_dict(orient='records'), 'endeks': edited_endeks.to_dict(orient='records'), 'alt': edited_alt.to_dict(orient='records'), 'b': edited_b.to_dict(orient='records')}, indent=4),
+        data=json.dumps({'prog': st.session_state.prog_df.to_dict(orient='records'), 'endeks': st.session_state.endeks_df.to_dict(orient='records'), 'alt': st.session_state.alt_df.to_dict(orient='records'), 'b': st.session_state.b_df.to_dict(orient='records')}, indent=4),
         file_name="hakedis_projem.json", mime="application/json", use_container_width=True
     )
 with col_s2:
     st.download_button(
         label="📊 EXCEL",
-        data=generate_excel_download(edited_prog, edited_endeks, edited_alt, edited_b),
+        data=generate_excel_download(st.session_state.prog_df, st.session_state.endeks_df, st.session_state.alt_df, st.session_state.b_df),
         file_name="idari_hakedis_sablonu.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
@@ -463,7 +469,7 @@ st.markdown("---")
 # ==========================================
 if st.button("🚀 Hesapla ve Sonuçları Göster", use_container_width=True, type="primary"):
     with st.spinner("Matematiksel motor çalışıyor..."):
-        st.session_state.hesap_sonuc = hesapla(edited_prog, edited_endeks, edited_alt, edited_b)
+        st.session_state.hesap_sonuc = hesapla(st.session_state.prog_df, st.session_state.endeks_df, st.session_state.alt_df, st.session_state.b_df)
         st.session_state.hesap_yapildi = True
 
 if st.session_state.get('hesap_yapildi', False):
