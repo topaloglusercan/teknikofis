@@ -48,15 +48,55 @@ def load_data():
     if st.session_state.json_uploader is not None:
         try:
             data = json.load(st.session_state.json_uploader)
-            st.session_state.bac = float(data["Parametreler"]["BAC"])
-            st.session_state.sac = float(data["Parametreler"]["SAC"])
-            st.session_state.at = float(data["Parametreler"]["AT"])
-            st.session_state.ev = float(data["Parametreler"]["EV"])
-            st.session_state.ac = float(data["Parametreler"]["AC"])
-            loaded_df = pd.DataFrame(data["Planlanan_Degerler"])
-            st.session_state.pv_df = loaded_df[["Ay", "Aylik_PV_TL"]]
+            
+            # 1. Hakediş Dosyası (Otomasyon) Formatı
+            if "prog" in data:
+                prog_df = pd.DataFrame(data["prog"])
+                
+                # PV Kümülatif serisini temizle ve Aylık farklara dönüştür
+                pv_kum = prog_df["İŞ PROGRAMI KÜMÜLATİF"].apply(parse_tr_number)
+                aylik_pv = pv_kum.diff().fillna(pv_kum)
+                
+                st.session_state.bac = float(pv_kum.iloc[-1])
+                st.session_state.sac = float(len(prog_df))
+                
+                # Gerçekleşen Zaman (AT) ve Kazanılmış Değer (EV) Tespiti
+                # İmalat sütununda verisi olan son ayı buluyoruz
+                ev_series = prog_df["İMALAT TUTARI KÜMÜLATİF"].astype(str).str.strip()
+                dolu_satirlar = ev_series[ev_series != ""].index
+                
+                if len(dolu_satirlar) > 0:
+                    at_index = dolu_satirlar[-1]
+                    st.session_state.at = float(at_index + 1)
+                    st.session_state.ev = float(parse_tr_number(ev_series.iloc[at_index]))
+                    # Ayrı bir maliyet verisi (AC) olmadığı için EV'ye eşitliyoruz
+                    st.session_state.ac = st.session_state.ev
+                else:
+                    st.session_state.at = 0.0
+                    st.session_state.ev = 0.0
+                    st.session_state.ac = 0.0
+                
+                # Planlanan değerler (PV) tablosunu sıfırdan oluştur
+                yeni_pv = pd.DataFrame({
+                    "Ay": list(range(1, len(prog_df) + 1)),
+                    "Aylik_PV_TL": aylik_pv.apply(lambda x: f"{x:.2f}".replace(".", ","))
+                })
+                st.session_state.pv_df = yeni_pv
+                st.sidebar.success("✅ Hakediş verisinden performans metrikleri başarıyla senkronize edildi!")
+
+            # 2. Önceki Manuel Kayıt (Parametreler) Formatı
+            elif "Parametreler" in data:
+                st.session_state.bac = float(data["Parametreler"]["BAC"])
+                st.session_state.sac = float(data["Parametreler"]["SAC"])
+                st.session_state.at = float(data["Parametreler"]["AT"])
+                st.session_state.ev = float(data["Parametreler"]["EV"])
+                st.session_state.ac = float(data["Parametreler"]["AC"])
+                loaded_df = pd.DataFrame(data["Planlanan_Degerler"])
+                st.session_state.pv_df = loaded_df[["Ay", "Aylik_PV_TL"]]
+                st.sidebar.success("✅ Proje kayıt verisi başarıyla yüklendi!")
+                
         except Exception as e:
-            st.sidebar.error("Dosya okuma hatası! Geçerli bir JSON yüklediğinizden emin olun.")
+            st.sidebar.error(f"Dosya okuma hatası! Hata detayı: {e}")
 
 # --- SIDEBAR & INPUTS ---
 st.sidebar.header("💾 Veri Kaydet ve Yükle")
@@ -148,7 +188,6 @@ col_k1, col_k2, col_k3, col_k4 = st.columns(4)
 col_k1.metric(label="Maliyet Endeksi (CPI)", value=f"{cpi:.2f}", delta=f"{cpi - 1.0:.2f}")
 col_k2.metric(label="Maliyet Sapması (CV)", value=f"{format_tr(cv)} TL", delta="Negatif: Aşım" if cv < 0 else "Pozitif: Tasarruf", delta_color="normal")
 
-# SPI ve ESA (Zaman Sapması) Düzeltmeleri
 col_k3.metric(
     label="Zaman Endeksi (SPI-t)", 
     value=f"{spi_t:.2f}", 
