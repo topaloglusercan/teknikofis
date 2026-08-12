@@ -138,14 +138,28 @@ es_scurve = c + i_val
 spi_t = es_scurve / at if at > 0 else 0
 ieac_t = sac / spi_t if spi_t > 0 else 0
 
+# DOĞRU ZAMAN SAPMASI (ESA) HESABI: Kazanılmış Takvim - Gerçekleşen Takvim
+esa = es_scurve - at
+
 # --- YÖNETİCİ ÖZETİ (MİNİMAL) ---
 st.markdown("### Performans Özeti")
 col_k1, col_k2, col_k3, col_k4 = st.columns(4)
 
 col_k1.metric(label="Maliyet Endeksi (CPI)", value=f"{cpi:.2f}", delta=f"{cpi - 1.0:.2f}")
-col_k2.metric(label="Maliyet Sapması (CV)", value=f"{format_tr(cv)} TL", delta="Negatif: Aşım" if cv < 0 else "Pozitif: Tasarruf", delta_color="off")
-col_k3.metric(label="Zaman Endeksi (SPI-t)", value=f"{spi_t:.2f}", delta=f"{spi_t - 1.0:.2f}")
-col_k4.metric(label="Zaman Sapması (ESA)", value=f"{format_tr(ieac_t - sac)} Ay", delta="Pozitif: Gecikme" if (ieac_t - sac) > 0 else "Negatif: Erken", delta_color="inverse")
+col_k2.metric(label="Maliyet Sapması (CV)", value=f"{format_tr(cv)} TL", delta="Negatif: Aşım" if cv < 0 else "Pozitif: Tasarruf", delta_color="normal")
+
+# SPI ve ESA (Zaman Sapması) Düzeltmeleri
+col_k3.metric(
+    label="Zaman Endeksi (SPI-t)", 
+    value=f"{spi_t:.2f}", 
+    delta=f"{spi_t - 1.0:.2f} (Sapma)" 
+)
+col_k4.metric(
+    label="Zaman Sapması (ESA)", 
+    value=f"{format_tr(abs(esa))} Ay", 
+    delta="Pozitif (Erken)" if esa >= 0 else "Negatif (Gecikme)", 
+    delta_color="normal" if esa >= 0 else "inverse"
+)
 
 st.markdown("---")
 
