@@ -269,6 +269,9 @@ def hesapla(df_prog, df_endeks, df_alt, df_b):
 # ==========================================
 # --- SİMÜLASYON DÖNÜŞÜMLERİ ---
 # ==========================================
+# ==========================================
+# --- SİMÜLASYON DÖNÜŞÜMLERİ ---
+# ==========================================
 def endeks_uzat(df_end, artis, ek_ay=36):
     df = df_end.copy()
     end_col = 'AYLAR' if 'AYLAR' in df.columns else 'Aylar'
@@ -288,8 +291,14 @@ def endeks_uzat(df_end, artis, ek_ay=36):
         yeni_ay = son_ay + k
         satir = {end_col: str(yeni_ay)}
         for c in cols:
-            val_str = str(son[c]).replace(',', '.')
-            satir[c] = f"{(float(val_str) * ((1 + artis_map[c] / 100) ** k)):.6f}".replace('.', ',')
+            # HATA VEREN ESKİ SATIRLAR:
+            # val_str = str(son[c]).replace(',', '.')
+            # satir[c] = f"{(float(val_str) * ((1 + artis_map[c] / 100) ** k)):.6f}".replace('.', ',')
+            
+            # DÜZELTİLMİŞ YENİ SATIRLAR:
+            # clean_decimal kullanarak binlik/ondalık ayracını güvenle çözüyoruz
+            val_float = float(clean_decimal(son[c])) 
+            satir[c] = f"{(val_float * ((1 + artis_map[c] / 100) ** k)):.6f}".replace('.', ',')
         yeni.append(satir)
 
     df_ek = pd.DataFrame(yeni)
