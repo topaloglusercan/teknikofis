@@ -1,7 +1,14 @@
 import streamlit as st
 
+# 1. ANA SAYFA AYARI (Sistem açılırken 1 kez yapılır)
 st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", page_icon="🏗️")
 
+# 2. SUSTURUCU HİLE (Monkey Patch)
+# Eski dosyalarının içindeki set_page_config komutlarının sistemi çökertmesini engeller
+st.set_page_config = lambda *args, **kwargs: None
+
+
+# --- KARŞILAMA EKRANI ---
 def ana_sayfa():
     st.title("🏗️ Teknik Ofis Portalı")
     st.markdown("""
@@ -20,7 +27,7 @@ eski_moduller = [
     st.Page("pages/4_performans_analizi.py", title="Performans Analizi", icon="📈"),
     st.Page("pages/5_fiyat_farki_simulatoru.py", title="Fiyat Farkı Simülatörü", icon="💰"),
     st.Page("pages/6_pursantaj_revize.py", title="Pursantaj Revize", icon="🔄"),
-    st.Page("pages/7_teklif_karsılastırma.py", title="Teklif Karşılaştırma", icon="⚖️")
+    st.Page("pages/7_teklif_karsilastirma.py", title="Teklif Karşılaştırma", icon="⚖️") 
 ]
 
 # --- YENİ P6 MODÜLLERİ ---
@@ -39,4 +46,5 @@ sayfalar = {
 pg = st.navigation(sayfalar)
 st.sidebar.markdown("<h2 style='text-align: center; color: #1f77b4;'>TEKNİK OFİS PORTALI</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
+
 pg.run()
