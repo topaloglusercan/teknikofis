@@ -17,26 +17,36 @@ def ana_sayfa():
     st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 18px;'>Şantiye ve Teknik Ofis Dijital Süreç Yönetimi</p>", unsafe_allow_html=True)
     st.markdown("---")
     
+    st.markdown("""
+    ### Hoş Geldiniz!
+    Bu portal şantiye ve teknik ofis süreçlerinizi dijitalleştirmek için tasarlanmıştır.
+    Sol taraftaki menüyü kullanarak ilgili modüle geçiş yapabilirsiniz.
+    <br><br>
+    """, unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
-    
     with c1:
-        st.markdown("### 📁 Teknik Ofis Modülleri")
-        st.info("**İdari Hakediş:** Taşeron ve ana firma hakedişleri için sayısal kontrol sistem aracıdır.")
-        st.info("**Pursantaj:** Sözleşme bedelinin iş kalemlerine göre dağılımını planlayan, izleyen ve analiz eden bütünleşik bir dijital araçtır.")
-        st.info("**Şantiye Tutanak:** Eklenti ve kesinti tutanakları hazırlayıp PDF olarak indirebileceğiniz, filtrelenebilir dijital arşivdir.")
-        st.info("**Performans Analizi:** Proje harcamalarını Kazanılmış Takvim (ESA) ve Kazanılmış Değer (EVA) ile kıyaslayan performans ölçüm aracıdır.")
-        st.info("**Fiyat Farkı Simülatörü:** Kova sistemi ve gecikme matrisi mantığıyla fiyat farkı senaryolarını anlık simüle edip karşılaştıran araçtır.")
-        st.info("**Pursantaj Revize:** Keşif/iş artışı durumunda tüm kalemlerin pursantaj ve parasal ağırlıklarını %100'e kilitlenecek şekilde otomatik paylaştıran motordur.")
-        st.info("**Teklif Karşılaştırma:** Fiyat, Kalite ve Finansal Güç kriterlerini TOPSIS algoritmasıyla ağırlıklandırarak en ideal alt yükleniciyi bulan ve raporlayan karar destek asistanıdır.")
+        st.markdown("#### 📁 Teknik Ofis Modülleri")
+        st.markdown("""
+        * **İdari Hakediş:** Taşeron ve ana firma hakedişleri için sayısal kontrol.
+        * **Pursantaj:** Sözleşme bedelinin kalemlere göre dağılımı ve analizi.
+        * **Şantiye Tutanak:** Eklenti/kesinti tutanakları hazırlama ve PDF arşivi.
+        * **Performans Analizi:** ESA ve EVA yöntemleriyle proje performans ölçümü.
+        * **Fiyat Farkı Simülatörü:** Gecikme matrisi ile fiyat farkı simülasyonu.
+        * **Pursantaj Revize:** İş artışlarında pursantajların otomatik yeni dağıtımı.
+        * **Teklif Karşılaştırma:** TOPSIS algoritmasıyla ideal alt yüklenici seçimi.
+        """)
 
     with c2:
-        st.markdown("### 🔍 P6 İnceleme Modülleri")
-        st.success("**P6 Adam-Saat Analizi:** XER veritabanını tarayarak kaynak dağılımlarını şelale yöntemiyle aylara bölen analiz aracıdır.")
-        st.success("**P6 S-Eğrisi (İlerleme):** XER dosyasından maliyet/bütçe verilerini çekerek projenin aylık ve kümülatif S-Eğrisi (Nakit Akışı) grafiklerini otomatik çizer.")
-        st.success("**P6 Lag Analizi:** XER dosyasındaki aktivite ilişkilerini (Network) tarayarak gizlenmiş Lag (Bekleme Süresi) değerlerini tespit eden kontrol modülüdür.")
+        st.markdown("#### 🔍 P6 İnceleme Modülleri")
+        st.markdown("""
+        * **P6 Adam-Saat Analizi:** XER veritabanından kaynak dağılımlarını aylara bölen analiz.
+        * **P6 S-Eğrisi (İlerleme):** Bütçe/maliyet verileriyle kümülatif S-Eğrisi grafikleri.
+        * **P6 Lag Analizi:** Aktivite ilişkilerindeki gizlenmiş Lag (Bekleme) değerlerinin tespiti.
+        """)
         
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.caption("🔒 *Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz. İşlemleriniz sadece tarayıcınızın belleğinde gerçekleşir.*")
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.caption("🔒 *Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz. İşlemleriniz sadece tarayıcınızın belleğinde gerçekleşir.*")
 
 giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon=":material/home:", default=True)
 
