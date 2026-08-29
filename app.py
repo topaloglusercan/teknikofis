@@ -1,9 +1,7 @@
 import streamlit as st
 
-# 1. TÜM PORTAL İÇİN GENİŞ EKRAN (WIDE) AYARI 
 st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", initial_sidebar_state="expanded")
 
-# 2. TÜM ALT SAYFALARI GENİŞ EKRANA ZORLAYAN CSS (Daralmayı kesin engeller)
 st.markdown("""
     <style>
         .block-container {
@@ -14,7 +12,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- KARŞILAMA EKRANI VE MODÜL ÖZETLERİ ---
 def ana_sayfa():
     st.markdown("<h1 style='text-align: center; color: #2c3e50;'>TEKNİK OFİS PORTALI</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #7f8c8d; font-size: 18px;'>Şantiye ve Teknik Ofis Dijital Süreç Yönetimi</p>", unsafe_allow_html=True)
@@ -34,8 +31,9 @@ def ana_sayfa():
 
     with c2:
         st.markdown("### 🔍 P6 İnceleme Modülleri")
-        st.success("**P6 Adam-Saat Analizi:** Primavera P6 (XER) veritabanını tarayarak iş kalemlerinin kaynak dağılımlarını şelale (spread) yöntemiyle aylara bölen ve ekip ihtiyacını görselleştiren analiz aracıdır.")
-        st.success("**P6 Lag Analizi:** XER dosyasındaki aktivite ilişkilerini (Network) tarayarak aralara gizlenmiş Lag (Bekleme Süresi) değerlerini anında tespit edip listeleyen kontrol modülüdür.")
+        st.success("**P6 Adam-Saat Analizi:** XER veritabanını tarayarak kaynak dağılımlarını şelale yöntemiyle aylara bölen analiz aracıdır.")
+        st.success("**P6 S-Eğrisi (İlerleme):** XER dosyasından maliyet/bütçe verilerini çekerek projenin aylık ve kümülatif S-Eğrisi (Nakit Akışı) grafiklerini otomatik çizer.")
+        st.success("**P6 Lag Analizi:** XER dosyasındaki aktivite ilişkilerini (Network) tarayarak gizlenmiş Lag (Bekleme Süresi) değerlerini tespit eden kontrol modülüdür.")
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.caption("🔒 *Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz. İşlemleriniz sadece tarayıcınızın belleğinde gerçekleşir.*")
@@ -54,6 +52,7 @@ eski_moduller = [
 
 p6_modulleri = [
     st.Page("pages/p6_adam_saat.py", title="P6 Adam-Saat Analizi", icon=":material/engineering:"),
+    st.Page("pages/p6_s_egrisi.py", title="P6 S-Eğrisi", icon=":material/show_chart:"),
     st.Page("pages/p6_lag_analizi.py", title="P6 Lag Analizi", icon=":material/hourglass_empty:")
 ]
 
