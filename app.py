@@ -20,8 +20,7 @@ eski_moduller = [
     st.Page("pages/4_performans_analizi.py", title="Performans Analizi", icon="📈"),
     st.Page("pages/5_fiyat_farki_simulatoru.py", title="Fiyat Farkı Simülatörü", icon="💰"),
     st.Page("pages/6_pursantaj_revize.py", title="Pursantaj Revize", icon="🔄"),
-    # İsimdeki tüm harfler İngilizce karakter (i) yapıldı:
-    st.Page("pages/7_teklif_karsilastirma.py", title="Teklif Karşılaştırma", icon="⚖️") 
+    st.Page("pages/7_teklif_karsılastırma.py", title="Teklif Karşılaştırma", icon="⚖️")
 ]
 
 # --- YENİ P6 MODÜLLERİ ---
