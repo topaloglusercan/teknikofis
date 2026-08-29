@@ -1,43 +1,21 @@
 import streamlit as st
-import os
 
 st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", page_icon="🏗️")
 
-def ana_sayfa():
-    st.title("🏗️ Teknik Ofis Portalı")
-    st.markdown("""
-    ### Hoş Geldiniz!
-    Bu portal şantiye ve teknik ofis süreçlerinizi dijitalleştirmek için tasarlanmıştır.
-    Sol taraftaki menüyü kullanarak ilgili modüle geçiş yapabilirsiniz.
-    """)
+st.title("🏗️ Teknik Ofis Portalı")
+st.markdown("""
+### Hoş Geldiniz!
+Bu portal şantiye ve teknik ofis süreçlerinizi dijitalleştirmek için tasarlanmıştır.
+    
+**Nasıl Kullanılır?**
+Sol taraftaki menüyü kullanarak modüller arasında geçiş yapabilirsiniz:
+* 📂 **İdari Hakediş:** İdari Hakediş sayısal kontrol sistem aracıdır.
+* 📂 **Pursantaj:** Pursantaj Yönetim Sistemi, inşaat projelerinde sözleşme bedelinin iş kalemlerine göre dağılımını planlayan, izleyen ve analiz eden bütünleşik bir dijital araçtır.
+* 📂 **Şantiye Tutanak:** İnşaat projelerinde eklenti ve kesinti tutanakları hazırlayıp, pdf dosyası indirebileceğiniz, filtre yapabileceğiniz bir dijital araçtır.
+* 📂 **Performans Analizi:** Projelerdeki harcama ve ilerleme durumunu Kazanılmış Takvim (ESA) ve Kazanılmış Değer (EVA) yöntemleriyle kıyaslayan performans ölçüm aracıdır.
+* 📂 **Fiyat Farkı Simülatörü:** Kova sistemi ve gecikme matrisi mantığıyla hesaplanan fiyat farkını, gecikme/hızlanma, imalat hızı, endeks artışı ve alt endeks ağırlıkları gibi değişkenleri slider'larla anlık değiştirerek simüle etmenizi ve farklı senaryoları yan yana karşılaştırmanızı sağlayan bir dijital araçtır.
+* 📂 **Revize Pursantaj Dağıtım:** Revize Pursantaj Dağıtım Motoru, sözleşme bedelinin değişmesi (keşif artışı) veya yeni mukayese işlerinin (iş artışı/eksilişi) sisteme dahil olması durumunda, projedeki tüm iş kalemlerinin pursantaj (yüzde) ve parasal (TL) ağırlıklarını belirli kısıtlar altında ve %100'e kilitlenecek şekilde otomatik olarak yeniden paylaştıran gelişmiş bir teknik ofis aracıdır.
+* 📂 **Dinamik Teklif Kıyaslama ve Karar Destek Motoru:** Teklif alma süreçlerindeki manuel tablo birleştirme ve salt fiyata dayalı yüzeysel karar verme hatalarını ortadan kaldıran; firmaların Fiyat, Kalite, Finansal Güç ve Teslimat Hızı kriterlerini TOPSIS (Çok Kriterli Karar Verme) algoritmasıyla ağırlıklandırarak size en ideal ("Optimum") alt yükleniciyi matematiksel olarak sunan gelişmiş bir teknik ofis asistanıdır. Sistem, kalem bazlı min/max fiyat ısı haritaları çıkartır, "Karma Dağılım" senaryosu ile maksimum tasarruf tutarını hesaplar ve tüm analizleri saniyeler içinde A3 boyutunda, yönetime sunulmaya hazır, dilerseniz isimlerin gizlendiği (anonimleştirilmiş) profesyonel E-Tablo raporlarına dönüştürür.
 
-giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠", default=True)
-
-# pages klasöründeki dosyaları otomatik buluyoruz (harf hatası riski kalmaz)
-pages_dir = "pages"
-bulunan_dosyalar = os.listdir(pages_dir) if os.path.exists(pages_dir) else []
-
-eski_moduller = []
-p6_modulleri = []
-
-for dosya in sorted(bulunan_dosyalar):
-    if dosya.endswith(".py"):
-        dosya_yolu = f"pages/{dosya}"
-        # Dosya adı temizlenerek menü ismi yapılır (p6_adam_saat -> P6 Adam Saat)
-        temiz_isim = dosya.replace(".py", "").replace("_", " ").title()
-        
-        if "p6" in dosya.lower():
-            p6_modulleri.append(st.Page(dosya_yolu, title=temiz_isim, icon="👷‍♂️"))
-        else:
-            eski_moduller.append(st.Page(dosya_yolu, title=temiz_isim, icon="📄"))
-
-sayfalar = {
-    "Giriş": [giris_sayfasi],
-    "Teknik Ofis Modülleri": eski_moduller,
-    "P6 İnceleme": p6_modulleri
-}
-
-pg = st.navigation(sayfalar)
-st.sidebar.markdown("<h2 style='text-align: center; color: #1f77b4;'>TEKNİK OFİS PORTALI</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
-pg.run()
+*Not: Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz, yan menüden projelerinizi kendi bilgisayarınıza indirebilir ve yükleyebilirsiniz.*
+""")
