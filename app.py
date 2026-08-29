@@ -12,7 +12,7 @@ def ana_sayfa():
 
 giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠", default=True)
 
-# --- ESKİ MODÜLLER (GitHub'daki tam dosya isimlerinle eşleştirildi) ---
+# --- ESKİ MODÜLLER ---
 eski_moduller = [
     st.Page("pages/1_idari_hakedis.py", title="İdari Hakediş", icon="📄"),
     st.Page("pages/2_pursantaj.py", title="Pursantaj", icon="📊"),
@@ -20,8 +20,8 @@ eski_moduller = [
     st.Page("pages/4_performans_analizi.py", title="Performans Analizi", icon="📈"),
     st.Page("pages/5_fiyat_farki_simulatoru.py", title="Fiyat Farkı Simülatörü", icon="💰"),
     st.Page("pages/6_pursantaj_revize.py", title="Pursantaj Revize", icon="🔄"),
-    # Buradaki dosya adında bulunan 'ı' harfi GitHub'daki orijinal adına göre düzeltildi:
-    st.Page("pages/7_teklif_karsilastırma.py", title="Teklif Karşılaştırma", icon="⚖️")
+    # İsimdeki tüm harfler İngilizce karakter (i) yapıldı:
+    st.Page("pages/7_teklif_karsilastirma.py", title="Teklif Karşılaştırma", icon="⚖️") 
 ]
 
 # --- YENİ P6 MODÜLLERİ ---
