@@ -44,7 +44,6 @@ def parse_xer_lag(file_bytes):
         if not df.empty:
             for col in df.columns: df[col] = df[col].astype(str).str.strip()
         return df
-
     return clean_df(tables.get('TASK', [])), clean_df(tables.get('TASKPRED', []))
 
 uploaded_xer_lag = st.file_uploader("📂 XER Dosyasını Yükle (Lag Analizi İçin)", type=['xer'])
