@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter, FuncFormatter
 
@@ -9,23 +8,26 @@ st.markdown("<h1 style='color: #2c3e50;'>📈 P6 S-Eğrisi (Parasal İlerleme)</
 st.markdown("XER dosyasındaki aktivite ve kaynak verilerini tarayarak projeye ait aylık ve kümülatif S-Eğrisi (Nakit Akışı / İlerleme) grafiklerini oluşturun.")
 
 def clean_dec_float(val):
-    if pd.isna(val) or val is None: return 0.0
-    s = str(val).strip().upper()
-    s = re.sub(r'[^\d.,-]', '', s)
-    if not s or s in ['-', '.', ',']: return 0.0
-    if '.' in s and ',' in s:
-        if s.rfind(',') > s.rfind('.'): s = s.replace('.', '').replace(',', '.')
-        else: s = s.replace(',', '')
-    elif ',' in s:
-        parts = s.split(',')
-        if len(parts[-1]) <= 2: s = s.replace(',', '.')
-        else: s = s.replace(',', '')
-    try: return float(s)
-    except: return 0.0
+    try:
+        if pd.isna(val) or val is None: return 0.0
+        s = str(val).strip()
+        if not s: return 0.0
+        # XER formatındaki olası noktalama virgül hatalarını güvenceye alıyoruz
+        if '.' in s and ',' in s:
+            if s.rfind(',') > s.rfind('.'):
+                s = s.replace('.', '').replace(',', '.')
+            else:
+                s = s.replace(',', '')
+        elif ',' in s:
+            s = s.replace(',', '.')
+        return float(s)
+    except:
+        return 0.0
 
 def format_tl(x, p=None):
-    if x >= 1e6: return f"{x/1e6:.1f}M"
-    elif x >= 1e3: return f"{x/1e3:.0f}K"
+    if x >= 1e9: return f"{x/1e9:.2f} Milyar"
+    elif x >= 1e6: return f"{x/1e6:.1f} Milyon"
+    elif x >= 1e3: return f"{x/1e3:.0f} Bin"
     else: return f"{int(x)}"
 
 @st.cache_data
@@ -75,12 +77,26 @@ if uploaded_xer:
                 
             df_merged = pd.merge(df_tr, df_t, on='task_id', how='inner')
             
+            # --- KAYNAK İSİMLERİNİ GETİRME (DÜZELTİLDİ) ---
             if not df_rsrc.empty and 'rsrc_id' in df_merged.columns:
                 df_r = df_rsrc.drop_duplicates(subset=['rsrc_id']).copy()
                 df_r['rsrc_id'] = df_r['rsrc_id'].astype(str)
-                df_merged = pd.merge(df_merged, df_r[['rsrc_id', 'rsrc_short_name']], on='rsrc_id', how='left')
+                
+                # RSRC tablosundaki isim sütununu bul
+                name_col = None
+                for c in ['rsrc_short_name', 'rsrc_name']:
+                    if c in df_r.columns:
+                        name_col = c
+                        break
+                
+                if name_col:
+                    df_merged = pd.merge(df_merged, df_r[['rsrc_id', name_col]], on='rsrc_id', how='left')
+                    df_merged['Kaynak_Adi'] = df_merged[name_col].fillna('Adlandırılmamış')
+                    df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'] + " - " + df_merged['Kaynak_Adi']
+                else:
+                    df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id']
             else:
-                df_merged['rsrc_short_name'] = 'Tüm Kaynaklar'
+                df_merged['Kaynak_Gorunum'] = df_merged.get('rsrc_id', 'Tüm Kaynaklar').astype(str)
 
             df_merged['Baslangic'] = pd.NaT
             df_merged['Bitis'] = pd.NaT
@@ -96,11 +112,11 @@ if uploaded_xer:
             df_valid = df_valid[df_valid['Maliyet'] > 0]
             
             if not df_valid.empty:
-                kaynak_listesi = sorted([str(x) for x in df_valid['rsrc_short_name'].unique()])
-                secilen_kaynaklar = st.multiselect("📊 Analiz Edilecek Kaynakları Seçin (Boş bırakırsanız tüm proje hesaplanır):", kaynak_listesi, default=[])
+                kaynak_listesi = sorted([str(x) for x in df_valid['Kaynak_Gorunum'].unique()])
+                secilen_kaynaklar = st.multiselect("📊 Analiz Edilecek Kaynakları Seçin (Excel'deki PARA kaynağını buradan işaretleyin):", kaynak_listesi, default=[])
                 
                 if secilen_kaynaklar:
-                    df_valid = df_valid[df_valid['rsrc_short_name'].isin(secilen_kaynaklar)]
+                    df_valid = df_valid[df_valid['Kaynak_Gorunum'].isin(secilen_kaynaklar)]
                 
                 df_valid['Toplam_Gun'] = (df_valid['Bitis'] - df_valid['Baslangic']).dt.days + 1
                 df_valid['Toplam_Gun'] = df_valid['Toplam_Gun'].clip(lower=1).astype(int)
@@ -116,15 +132,15 @@ if uploaded_xer:
                 
                 total_budget = df_monthly['Aylık Maliyet (TL)'].sum()
                 df_monthly['Kümülatif Maliyet (TL)'] = df_monthly['Aylık Maliyet (TL)'].cumsum()
-                df_monthly['Aylık İlerleme (%)'] = (df_monthly['Aylık Maliyet (TL)'] / total_budget) * 100
-                df_monthly['Kümülatif İlerleme (%)'] = (df_monthly['Kümülatif Maliyet (TL)'] / total_budget) * 100
+                df_monthly['Aylık İlerleme (%)'] = (df_monthly['Aylık Maliyet (TL)'] / total_budget) * 100 if total_budget > 0 else 0
+                df_monthly['Kümülatif İlerleme (%)'] = (df_monthly['Kümülatif Maliyet (TL)'] / total_budget) * 100 if total_budget > 0 else 0
                 
                 df_monthly['Ay Sonu Gösterim'] = df_monthly['Ay Sonu'].dt.strftime('%m-%Y')
                 
                 for col in ['Aylık Maliyet (TL)', 'Kümülatif Maliyet (TL)', 'Aylık İlerleme (%)', 'Kümülatif İlerleme (%)']:
                     df_monthly[col] = df_monthly[col].round(2)
 
-                st.success(f"✅ Dağıtım Tamamlandı! Toplam Maliyet/Bütçe: **{total_budget:,.2f}**")
+                st.success(f"✅ Dağıtım Tamamlandı! Toplam Maliyet/Bütçe: **{total_budget:,.2f} TL**")
                 
                 st.markdown("### 📊 Proje S-Eğrisi Grafiği")
                 plt.style.use('ggplot')
