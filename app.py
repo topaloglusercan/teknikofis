@@ -19,7 +19,7 @@ eski_moduller = [
     st.Page("pages/4_performans_analizi.py", title="Performans Analizi", icon="📈"),
     st.Page("pages/5_fiyat_farki_simulatoru.py", title="Fiyat Farkı Simülatörü", icon="💰"),
     st.Page("pages/6_pursantaj_revize.py", title="Pursantaj Revize", icon="🔄"),
-    st.Page("pages/7_teklif_karsilastırma.py", title="Teklif Karşılaştırma", icon="⚖️")
+
 ]
 
 p6_modulleri = [
