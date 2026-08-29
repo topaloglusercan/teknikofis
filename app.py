@@ -3,6 +3,17 @@ import streamlit as st
 # 1. TÜM PORTAL İÇİN GENİŞ EKRAN (WIDE) AYARI 
 st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", initial_sidebar_state="expanded")
 
+# 2. TÜM ALT SAYFALARI GENİŞ EKRANA ZORLAYAN CSS (Daralmayı kesin engeller)
+st.markdown("""
+    <style>
+        .block-container {
+            max-width: 95% !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- KARŞILAMA EKRANI VE MODÜL ÖZETLERİ ---
 def ana_sayfa():
     st.markdown("<h1 style='text-align: center; color: #2c3e50;'>TEKNİK OFİS PORTALI</h1>", unsafe_allow_html=True)
@@ -29,7 +40,6 @@ def ana_sayfa():
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.caption("🔒 *Güvenliğiniz için girdiğiniz veriler sunucuda tutulmaz. İşlemleriniz sadece tarayıcınızın belleğinde gerçekleşir.*")
 
-# Material ikonlar (tek renkli, kurumsal vektörel çizimler) kullanıldı
 giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon=":material/home:", default=True)
 
 eski_moduller = [
