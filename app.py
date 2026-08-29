@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 
 st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", page_icon="🏗️")
 
@@ -12,20 +13,23 @@ def ana_sayfa():
 
 giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠", default=True)
 
-eski_moduller = [
-    st.Page("pages/1_idari_hakedis.py", title="İdari Hakediş", icon="📄"),
-    st.Page("pages/2_pursantaj.py", title="Pursantaj", icon="📊"),
-    st.Page("pages/3_santiye_tutanak.py", title="Şantiye Tutanak", icon="📝"),
-    st.Page("pages/4_performans_analizi.py", title="Performans Analizi", icon="📈"),
-    st.Page("pages/5_fiyat_farki_simulatoru.py", title="Fiyat Farkı Simülatörü", icon="💰"),
-    st.Page("pages/6_pursantaj_revize.py", title="Pursantaj Revize", icon="🔄"),
+# pages klasöründeki dosyaları otomatik buluyoruz (harf hatası riski kalmaz)
+pages_dir = "pages"
+bulunan_dosyalar = os.listdir(pages_dir) if os.path.exists(pages_dir) else []
 
-]
+eski_moduller = []
+p6_modulleri = []
 
-p6_modulleri = [
-    st.Page("pages/p6_adam_saat.py", title="P6 Adam-Saat Analizi", icon="👷‍♂️"),
-    st.Page("pages/p6_lag_analizi.py", title="P6 Lag Analizi", icon="⏳")
-]
+for dosya in sorted(bulunan_dosyalar):
+    if dosya.endswith(".py"):
+        dosya_yolu = f"pages/{dosya}"
+        # Dosya adı temizlenerek menü ismi yapılır (p6_adam_saat -> P6 Adam Saat)
+        temiz_isim = dosya.replace(".py", "").replace("_", " ").title()
+        
+        if "p6" in dosya.lower():
+            p6_modulleri.append(st.Page(dosya_yolu, title=temiz_isim, icon="👷‍♂️"))
+        else:
+            eski_moduller.append(st.Page(dosya_yolu, title=temiz_isim, icon="📄"))
 
 sayfalar = {
     "Giriş": [giris_sayfasi],
