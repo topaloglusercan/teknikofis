@@ -2,7 +2,6 @@ import streamlit as st
 
 st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", page_icon="🏗️")
 
-# --- KARŞILAMA EKRANI ---
 def ana_sayfa():
     st.title("🏗️ Teknik Ofis Portalı")
     st.markdown("""
@@ -13,7 +12,6 @@ def ana_sayfa():
 
 giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠", default=True)
 
-# --- ESKİ MODÜLLERİN (pages klasöründeki mevcut dosyaların) ---
 eski_moduller = [
     st.Page("pages/1_idari_hakedis.py", title="İdari Hakediş", icon="📄"),
     st.Page("pages/2_pursantaj.py", title="Pursantaj", icon="📊"),
@@ -24,21 +22,18 @@ eski_moduller = [
     st.Page("pages/7_teklif_karsilastırma.py", title="Teklif Karşılaştırma", icon="⚖️")
 ]
 
-# --- YENİ P6 MODÜLLERİ (Bunlar P6 İnceleme başlığı altına girecek) ---
 p6_modulleri = [
     st.Page("pages/p6_adam_saat.py", title="P6 Adam-Saat Analizi", icon="👷‍♂️"),
-    st.Page("pages/p6_lag_analizi.py", title="P6 Lag (Bekleme) Analizi", icon="⏳")
+    st.Page("pages/p6_lag_analizi.py", title="P6 Lag Analizi", icon="⏳")
 ]
 
-# --- SOL MENÜDEKİ BAŞLIKLAR (GRUP) ---
 sayfalar = {
     "Giriş": [giris_sayfasi],
     "Teknik Ofis Modülleri": eski_moduller,
-    "P6 İnceleme": p6_modulleri  # İşte aradığın klasörleme / gruplama burada!
+    "P6 İnceleme": p6_modulleri
 }
 
-# Yönlendirmeyi Başlat
 pg = st.navigation(sayfalar)
-st.sidebar.markdown("<h2 style='text-align: center; color: #1f77b4;'>USÛL TEKNİK A.Ş.</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: #1f77b4;'>TEKNİK OFİS PORTALI</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 pg.run()
