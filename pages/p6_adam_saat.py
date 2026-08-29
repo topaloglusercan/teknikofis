@@ -28,7 +28,6 @@ def parse_xer(file_bytes):
     tables = {}
     current_table = None
     columns = []
-    
     for line in lines:
         if line.startswith('%T'):
             current_table = line.split('\t')[1].strip()
@@ -39,19 +38,16 @@ def parse_xer(file_bytes):
             values = line.split('\t')[1:]
             row_dict = {columns[i]: values[i].strip() if i < len(values) else "" for i in range(len(columns))}
             tables[current_table].append(row_dict)
-            
     def clean_df(data_list):
         df = pd.DataFrame(data_list)
         if not df.empty:
             for col in df.columns: df[col] = df[col].astype(str).str.strip()
         return df
-
     return clean_df(tables.get('TASK', [])), clean_df(tables.get('TASKRSRC', [])), clean_df(tables.get('RSRC', [])), clean_df(tables.get('ACTVTYPE', [])), clean_df(tables.get('ACTVCODE', [])), clean_df(tables.get('TASKACTV', []))
 
 @st.cache_data
 def prepare_xer_data(df_task, df_taskrsrc, df_rsrc, df_actvtype, df_actvcode, df_taskactv, grup_secimi, code_type_id=None):
     if df_task.empty or df_taskrsrc.empty: return pd.DataFrame()
-    
     df_t = df_task.drop_duplicates(subset=['task_id']).copy()
     df_t['task_id'] = df_t['task_id'].astype(str)
     df_tr = df_taskrsrc.copy()
@@ -65,8 +61,7 @@ def prepare_xer_data(df_task, df_taskrsrc, df_rsrc, df_actvtype, df_actvcode, df
         df_r['rsrc_id'] = df_r['rsrc_id'].astype(str)
         df_merged = pd.merge(df_merged, df_r, on='rsrc_id', how='left')
         if 'rsrc_short_name' not in df_merged.columns: df_merged['rsrc_short_name'] = 'EK-AS'
-    else:
-        df_merged['rsrc_short_name'] = 'EK-AS'
+    else: df_merged['rsrc_short_name'] = 'EK-AS'
         
     if grup_secimi == "Sadece Kaynak Adına Göre":
         df_merged['Grup_Adi'] = df_merged.get('rsrc_short_name', 'EK-AS')
@@ -74,25 +69,21 @@ def prepare_xer_data(df_task, df_taskrsrc, df_rsrc, df_actvtype, df_actvcode, df
         if not df_actvcode.empty and not df_taskactv.empty and code_type_id:
             hedef_kodlar = df_actvcode[df_actvcode['actv_code_type_id'].astype(str) == str(code_type_id)].copy()
             desc_col = 'actv_code_name' if 'actv_code_name' in hedef_kodlar.columns else 'short_name' if 'short_name' in hedef_kodlar.columns else 'actv_code_id'
-            
             df_ta = df_taskactv.copy()
             df_ta['actv_code_id'] = df_ta['actv_code_id'].astype(str)
             df_ta['task_id'] = df_ta['task_id'].astype(str)
             hedef_kodlar['actv_code_id'] = hedef_kodlar['actv_code_id'].astype(str)
-            
             baglanti_df = pd.merge(df_ta, hedef_kodlar, on='actv_code_id', how='inner').drop_duplicates(subset=['task_id']) 
             df_merged = pd.merge(df_merged, baglanti_df[['task_id', desc_col]], on='task_id', how='left')
             df_merged['Grup_Adi'] = df_merged[desc_col].fillna("Atanmamış İşler")
         else: df_merged['Grup_Adi'] = "Atanmamış İşler"
 
     df_merged['Grup_Adi'] = df_merged['Grup_Adi'].replace(['nan', 'None', '', '<NA>'], 'Atanmamış İşler')
-
     df_merged['Gecerli_Baslangic'] = pd.NaT
     df_merged['Gecerli_Bitis'] = pd.NaT
     
     for col in ['target_start_date', 'early_start_date', 'act_start_date']:
         if col in df_merged.columns: df_merged['Gecerli_Baslangic'] = df_merged['Gecerli_Baslangic'].fillna(pd.to_datetime(df_merged[col], errors='coerce'))
-
     for col in ['target_end_date', 'early_end_date', 'act_end_date']:
         if col in df_merged.columns: df_merged['Gecerli_Bitis'] = df_merged['Gecerli_Bitis'].fillna(pd.to_datetime(df_merged[col], errors='coerce'))
             
@@ -125,7 +116,6 @@ def spread_to_months(df_filtered, qty_column):
     return aylik_pivot
 
 uploaded_xer = st.file_uploader("📂 XER Dosyasını Yükle", type=['xer'])
-
 if uploaded_xer:
     with st.spinner("P6 Veritabanı okunuyor..."):
         df_task, df_taskrsrc, df_rsrc, df_actvtype, df_actvcode, df_taskactv = parse_xer(uploaded_xer.getvalue())
