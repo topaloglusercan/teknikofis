@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter, FuncFormatter
+import re
 
 st.markdown("<h1 style='color: #2c3e50;'>📈 P6 S-Eğrisi (Parasal İlerleme)</h1>", unsafe_allow_html=True)
 st.markdown("XER dosyasındaki aktivite ve kaynak verilerini tarayarak projeye ait aylık ve kümülatif S-Eğrisi (Nakit Akışı / İlerleme) grafiklerini oluşturun.")
@@ -63,42 +64,47 @@ if uploaded_xer:
         df_task, df_taskrsrc, df_rsrc = parse_xer_for_scurve(uploaded_xer.getvalue())
         
         if not df_task.empty and not df_taskrsrc.empty:
-            df_t = df_task.drop_duplicates(subset=['task_id']).copy()
+            # 1. TASK TABLOSU TEMİZLİĞİ (Sadece gerekli kolonlar, çakışma önleyici)
+            t_cols = [c for c in ['task_id', 'target_start_date', 'target_end_date', 'early_start_date', 'early_end_date', 'act_start_date', 'act_end_date'] if c in df_task.columns]
+            df_t = df_task[t_cols].copy()
+            df_t = df_t.loc[:, ~df_t.columns.duplicated()].drop_duplicates(subset=['task_id'])
             df_t['task_id'] = df_t['task_id'].astype(str)
             
+            # 2. TASKRSRC TABLOSU TEMİZLİĞİ
             df_tr = df_taskrsrc.copy()
+            df_tr = df_tr.loc[:, ~df_tr.columns.duplicated()]
             df_tr['task_id'] = df_tr['task_id'].astype(str)
-            if 'rsrc_id' in df_tr.columns: df_tr['rsrc_id'] = df_tr['rsrc_id'].astype(str)
             
             cost_col = 'target_cost' if 'target_cost' in df_tr.columns else 'target_qty'
             if cost_col not in df_tr.columns:
                 df_tr[cost_col] = 0.0
                 
+            # 3. MERGE İŞLEMİ (Çakışan Sütun Kontrolüyle)
             df_merged = pd.merge(df_tr, df_t, on='task_id', how='inner')
+            df_merged = df_merged.loc[:, ~df_merged.columns.duplicated()]
             
-            if not df_rsrc.empty and 'rsrc_id' in df_merged.columns:
-                df_r = df_rsrc.drop_duplicates(subset=['rsrc_id']).copy()
-                df_r['rsrc_id'] = df_r['rsrc_id'].astype(str)
+            # 4. KAYNAK İSMİ (RSRC) EŞLEŞTİRME
+            if 'rsrc_id' in df_merged.columns:
+                df_merged['rsrc_id'] = df_merged['rsrc_id'].astype(str)
                 
-                name_col = None
-                for c in ['rsrc_short_name', 'rsrc_name']:
-                    if c in df_r.columns:
-                        name_col = c
-                        break
-                
-                if name_col:
-                    df_merged = pd.merge(df_merged, df_r[['rsrc_id', name_col]], on='rsrc_id', how='left')
-                    df_merged['Kaynak_Adi'] = df_merged[name_col].fillna('Adlandırılmamış')
-                    df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'] + " - " + df_merged['Kaynak_Adi']
+                if not df_rsrc.empty and 'rsrc_id' in df_rsrc.columns:
+                    df_r = df_rsrc.copy()
+                    df_r = df_r.loc[:, ~df_r.columns.duplicated()].drop_duplicates(subset=['rsrc_id'])
+                    df_r['rsrc_id'] = df_r['rsrc_id'].astype(str)
+                    
+                    name_col = next((c for c in ['rsrc_name', 'rsrc_short_name'] if c in df_r.columns), None)
+                    
+                    if name_col:
+                        df_merged = pd.merge(df_merged, df_r[['rsrc_id', name_col]], on='rsrc_id', how='left')
+                        df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'] + " - " + df_merged[name_col].fillna('İsimsiz')
+                    else:
+                        df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id']
                 else:
                     df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id']
             else:
-                # BURASI DÜZELTİLDİ: Sütun kontrolü yapılarak düz metne astype uygulanması engellendi.
-                if 'rsrc_id' in df_merged.columns:
-                    df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'].astype(str)
-                else:
-                    df_merged['Kaynak_Gorunum'] = 'Tüm Kaynaklar'
+                df_merged['Kaynak_Gorunum'] = 'Tüm Kaynaklar'
 
+            # 5. TARİH VE MALİYET HESAPLAMALARI
             df_merged['Baslangic'] = pd.NaT
             df_merged['Bitis'] = pd.NaT
             
@@ -114,7 +120,7 @@ if uploaded_xer:
             
             if not df_valid.empty:
                 kaynak_listesi = sorted([str(x) for x in df_valid['Kaynak_Gorunum'].unique()])
-                secilen_kaynaklar = st.multiselect("📊 Analiz Edilecek Kaynakları Seçin (Örn: PARA kaynağını buradan seçin):", kaynak_listesi, default=[])
+                secilen_kaynaklar = st.multiselect("📊 Analiz Edilecek Kaynakları Seçin (Örn: Excel'deki 'PARA' kaynağını arayıp seçin):", kaynak_listesi, default=[])
                 
                 if secilen_kaynaklar:
                     df_valid = df_valid[df_valid['Kaynak_Gorunum'].isin(secilen_kaynaklar)]
@@ -143,6 +149,7 @@ if uploaded_xer:
 
                 st.success(f"✅ Dağıtım Tamamlandı! Toplam Maliyet/Bütçe: **{total_budget:,.2f} TL**")
                 
+                # 6. GRAFİK ÇİZİMİ
                 st.markdown("### 📊 Proje S-Eğrisi Grafiği")
                 plt.style.use('ggplot')
                 fig, (ax1, ax3) = plt.subplots(2, 1, figsize=(16, 12))
