@@ -12,7 +12,6 @@ def clean_dec_float(val):
         if pd.isna(val) or val is None: return 0.0
         s = str(val).strip()
         if not s: return 0.0
-        # XER formatındaki olası noktalama virgül hatalarını güvenceye alıyoruz
         if '.' in s and ',' in s:
             if s.rfind(',') > s.rfind('.'):
                 s = s.replace('.', '').replace(',', '.')
@@ -77,12 +76,10 @@ if uploaded_xer:
                 
             df_merged = pd.merge(df_tr, df_t, on='task_id', how='inner')
             
-            # --- KAYNAK İSİMLERİNİ GETİRME (DÜZELTİLDİ) ---
             if not df_rsrc.empty and 'rsrc_id' in df_merged.columns:
                 df_r = df_rsrc.drop_duplicates(subset=['rsrc_id']).copy()
                 df_r['rsrc_id'] = df_r['rsrc_id'].astype(str)
                 
-                # RSRC tablosundaki isim sütununu bul
                 name_col = None
                 for c in ['rsrc_short_name', 'rsrc_name']:
                     if c in df_r.columns:
@@ -96,7 +93,11 @@ if uploaded_xer:
                 else:
                     df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id']
             else:
-                df_merged['Kaynak_Gorunum'] = df_merged.get('rsrc_id', 'Tüm Kaynaklar').astype(str)
+                # BURASI DÜZELTİLDİ: Sütun kontrolü yapılarak düz metne astype uygulanması engellendi.
+                if 'rsrc_id' in df_merged.columns:
+                    df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'].astype(str)
+                else:
+                    df_merged['Kaynak_Gorunum'] = 'Tüm Kaynaklar'
 
             df_merged['Baslangic'] = pd.NaT
             df_merged['Bitis'] = pd.NaT
@@ -113,7 +114,7 @@ if uploaded_xer:
             
             if not df_valid.empty:
                 kaynak_listesi = sorted([str(x) for x in df_valid['Kaynak_Gorunum'].unique()])
-                secilen_kaynaklar = st.multiselect("📊 Analiz Edilecek Kaynakları Seçin (Excel'deki PARA kaynağını buradan işaretleyin):", kaynak_listesi, default=[])
+                secilen_kaynaklar = st.multiselect("📊 Analiz Edilecek Kaynakları Seçin (Örn: PARA kaynağını buradan seçin):", kaynak_listesi, default=[])
                 
                 if secilen_kaynaklar:
                     df_valid = df_valid[df_valid['Kaynak_Gorunum'].isin(secilen_kaynaklar)]
