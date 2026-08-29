@@ -64,7 +64,7 @@ if uploaded_xer:
         df_task, df_taskrsrc, df_rsrc = parse_xer_for_scurve(uploaded_xer.getvalue())
         
         if not df_task.empty and not df_taskrsrc.empty:
-            # 1. TASK TABLOSU TEMİZLİĞİ (Sadece gerekli kolonlar, çakışma önleyici)
+            # 1. TASK TABLOSU TEMİZLİĞİ
             t_cols = [c for c in ['task_id', 'target_start_date', 'target_end_date', 'early_start_date', 'early_end_date', 'act_start_date', 'act_end_date'] if c in df_task.columns]
             df_t = df_task[t_cols].copy()
             df_t = df_t.loc[:, ~df_t.columns.duplicated()].drop_duplicates(subset=['task_id'])
@@ -79,11 +79,11 @@ if uploaded_xer:
             if cost_col not in df_tr.columns:
                 df_tr[cost_col] = 0.0
                 
-            # 3. MERGE İŞLEMİ (Çakışan Sütun Kontrolüyle)
+            # 3. AKTİVİTE BİLGİLERİNİ EŞLEŞTİR (Merge burada güvenli)
             df_merged = pd.merge(df_tr, df_t, on='task_id', how='inner')
             df_merged = df_merged.loc[:, ~df_merged.columns.duplicated()]
             
-            # 4. KAYNAK İSMİ (RSRC) EŞLEŞTİRME
+            # 4. KAYNAK İSMİ (RSRC) EŞLEŞTİRME (Merge yerine Sözlük Map yöntemi)
             if 'rsrc_id' in df_merged.columns:
                 df_merged['rsrc_id'] = df_merged['rsrc_id'].astype(str)
                 
@@ -95,8 +95,10 @@ if uploaded_xer:
                     name_col = next((c for c in ['rsrc_name', 'rsrc_short_name'] if c in df_r.columns), None)
                     
                     if name_col:
-                        df_merged = pd.merge(df_merged, df_r[['rsrc_id', name_col]], on='rsrc_id', how='left')
-                        df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'] + " - " + df_merged[name_col].fillna('İsimsiz')
+                        # Sözlük eşleştirme (Çakışma ve DataFrame formatına dönme riskini sıfırlar)
+                        isim_sozlugu = df_r.set_index('rsrc_id')[name_col].to_dict()
+                        df_merged['Kaynak_Adi'] = df_merged['rsrc_id'].map(isim_sozlugu).fillna('İsimsiz').astype(str)
+                        df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'] + " - " + df_merged['Kaynak_Adi']
                     else:
                         df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id']
                 else:
