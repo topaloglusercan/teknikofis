@@ -23,7 +23,7 @@ from openpyxl.utils import get_column_letter
 getcontext().prec = 28 
 warnings.filterwarnings("ignore")
 
-# st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_icon="📂")
+st.set_page_config(page_title="İdari Hakediş Modülü", layout="wide", page_icon="📂")
 
 # ==========================================
 # 1. GÖRSEL TEMİZLİK VE FORMATLAMA
