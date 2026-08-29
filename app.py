@@ -1,6 +1,5 @@
 import streamlit as st
 
-st.set_page_config(page_title="Teknik Ofis Portalı", layout="wide", page_icon="🏗️")
 
 # --- KARŞILAMA EKRANI ---
 def ana_sayfa():
