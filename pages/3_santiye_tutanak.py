@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 
-st.set_page_config(
+# st.set_page_config(
     page_title="Şantiye Tutanak",
     page_icon="📋",
     layout="wide"
