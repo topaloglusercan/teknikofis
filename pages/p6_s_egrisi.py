@@ -168,11 +168,15 @@ if uploaded_xer:
                 for i, txt in enumerate(df_monthly['Kümülatif İlerleme (%)']):
                     ax2.annotate(f"{txt:.1f}%", (i, df_monthly['Kümülatif İlerleme (%)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#C44E52')
                 
-                # SİYAH YAZILAR BARIN ALTINDAN (0 NOKTASINDAN) BAŞLATILDI
+                # YÜZDELER BARIN İÇİNDEN (SIFIR NOKTASINDAN YUKARI DOĞRU) HİÇBİR DEĞERİ BOŞ GEÇMEDEN YAZILACAK
                 for i, bar in enumerate(bars_pct):
                     val = df_monthly['Aylık İlerleme (%)'].iloc[i]
-                    if val > 0.1:
-                        ax1.annotate(f"{val:.1f}%", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
+                    ax1.annotate(f"{val:.1f}%", 
+                                 (bar.get_x() + bar.get_width() / 2, 0), 
+                                 textcoords="offset points", 
+                                 xytext=(0, 10), # Yazıyı çizgiye çarpmaması için 10 piksel yukarı ittik
+                                 ha='center', va='bottom', rotation=90, 
+                                 fontsize=10, fontweight='bold', color='black')
 
                 lines_1, labels_1 = ax1.get_legend_handles_labels()
                 lines_2, labels_2 = ax2.get_legend_handles_labels()
@@ -198,11 +202,15 @@ if uploaded_xer:
                 for i, txt in enumerate(df_monthly['Kümülatif Maliyet (TL)']):
                     ax4.annotate(f"{format_tl(txt)}", (i, df_monthly['Kümülatif Maliyet (TL)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#8C8C8C')
 
-                # SİYAH YAZILAR BARIN ALTINDAN (0 NOKTASINDAN) BAŞLATILDI
+                # TUTARLAR BARIN İÇİNDEN (SIFIR NOKTASINDAN YUKARI DOĞRU) HİÇBİR DEĞERİ BOŞ GEÇMEDEN YAZILACAK
                 for i, bar in enumerate(bars_tl):
                     val = df_monthly['Aylık Maliyet (TL)'].iloc[i]
-                    if val > (total_budget * 0.005):
-                        ax3.annotate(f"{format_tl(val)}", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
+                    ax3.annotate(f"{format_tl(val)}", 
+                                 (bar.get_x() + bar.get_width() / 2, 0), 
+                                 textcoords="offset points", 
+                                 xytext=(0, 10), # Yazıyı çizgiye çarpmaması için 10 piksel yukarı ittik
+                                 ha='center', va='bottom', rotation=90, 
+                                 fontsize=10, fontweight='bold', color='black')
 
                 lines_3, labels_3 = ax3.get_legend_handles_labels()
                 lines_4, labels_4 = ax4.get_legend_handles_labels()
@@ -247,15 +255,10 @@ if uploaded_xer:
                 st.markdown("### 📋 Dağıtım Tablosu (Rapor)")
                 st.dataframe(df_monthly[['Ay Sonu Gösterim', 'Aylık Maliyet (TL)', 'Kümülatif Maliyet (TL)', 'Aylık İlerleme (%)', 'Kümülatif İlerleme (%)']], use_container_width=True)
                 
-                # --- İNDİRME BUTONLARI ---
+                # --- SADECE PDF İNDİRME BUTONU ---
                 st.markdown("---")
-                c1, c2 = st.columns(2)
-                with c1:
-                    pdf_bytes = pdf_buffer.getvalue()
-                    st.download_button(label="📑 A3 PDF Raporu İndir", data=pdf_bytes, file_name='S_Egrisi_A3_Rapor.pdf', mime='application/pdf', use_container_width=True)
-                with c2:
-                    csv = df_monthly.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button(label="💾 Excel/CSV Olarak İndir", data=csv, file_name='S_Egrisi_Raporu.csv', mime='text/csv', use_container_width=True)
+                pdf_bytes = pdf_buffer.getvalue()
+                st.download_button(label="📑 A3 PDF Raporu İndir", data=pdf_bytes, file_name='S_Egrisi_A3_Rapor.pdf', mime='application/pdf', use_container_width=True)
 
             else:
                 st.warning("⚠️ Seçilen dosyadaki aktivitelerde geçerli tarih veya bütçe/maliyet (Cost/Qty) değeri bulunamadı.")
