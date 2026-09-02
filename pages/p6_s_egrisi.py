@@ -3,7 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter, FuncFormatter
+from matplotlib.backends.backend_pdf import PdfPages
 import re
+import io
 
 st.markdown("<h1 style='color: #2c3e50;'>📈 P6 S-Eğrisi (Parasal İlerleme)</h1>", unsafe_allow_html=True)
 st.markdown("XER dosyasındaki aktivite ve kaynak verilerini tarayarak projeye ait aylık ve kümülatif S-Eğrisi (Nakit Akışı / İlerleme) grafiklerini oluşturun.")
@@ -64,13 +66,11 @@ if uploaded_xer:
         df_task, df_taskrsrc, df_rsrc = parse_xer_for_scurve(uploaded_xer.getvalue())
         
         if not df_task.empty and not df_taskrsrc.empty:
-            # 1. TASK TABLOSU TEMİZLİĞİ
             t_cols = [c for c in ['task_id', 'target_start_date', 'target_end_date', 'early_start_date', 'early_end_date', 'act_start_date', 'act_end_date'] if c in df_task.columns]
             df_t = df_task[t_cols].copy()
             df_t = df_t.loc[:, ~df_t.columns.duplicated()].drop_duplicates(subset=['task_id'])
             df_t['task_id'] = df_t['task_id'].astype(str)
             
-            # 2. TASKRSRC TABLOSU TEMİZLİĞİ
             df_tr = df_taskrsrc.copy()
             df_tr = df_tr.loc[:, ~df_tr.columns.duplicated()]
             df_tr['task_id'] = df_tr['task_id'].astype(str)
@@ -79,11 +79,9 @@ if uploaded_xer:
             if cost_col not in df_tr.columns:
                 df_tr[cost_col] = 0.0
                 
-            # 3. AKTİVİTE BİLGİLERİNİ EŞLEŞTİR (Merge burada güvenli)
             df_merged = pd.merge(df_tr, df_t, on='task_id', how='inner')
             df_merged = df_merged.loc[:, ~df_merged.columns.duplicated()]
             
-            # 4. KAYNAK İSMİ (RSRC) EŞLEŞTİRME (Merge yerine Sözlük Map yöntemi)
             if 'rsrc_id' in df_merged.columns:
                 df_merged['rsrc_id'] = df_merged['rsrc_id'].astype(str)
                 
@@ -95,7 +93,6 @@ if uploaded_xer:
                     name_col = next((c for c in ['rsrc_name', 'rsrc_short_name'] if c in df_r.columns), None)
                     
                     if name_col:
-                        # Sözlük eşleştirme (Çakışma ve DataFrame formatına dönme riskini sıfırlar)
                         isim_sozlugu = df_r.set_index('rsrc_id')[name_col].to_dict()
                         df_merged['Kaynak_Adi'] = df_merged['rsrc_id'].map(isim_sozlugu).fillna('İsimsiz').astype(str)
                         df_merged['Kaynak_Gorunum'] = df_merged['rsrc_id'] + " - " + df_merged['Kaynak_Adi']
@@ -106,7 +103,6 @@ if uploaded_xer:
             else:
                 df_merged['Kaynak_Gorunum'] = 'Tüm Kaynaklar'
 
-            # 5. TARİH VE MALİYET HESAPLAMALARI
             df_merged['Baslangic'] = pd.NaT
             df_merged['Bitis'] = pd.NaT
             
@@ -151,67 +147,110 @@ if uploaded_xer:
 
                 st.success(f"✅ Dağıtım Tamamlandı! Toplam Maliyet/Bütçe: **{total_budget:,.2f} TL**")
                 
-                # 6. GRAFİK ÇİZİMİ
-                st.markdown("### 📊 Proje S-Eğrisi Grafiği")
+                # --- A3 GRAFİK ÇİZİMİ ---
                 plt.style.use('ggplot')
-                fig, (ax1, ax3) = plt.subplots(2, 1, figsize=(16, 12))
+                fig, (ax1, ax3) = plt.subplots(2, 1, figsize=(16.5, 11.7)) # A3 Landscape Boyutları
+                fig.suptitle('Proje İlerleme ve Maliyet (S-Eğrisi) Raporu', fontsize=20, fontweight='bold', y=0.98)
                 
                 bars_pct = ax1.bar(df_monthly['Ay Sonu Gösterim'], df_monthly['Aylık İlerleme (%)'], color='#4C72B0', alpha=0.6, edgecolor='black', label='Aylık İlerleme (%)')
-                ax1.set_ylabel('Aylık İlerleme (%)', color='#4C72B0', fontweight='bold')
-                ax1.tick_params(axis='y', labelcolor='#4C72B0')
-                ax1.set_xticklabels(df_monthly['Ay Sonu Gösterim'], rotation=45, ha='right')
+                ax1.set_ylabel('Aylık İlerleme (%)', color='#4C72B0', fontweight='bold', fontsize=12)
+                ax1.tick_params(axis='y', labelcolor='#4C72B0', labelsize=10)
+                ax1.set_xticklabels(df_monthly['Ay Sonu Gösterim'], rotation=45, ha='right', fontsize=10)
                 ax1.yaxis.set_major_formatter(PercentFormatter())
 
                 ax2 = ax1.twinx()
-                line_pct = ax2.plot(df_monthly['Ay Sonu Gösterim'], df_monthly['Kümülatif İlerleme (%)'], color='#C44E52', marker='o', linewidth=3, markersize=6, label='Kümülatif İlerleme (%)')
-                ax2.set_ylabel('Kümülatif İlerleme (%)', color='#C44E52', fontweight='bold')
-                ax2.tick_params(axis='y', labelcolor='#C44E52')
+                line_pct = ax2.plot(df_monthly['Ay Sonu Gösterim'], df_monthly['Kümülatif İlerleme (%)'], color='#C44E52', marker='o', linewidth=3, markersize=8, label='Kümülatif İlerleme (%)')
+                ax2.set_ylabel('Kümülatif İlerleme (%)', color='#C44E52', fontweight='bold', fontsize=12)
+                ax2.tick_params(axis='y', labelcolor='#C44E52', labelsize=10)
                 ax2.yaxis.set_major_formatter(PercentFormatter())
 
                 for i, txt in enumerate(df_monthly['Kümülatif İlerleme (%)']):
-                    ax2.annotate(f"{txt:.1f}%", (i, df_monthly['Kümülatif İlerleme (%)'][i]), textcoords="offset points", xytext=(5,8), ha='left', va='bottom', rotation=45, fontsize=9, fontweight='bold', color='#C44E52')
+                    ax2.annotate(f"{txt:.1f}%", (i, df_monthly['Kümülatif İlerleme (%)'][i]), textcoords="offset points", xytext=(5,10), ha='left', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#C44E52')
 
                 for i, bar in enumerate(bars_pct):
                     val = df_monthly['Aylık İlerleme (%)'].iloc[i]
                     if val > 0.1:
-                        ax1.annotate(f"{val:.1f}%", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
+                        ax1.annotate(f"{val:.1f}%", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=10, fontweight='bold', color='black')
 
                 lines_1, labels_1 = ax1.get_legend_handles_labels()
                 lines_2, labels_2 = ax2.get_legend_handles_labels()
-                ax2.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper left')
+                ax2.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper left', fontsize=10)
 
                 bars_tl = ax3.bar(df_monthly['Ay Sonu Gösterim'], df_monthly['Aylık Maliyet (TL)'], color='#55A868', alpha=0.6, edgecolor='black', label='Aylık Maliyet')
-                ax3.set_ylabel('Aylık Maliyet', color='#55A868', fontweight='bold')
-                ax3.tick_params(axis='y', labelcolor='#55A868')
-                ax3.set_xticklabels(df_monthly['Ay Sonu Gösterim'], rotation=45, ha='right')
+                ax3.set_ylabel('Aylık Maliyet', color='#55A868', fontweight='bold', fontsize=12)
+                ax3.tick_params(axis='y', labelcolor='#55A868', labelsize=10)
+                ax3.set_xticklabels(df_monthly['Ay Sonu Gösterim'], rotation=45, ha='right', fontsize=10)
                 ax3.yaxis.set_major_formatter(FuncFormatter(format_tl))
 
                 ax4 = ax3.twinx()
-                line_tl = ax4.plot(df_monthly['Ay Sonu Gösterim'], df_monthly['Kümülatif Maliyet (TL)'], color='#8C8C8C', marker='s', linewidth=3, markersize=6, label='Kümülatif Maliyet')
-                ax4.set_ylabel('Kümülatif Maliyet', color='#8C8C8C', fontweight='bold')
-                ax4.tick_params(axis='y', labelcolor='#8C8C8C')
+                line_tl = ax4.plot(df_monthly['Ay Sonu Gösterim'], df_monthly['Kümülatif Maliyet (TL)'], color='#8C8C8C', marker='s', linewidth=3, markersize=8, label='Kümülatif Maliyet')
+                ax4.set_ylabel('Kümülatif Maliyet', color='#8C8C8C', fontweight='bold', fontsize=12)
+                ax4.tick_params(axis='y', labelcolor='#8C8C8C', labelsize=10)
                 ax4.yaxis.set_major_formatter(FuncFormatter(format_tl))
 
                 for i, txt in enumerate(df_monthly['Kümülatif Maliyet (TL)']):
-                    ax4.annotate(f"{format_tl(txt)}", (i, df_monthly['Kümülatif Maliyet (TL)'][i]), textcoords="offset points", xytext=(5,8), ha='left', va='bottom', rotation=45, fontsize=8, fontweight='bold', color='#8C8C8C')
+                    ax4.annotate(f"{format_tl(txt)}", (i, df_monthly['Kümülatif Maliyet (TL)'][i]), textcoords="offset points", xytext=(5,10), ha='left', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#8C8C8C')
 
                 for i, bar in enumerate(bars_tl):
                     val = df_monthly['Aylık Maliyet (TL)'].iloc[i]
                     if val > (total_budget * 0.005):
-                        ax3.annotate(f"{format_tl(val)}", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
+                        ax3.annotate(f"{format_tl(val)}", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=10, fontweight='bold', color='black')
 
                 lines_3, labels_3 = ax3.get_legend_handles_labels()
                 lines_4, labels_4 = ax4.get_legend_handles_labels()
-                ax4.legend(lines_3 + lines_4, labels_3 + labels_4, loc='upper left')
+                ax4.legend(lines_3 + lines_4, labels_3 + labels_4, loc='upper left', fontsize=10)
 
-                plt.tight_layout()
+                plt.tight_layout(rect=[0, 0, 1, 0.96])
                 st.pyplot(fig)
+                
+                # --- PDF OLUŞTURMA (Grafik ve Tablo) ---
+                pdf_buffer = io.BytesIO()
+                with PdfPages(pdf_buffer) as pdf:
+                    # 1. Sayfa: A3 Grafik
+                    pdf.savefig(fig, bbox_inches='tight')
+                    
+                    # 2. Sayfa: A3 Veri Tablosu
+                    fig_table, ax_table = plt.subplots(figsize=(16.5, 11.7))
+                    ax_table.axis('tight')
+                    ax_table.axis('off')
+                    ax_table.set_title("Proje İlerleme ve Maliyet Dağılım Tablosu", fontsize=20, fontweight='bold', pad=20)
+                    
+                    table_cols = ['Ay Sonu Gösterim', 'Aylık Maliyet (TL)', 'Kümülatif Maliyet (TL)', 'Aylık İlerleme (%)', 'Kümülatif İlerleme (%)']
+                    table_data = df_monthly[table_cols].copy()
+                    table_data['Aylık İlerleme (%)'] = table_data['Aylık İlerleme (%)'].astype(str) + ' %'
+                    table_data['Kümülatif İlerleme (%)'] = table_data['Kümülatif İlerleme (%)'].astype(str) + ' %'
+                    table_data['Aylık Maliyet (TL)'] = table_data['Aylık Maliyet (TL)'].apply(lambda x: f"{x:,.2f} ₺")
+                    table_data['Kümülatif Maliyet (TL)'] = table_data['Kümülatif Maliyet (TL)'].apply(lambda x: f"{x:,.2f} ₺")
+                    
+                    table = ax_table.table(cellText=table_data.values, colLabels=table_data.columns, loc='center', cellLoc='center')
+                    table.scale(1, 2.5) # Satır aralıklarını genişlet
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(12)
+                    
+                    # Başlık hücrelerini şekillendirme
+                    for (row, col), cell in table.get_celld().items():
+                        if row == 0:
+                            cell.set_text_props(weight='bold', color='white')
+                            cell.set_facecolor('#2c3e50')
+                        else:
+                            cell.set_facecolor('#f8f9fa' if row % 2 == 0 else 'white')
+                            
+                    pdf.savefig(fig_table, bbox_inches='tight')
+                    plt.close('all')
                 
                 st.markdown("### 📋 Dağıtım Tablosu (Rapor)")
                 st.dataframe(df_monthly[['Ay Sonu Gösterim', 'Aylık Maliyet (TL)', 'Kümülatif Maliyet (TL)', 'Aylık İlerleme (%)', 'Kümülatif İlerleme (%)']], use_container_width=True)
                 
-                csv = df_monthly.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(label="💾 S-Eğrisi Tablosunu İndir (CSV)", data=csv, file_name='S_Egrisi_Raporu.csv', mime='text/csv')
+                # --- İNDİRME BUTONLARI ---
+                st.markdown("---")
+                c1, c2 = st.columns(2)
+                with c1:
+                    pdf_bytes = pdf_buffer.getvalue()
+                    st.download_button(label="📑 A3 PDF Raporu İndir", data=pdf_bytes, file_name='S_Egrisi_A3_Rapor.pdf', mime='application/pdf', use_container_width=True)
+                with c2:
+                    csv = df_monthly.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(label="💾 Excel/CSV Olarak İndir", data=csv, file_name='S_Egrisi_Raporu.csv', mime='text/csv', use_container_width=True)
+
             else:
                 st.warning("⚠️ Seçilen dosyadaki aktivitelerde geçerli tarih veya bütçe/maliyet (Cost/Qty) değeri bulunamadı.")
         else:
