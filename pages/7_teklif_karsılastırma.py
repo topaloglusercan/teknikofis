@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-st.set_page_config(page_title="Dinamik Teklif Kıyaslama", page_icon="📊", layout="wide")
+# st.set_page_config(page_title="Dinamik Teklif Kıyaslama", page_icon="📊", layout="wide")
 
 # ==========================================
 # 1. YARDIMCI FONKSİYONLAR VE FORMATLAYICILAR
