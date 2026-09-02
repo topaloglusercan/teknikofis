@@ -16,7 +16,7 @@ import re
 # ==========================================
 # PROD AYARLARI: Sayfa Yapısı
 # ==========================================
-st.set_page_config(page_title="Revize Pursantaj Dağıtımı", page_icon="⚖️", layout="wide", initial_sidebar_state="expanded")
+# st.set_page_config(page_title="Revize Pursantaj Dağıtımı", page_icon="⚖️", layout="wide", initial_sidebar_state="expanded")
 
 hide_st_style = """
             <style>
