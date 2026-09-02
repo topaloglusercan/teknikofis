@@ -2,12 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 
-# st.set_page_config(
-    page_title="Şantiye Tutanak",
-    page_icon="📋",
-    layout="wide"
-)
-
 # Sayfanın kendi padding'ini kaldır — tam ekran iframe için
 st.markdown("""
     <style>
