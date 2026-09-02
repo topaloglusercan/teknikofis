@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from matplotlib.backends.backend_pdf import PdfPages
+import io
 
 st.markdown("<h1 style='color: #2c3e50;'>📊 P6 Aktivite Kodu Analizi (Dashboard)</h1>", unsafe_allow_html=True)
 st.markdown("Projenizdeki Adam-Saat veya miktarları, belirlediğiniz Kaynaklara ve Aktivite Kodlarına (Disiplin, Faz vb.) göre filtreleyip gruplayın.")
@@ -56,7 +58,7 @@ def parse_xer_for_activity_codes(file_bytes):
         clean_df(tables.get('ACTVTYPE', [])), 
         clean_df(tables.get('ACTVCODE', [])), 
         clean_df(tables.get('TASKACTV', [])),
-        clean_df(tables.get('RSRC', [])) # Kaynak isimleri için RSRC eklendi
+        clean_df(tables.get('RSRC', []))
     )
 
 uploaded_xer = st.file_uploader("📂 XER Dosyasını Yükle (Aktivite Kodu Analizi İçin)", type=['xer'])
@@ -149,31 +151,73 @@ if uploaded_xer:
                     with c_met2:
                         st.metric(f"'{secilen_kategori}' Kırılım Sayısı", len(df_summary))
 
-                    # 6. Görselleştirme (Yatay Bar Chart)
+                    # 6. Görselleştirme (Yatay Bar Chart - A3 Uyumlu)
                     st.markdown(f"### 📊 {secilen_kategori} Dağılım Grafiği")
                     plt.style.use('ggplot')
-                    fig, ax = plt.subplots(figsize=(12, max(6, len(df_summary) * 0.5)))
+                    
+                    # Bar sayısına göre dinamik yükseklik (Min A3 yüksekliği: 11.7)
+                    chart_height = max(11.7, len(df_summary) * 0.6)
+                    fig, ax = plt.subplots(figsize=(16.5, chart_height))
+                    fig.suptitle(f"{secilen_kategori} - Dağılım Raporu", fontsize=22, fontweight='bold', y=0.98)
                     
                     bars = ax.barh(df_summary['short_name'], df_summary['Birim_Miktar'], color='#4C72B0', edgecolor='black', alpha=0.8)
-                    ax.set_xlabel('Budgeted Units (Seçilen Kaynaklar)', fontweight='bold')
+                    ax.set_xlabel('Budgeted Units (Seçilen Kaynaklar)', fontweight='bold', fontsize=12)
+                    ax.tick_params(axis='both', labelsize=11)
                     ax.xaxis.set_major_formatter(FuncFormatter(format_b))
                     
-                    # Sayısal değerleri yazdır
+                    # Barların sonuna değerleri yaz
                     for bar in bars:
                         width = bar.get_width()
                         ax.annotate(f"{width:,.0f}",
                                     xy=(width, bar.get_y() + bar.get_height() / 2),
                                     xytext=(5, 0),
                                     textcoords="offset points",
-                                    ha='left', va='center', fontweight='bold', fontsize=10)
+                                    ha='left', va='center', fontweight='bold', fontsize=11, color='black')
                         
-                    plt.tight_layout()
+                    # Çizimin sağ tarafında değerlerin kesilmemesi için limiti biraz artırıyoruz
+                    ax.set_xlim(0, df_summary['Birim_Miktar'].max() * 1.15)
+                    plt.tight_layout(rect=[0, 0, 1, 0.96])
                     st.pyplot(fig)
 
-                    # 7. Veri Tablosu
+                    # 7. Veri Tablosu Hazırlığı
                     st.markdown("### 📋 Detaylı Veri Tablosu")
                     df_rapor = df_summary.sort_values(by='Birim_Miktar', ascending=False).copy()
                     df_rapor['Yüzde (%)'] = (df_rapor['Birim_Miktar'] / toplam_proje_miktari * 100).round(2) if toplam_proje_miktari > 0 else 0
                     df_rapor.rename(columns={'short_name': secilen_kategori, 'Birim_Miktar': 'Budgeted Units'}, inplace=True)
                     
                     st.dataframe(df_rapor, use_container_width=True)
+                    
+                    # --- PDF OLUŞTURMA İŞLEMİ ---
+                    pdf_buffer = io.BytesIO()
+                    with PdfPages(pdf_buffer) as pdf:
+                        # 1. Sayfa: A3 Grafik
+                        pdf.savefig(fig, bbox_inches='tight')
+                        
+                        # 2. Sayfa: A3 Veri Tablosu
+                        fig_table, ax_table = plt.subplots(figsize=(16.5, 11.7))
+                        ax_table.axis('off')
+                        
+                        fig_table.text(0.5, 0.93, f"{secilen_kategori} Detaylı Veri Tablosu", ha='center', va='center', fontsize=24, fontweight='bold', color='#2c3e50')
+                        
+                        table_data = df_rapor.copy()
+                        table_data['Budgeted Units'] = table_data['Budgeted Units'].apply(lambda x: f"{x:,.2f}")
+                        table_data['Yüzde (%)'] = table_data['Yüzde (%)'].astype(str) + ' %'
+                        
+                        table = ax_table.table(cellText=table_data.values, colLabels=table_data.columns, loc='center', cellLoc='center', bbox=[0.05, 0.05, 0.9, 0.82])
+                        table.auto_set_font_size(False)
+                        table.set_fontsize(12)
+                        
+                        for (row, col), cell in table.get_celld().items():
+                            if row == 0:
+                                cell.set_text_props(weight='bold', color='white', fontsize=14)
+                                cell.set_facecolor('#2c3e50')
+                            else:
+                                cell.set_facecolor('#f8f9fa' if row % 2 == 0 else 'white')
+                                
+                        pdf.savefig(fig_table, bbox_inches='tight')
+                        plt.close('all')
+                    
+                    # --- PDF İNDİRME BUTONU ---
+                    st.markdown("---")
+                    pdf_bytes = pdf_buffer.getvalue()
+                    st.download_button(label="📑 A3 PDF Raporu İndir", data=pdf_bytes, file_name='Aktivite_Kodu_Analizi_A3_Rapor.pdf', mime='application/pdf', use_container_width=True)
