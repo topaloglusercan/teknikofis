@@ -22,7 +22,7 @@ def parse_tr_number(val):
     except:
         return 0.0
 
-st.set_page_config(page_title="Performans Analizi", layout="wide")
+# st.set_page_config(page_title="Performans Analizi", layout="wide")
 
 st.title("Proje Performans Analizi")
 st.markdown("Kazanılmış Takvim (ESA) ve Kazanılmış Değer (EVA) Metodolojileri Kıyaslaması")
