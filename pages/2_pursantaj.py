@@ -5,7 +5,7 @@ import pandas as pd
 import json, copy, io
 from datetime import datetime
 
-st.set_page_config(page_title="Pursantaj Yönetim", layout="wide", initial_sidebar_state="expanded")
+# st.set_page_config(page_title="Pursantaj Yönetim", layout="wide", initial_sidebar_state="expanded")
 
 # --- KULLANICI ARAYÜZÜ İÇİN ÖZEL CSS (BEYAZ TEMA & DÜZENLEMELER) ---
 st.markdown("""
