@@ -165,16 +165,17 @@ if uploaded_xer:
                 ax2.tick_params(axis='y', labelcolor='#C44E52', labelsize=10)
                 ax2.yaxis.set_major_formatter(PercentFormatter())
                 
+                # Kırmızı çizgi değerleri (çizginin hemen üstünde)
                 for i, txt in enumerate(df_monthly['Kümülatif İlerleme (%)']):
                     ax2.annotate(f"{txt:.1f}%", (i, df_monthly['Kümülatif İlerleme (%)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#C44E52')
                 
-                # YÜZDELER BARIN İÇİNDEN (SIFIR NOKTASINDAN YUKARI DOĞRU) HİÇBİR DEĞERİ BOŞ GEÇMEDEN YAZILACAK
+                # Bar yazıları (Sıfır noktasından başlayıp yukarı, istisnasız tüm barlar için)
                 for i, bar in enumerate(bars_pct):
                     val = df_monthly['Aylık İlerleme (%)'].iloc[i]
                     ax1.annotate(f"{val:.1f}%", 
                                  (bar.get_x() + bar.get_width() / 2, 0), 
                                  textcoords="offset points", 
-                                 xytext=(0, 10), # Yazıyı çizgiye çarpmaması için 10 piksel yukarı ittik
+                                 xytext=(0, 10), 
                                  ha='center', va='bottom', rotation=90, 
                                  fontsize=10, fontweight='bold', color='black')
 
@@ -202,13 +203,13 @@ if uploaded_xer:
                 for i, txt in enumerate(df_monthly['Kümülatif Maliyet (TL)']):
                     ax4.annotate(f"{format_tl(txt)}", (i, df_monthly['Kümülatif Maliyet (TL)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#8C8C8C')
 
-                # TUTARLAR BARIN İÇİNDEN (SIFIR NOKTASINDAN YUKARI DOĞRU) HİÇBİR DEĞERİ BOŞ GEÇMEDEN YAZILACAK
+                # Bar yazıları (Sıfır noktasından başlayıp yukarı, istisnasız tüm barlar için)
                 for i, bar in enumerate(bars_tl):
                     val = df_monthly['Aylık Maliyet (TL)'].iloc[i]
                     ax3.annotate(f"{format_tl(val)}", 
                                  (bar.get_x() + bar.get_width() / 2, 0), 
                                  textcoords="offset points", 
-                                 xytext=(0, 10), # Yazıyı çizgiye çarpmaması için 10 piksel yukarı ittik
+                                 xytext=(0, 10), 
                                  ha='center', va='bottom', rotation=90, 
                                  fontsize=10, fontweight='bold', color='black')
 
