@@ -165,11 +165,9 @@ if uploaded_xer:
                 ax2.tick_params(axis='y', labelcolor='#C44E52', labelsize=10)
                 ax2.yaxis.set_major_formatter(PercentFormatter())
                 
-                # Çakışmayı önlemek için çizgi grafik yazıları nokta merkezinden yukarı alındı (xytext)
                 for i, txt in enumerate(df_monthly['Kümülatif İlerleme (%)']):
                     ax2.annotate(f"{txt:.1f}%", (i, df_monthly['Kümülatif İlerleme (%)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#C44E52')
                 
-                # Bar yazıları 0'dan değil, çubuğun en tepesinden başlatıldı (bar.get_height())
                 for i, bar in enumerate(bars_pct):
                     val = df_monthly['Aylık İlerleme (%)'].iloc[i]
                     if val > 0.1:
@@ -186,7 +184,6 @@ if uploaded_xer:
                 ax3.set_xticklabels(df_monthly['Ay Sonu Gösterim'], rotation=45, ha='right', fontsize=10)
                 ax3.yaxis.set_major_formatter(FuncFormatter(format_tl))
                 
-                # Çizgi limitini biraz yükselterek tepe yazılarının kesilmesini engelliyoruz
                 ax3.set_ylim(0, df_monthly['Aylık Maliyet (TL)'].max() * 1.3)
 
                 ax4 = ax3.twinx()
@@ -222,8 +219,8 @@ if uploaded_xer:
                     fig_table, ax_table = plt.subplots(figsize=(16.5, 11.7))
                     ax_table.axis('off')
                     
-                    # Başlık ile tablonun çakışmasını engellemek için başlık y=0.95'e sabitlendi
-                    fig_table.suptitle("Proje İlerleme ve Maliyet Dağılım Tablosu", fontsize=22, fontweight='bold', y=0.95)
+                    # Başlığı bağımsız bir metin olarak tam tepeye (y=0.93) yerleştirerek çakışmayı kesin olarak engelliyoruz
+                    fig_table.text(0.5, 0.93, "Proje İlerleme ve Maliyet Dağılım Tablosu", ha='center', va='center', fontsize=24, fontweight='bold', color='#2c3e50')
                     
                     table_cols = ['Ay Sonu Gösterim', 'Aylık Maliyet (TL)', 'Kümülatif Maliyet (TL)', 'Aylık İlerleme (%)', 'Kümülatif İlerleme (%)']
                     table_data = df_monthly[table_cols].copy()
@@ -232,12 +229,11 @@ if uploaded_xer:
                     table_data['Aylık Maliyet (TL)'] = table_data['Aylık Maliyet (TL)'].apply(lambda x: f"{x:,.2f} ₺")
                     table_data['Kümülatif Maliyet (TL)'] = table_data['Kümülatif Maliyet (TL)'].apply(lambda x: f"{x:,.2f} ₺")
                     
-                    # bbox ile tablonun sayfanın neresinde duracağı kesin olarak sınırlandı (Başlığın altında kalması sağlandı)
-                    table = ax_table.table(cellText=table_data.values, colLabels=table_data.columns, loc='center', cellLoc='center', bbox=[0.05, 0.05, 0.9, 0.85])
+                    # Tabloyu aşağıya çektik (yükseklik 0.82, başlangıç 0.05). Böylece tavan 0.87'de biter ve başlığa asla çarpmaz.
+                    table = ax_table.table(cellText=table_data.values, colLabels=table_data.columns, loc='center', cellLoc='center', bbox=[0.05, 0.05, 0.9, 0.82])
                     table.auto_set_font_size(False)
                     table.set_fontsize(12)
                     
-                    # Başlık hücrelerini ve satırları renklendirme
                     for (row, col), cell in table.get_celld().items():
                         if row == 0:
                             cell.set_text_props(weight='bold', color='white', fontsize=14)
