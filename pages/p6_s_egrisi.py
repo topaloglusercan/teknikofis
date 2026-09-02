@@ -168,10 +168,11 @@ if uploaded_xer:
                 for i, txt in enumerate(df_monthly['Kümülatif İlerleme (%)']):
                     ax2.annotate(f"{txt:.1f}%", (i, df_monthly['Kümülatif İlerleme (%)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#C44E52')
                 
+                # SİYAH YAZILAR BARIN ALTINDAN (0 NOKTASINDAN) BAŞLATILDI
                 for i, bar in enumerate(bars_pct):
                     val = df_monthly['Aylık İlerleme (%)'].iloc[i]
                     if val > 0.1:
-                        ax1.annotate(f"{val:.1f}%", (bar.get_x() + bar.get_width() / 2, bar.get_height()), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
+                        ax1.annotate(f"{val:.1f}%", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
 
                 lines_1, labels_1 = ax1.get_legend_handles_labels()
                 lines_2, labels_2 = ax2.get_legend_handles_labels()
@@ -197,10 +198,11 @@ if uploaded_xer:
                 for i, txt in enumerate(df_monthly['Kümülatif Maliyet (TL)']):
                     ax4.annotate(f"{format_tl(txt)}", (i, df_monthly['Kümülatif Maliyet (TL)'][i]), textcoords="offset points", xytext=(-5,15), ha='center', va='bottom', rotation=45, fontsize=10, fontweight='bold', color='#8C8C8C')
 
+                # SİYAH YAZILAR BARIN ALTINDAN (0 NOKTASINDAN) BAŞLATILDI
                 for i, bar in enumerate(bars_tl):
                     val = df_monthly['Aylık Maliyet (TL)'].iloc[i]
                     if val > (total_budget * 0.005):
-                        ax3.annotate(f"{format_tl(val)}", (bar.get_x() + bar.get_width() / 2, bar.get_height()), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
+                        ax3.annotate(f"{format_tl(val)}", (bar.get_x() + bar.get_width() / 2, 0), textcoords="offset points", xytext=(0, 5), ha='center', va='bottom', rotation=90, fontsize=9, fontweight='bold', color='black')
 
                 lines_3, labels_3 = ax3.get_legend_handles_labels()
                 lines_4, labels_4 = ax4.get_legend_handles_labels()
@@ -219,7 +221,6 @@ if uploaded_xer:
                     fig_table, ax_table = plt.subplots(figsize=(16.5, 11.7))
                     ax_table.axis('off')
                     
-                    # Başlığı bağımsız bir metin olarak tam tepeye (y=0.93) yerleştirerek çakışmayı kesin olarak engelliyoruz
                     fig_table.text(0.5, 0.93, "Proje İlerleme ve Maliyet Dağılım Tablosu", ha='center', va='center', fontsize=24, fontweight='bold', color='#2c3e50')
                     
                     table_cols = ['Ay Sonu Gösterim', 'Aylık Maliyet (TL)', 'Kümülatif Maliyet (TL)', 'Aylık İlerleme (%)', 'Kümülatif İlerleme (%)']
@@ -229,7 +230,6 @@ if uploaded_xer:
                     table_data['Aylık Maliyet (TL)'] = table_data['Aylık Maliyet (TL)'].apply(lambda x: f"{x:,.2f} ₺")
                     table_data['Kümülatif Maliyet (TL)'] = table_data['Kümülatif Maliyet (TL)'].apply(lambda x: f"{x:,.2f} ₺")
                     
-                    # Tabloyu aşağıya çektik (yükseklik 0.82, başlangıç 0.05). Böylece tavan 0.87'de biter ve başlığa asla çarpmaz.
                     table = ax_table.table(cellText=table_data.values, colLabels=table_data.columns, loc='center', cellLoc='center', bbox=[0.05, 0.05, 0.9, 0.82])
                     table.auto_set_font_size(False)
                     table.set_fontsize(12)
