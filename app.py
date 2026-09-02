@@ -64,8 +64,9 @@ p6_modulleri = [
     st.Page("pages/p6_adam_saat.py", title="P6 Adam-Saat Analizi", icon=":material/engineering:"),
     st.Page("pages/p6_s_egrisi.py", title="P6 S-Eğrisi", icon=":material/show_chart:"),
     st.Page("pages/p6_lag_analizi.py", title="P6 Lag Analizi", icon=":material/hourglass_empty:"),
+    st.Page("pages/p6_gereksiz_baglar.py", title="P6 Gereksiz Bağ Analizi", icon=":material/link_off:"),
     # YENİ MODÜL BURAYA EKLENDİ:
-    st.Page("pages/p6_gereksiz_baglar.py", title="P6 Gereksiz Bağ Analizi", icon=":material/link_off:")
+    st.Page("pages/p6_aktivite_kodu_analizi.py", title="P6 Aktivite Kodu Analizi", icon=":material/dashboard:")
 ]
 
 sayfalar = {
