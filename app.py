@@ -43,6 +43,9 @@ def ana_sayfa():
         * **P6 Adam-Saat Analizi:** XER veritabanından kaynak dağılımlarını aylara bölen analiz.
         * **P6 S-Eğrisi (İlerleme):** Bütçe/maliyet verileriyle kümülatif S-Eğrisi grafikleri.
         * **P6 Lag Analizi:** Aktivite ilişkilerindeki gizlenmiş Lag (Bekleme) değerlerinin tespiti.
+        * **P6 Gereksiz Bağ Analizi:** Mantıksal döngü ve gereksiz bağların tespiti.
+        * **P6 Aktivite Kodu Analizi:** Proje aktivite kodlarının dağılım ve kontrolü.
+        * **P6 Change Log:** EKGYO formatında yapısal revizyon ve hakediş analizi.
         """)
         
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -65,8 +68,8 @@ p6_modulleri = [
     st.Page("pages/p6_s_egrisi.py", title="P6 S-Eğrisi", icon=":material/show_chart:"),
     st.Page("pages/p6_lag_analizi.py", title="P6 Lag Analizi", icon=":material/hourglass_empty:"),
     st.Page("pages/p6_gereksiz_baglar.py", title="P6 Gereksiz Bağ Analizi", icon=":material/link_off:"),
-    # YENİ MODÜL BURAYA EKLENDİ:
-    st.Page("pages/p6_aktivite_kodu_analizi.py", title="P6 Aktivite Kodu Analizi", icon=":material/dashboard:")
+    st.Page("pages/p6_aktivite_kodu_analizi.py", title="P6 Aktivite Kodu Analizi", icon=":material/dashboard:"),
+    st.Page("pages/p6_change_log.py", title="P6 Change Log", icon=":material/history:")
 ]
 
 sayfalar = {
