@@ -5,7 +5,7 @@ import plotly.express as px
 import datetime
 
 # --- SAYFA YAPILANDIRMASI ---
-st.set_page_config(layout="wide", page_title="XER Teknik Ofis Paneli", page_icon="📊")
+# st.set_page_config(layout="wide", page_title="XER Teknik Ofis Paneli", page_icon="📊")
 st.markdown("<h1 style='color: #2c3e50; font-weight: 800;'>📊 XER Teknik Ofis ve Kontrol Paneli</h1>", unsafe_allow_html=True)
 st.markdown("Revizyon özetleri, saha ilerlemeleri ve Emlak Konut resmi Change Log raporu tek ekranda.")
 
