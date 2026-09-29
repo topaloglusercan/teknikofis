@@ -19,7 +19,7 @@ from streamlit_folium import st_folium
 
 warnings = __import__('warnings')
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="AI Gantt Master v60.19", layout="wide", page_icon="🎓")
+# st.set_page_config(page_title="AI Gantt Master v60.19", layout="wide", page_icon="🎓")
 
 # ==========================================
 # 1. YARDIMCI VE GÜVENLİK FONKSİYONLARI
