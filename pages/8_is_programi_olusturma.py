@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.20 (NİHAİ TAM SÜRÜM - ARAYÜZ DÜZELTMELERİ)
-Özellikler: Sol Menü Harita Boşluğu Giderildi, Placeholder Metinleri Güncellendi, Tüm Akademik Çıktılar Korundu.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.21 (NİHAİ TAM SÜRÜM)
+Özellikler: Folium Sidebar Bug'ı Giderildi (Manuel Koordinat), Placeholder Metinleri Güncellendi.
 """
 
 import streamlit as st
@@ -14,8 +14,6 @@ import io
 import json
 import requests
 from datetime import datetime, timedelta
-import folium
-from streamlit_folium import st_folium
 
 warnings = __import__('warnings')
 warnings.filterwarnings("ignore")
@@ -117,7 +115,7 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.20)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.21)")
 st.divider()
 
 # ==========================================
@@ -170,12 +168,13 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("⛈️ Dinamik İklim Kütüğü (API)")
-    m = folium.Map(location=[39.0, 35.0], zoom_start=5)
-    m.add_child(folium.LatLngPopup())
     
-    # BOŞLUK HATASINI GİDEREN HARİTA AYARI
-    map_data = st_folium(m, width=300, height=200, returned_objects=["last_clicked"])
-    lat, lon = (map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]) if map_data and map_data.get("last_clicked") else (41.0082, 28.9784)
+    st.markdown("📍 **Şantiye Koordinatları**")
+    col_lat, col_lon = st.columns(2)
+    with col_lat:
+        lat = st.number_input("Enlem (Lat)", value=41.0082, format="%.4f")
+    with col_lon:
+        lon = st.number_input("Boylam (Lon)", value=28.9784, format="%.4f")
     
     c1, c2, c3 = st.columns(3)
     with c1: c_yagmur = st.checkbox("🌧️ Yağ", value=True)
