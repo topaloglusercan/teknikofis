@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.26 (NİHAİ STABİL PORTAL SÜRÜMÜ)
-Özellikler: Sol Menüye Geri Dönüldü, Harita Boşluğu Expander (Açılır Panel) ile Çözüldü.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.27 (NİHAİ STABİL PORTAL SÜRÜMÜ)
+Özellikler: Harita Expander'dan Çıkarıldı, Manuel Koordinat Kutuları Eklendi, Boşluk Bug'ı Çözüldü.
 """
 
 import streamlit as st
@@ -117,7 +117,7 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.27)")
 st.divider()
 
 # ==========================================
@@ -169,52 +169,64 @@ with st.sidebar:
         except Exception as e: st.error(f"Tablo okunamadı: {e}")
 
     st.markdown("---")
-    # HARİTA BOŞLUĞUNU ÇÖZEN EXPANDER MANTIĞI
-    with st.expander("⛈️ Dinamik İklim Kütüğü (API)", expanded=False):
-        st.caption("Haritadan tıklayarak konum seçin:")
-        m = folium.Map(location=[39.0, 35.0], zoom_start=5)
-        m.add_child(folium.LatLngPopup())
-        map_data = st_folium(m, width=280, height=250, returned_objects=["last_clicked"])
-        lat, lon = (map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]) if map_data and map_data.get("last_clicked") else (41.0082, 28.9784)
-        
-        c1, c2, c3 = st.columns(3)
-        with c1: c_yagmur = st.checkbox("🌧️ Yağ", value=True)
-        with c2: c_ruzgar = st.checkbox("💨 Rüz")
-        with c3: c_don = st.checkbox("❄️ Don")
-        
-        ce1, ce2, ce3 = st.columns(3)
-        with ce1: yagis_esik = st.number_input("Yağ(mm)", min_value=0.1, value=3.0, step=0.5)
-        with ce2: ruzgar_esik = st.number_input("Rüz(km)", min_value=10.0, value=45.0, step=5.0)
-        with ce3: sicaklik_esik = st.number_input("Sıc(°C)", max_value=15.0, value=0.0, step=1.0)
-        
-        ay_isimleri = {1:"Ocak", 2:"Şubat", 3:"Mart", 4:"Nisan", 5:"Mayıs", 6:"Haziran", 7:"Temmuz", 8:"Ağustos", 9:"Eylül", 10:"Ekim", 11:"Kasım", 12:"Aralık"}
-        secilen_aylar = st.multiselect("Ayları Seçin", options=list(ay_isimleri.keys()), default=[1, 2, 3], format_func=lambda x: ay_isimleri[x], label_visibility="collapsed")
+    st.header("⛈️ Dinamik İklim Kütüğü (API)")
+    st.caption("Haritadan tıklayın veya koordinat girin:")
+    
+    # Haritayı doğrudan sidebar'a yerleştirdik, expander sildik
+    m = folium.Map(location=[39.0, 35.0], zoom_start=5)
+    m.add_child(folium.LatLngPopup())
+    map_data = st_folium(m, height=220, use_container_width=True, returned_objects=["last_clicked"])
+    
+    # Güvenlik ağı: Haritaya tıklanmışsa koordinatı al, tıklanmamışsa varsayılan yap
+    c_lat = map_data["last_clicked"]["lat"] if map_data and map_data.get("last_clicked") else 41.0082
+    c_lon = map_data["last_clicked"]["lng"] if map_data and map_data.get("last_clicked") else 28.9784
+    
+    col_lat, col_lon = st.columns(2)
+    with col_lat: lat = st.number_input("Enlem (Lat)", value=float(c_lat), format="%.4f")
+    with col_lon: lon = st.number_input("Boylam (Lon)", value=float(c_lon), format="%.4f")
+    
+    c1, c2, c3 = st.columns(3)
+    with c1: c_yagmur = st.checkbox("🌧️ Yağ", value=True)
+    with c2: c_ruzgar = st.checkbox("💨 Rüz")
+    with c3: c_don = st.checkbox("❄️ Don")
+    
+    ce1, ce2, ce3 = st.columns(3)
+    with ce1: yagis_esik = st.number_input("Yağ.(mm)", min_value=0.1, value=3.0, step=0.5)
+    with ce2: ruzgar_esik = st.number_input("Rüz.(km)", min_value=10.0, value=45.0, step=5.0)
+    with ce3: sicaklik_esik = st.number_input("Sıc.(°C)", max_value=15.0, value=0.0, step=1.0)
+    
+    ay_isimleri = {1:"Ocak", 2:"Şubat", 3:"Mart", 4:"Nisan", 5:"Mayıs", 6:"Haziran", 7:"Temmuz", 8:"Ağustos", 9:"Eylül", 10:"Ekim", 11:"Kasım", 12:"Aralık"}
+    secilen_aylar = st.multiselect("Ayları Seçin", options=list(ay_isimleri.keys()), default=[1, 2, 3], format_func=lambda x: ay_isimleri[x], label_visibility="collapsed")
 
-        if st.button("📡 İklim Verisini Çek", type="primary", use_container_width=True):
-            if not (c_yagmur or c_ruzgar or c_don): 
-                st.error("Seçim yapınız!")
-            elif lat and lon and secilen_aylar:
-                with st.spinner("Geçmiş 5 yıl taranıyor..."):
-                    try:
-                        df_weather = fetch_weather_data(lat, lon, (datetime.today().date() - timedelta(days=365*5)).strftime("%Y-%m-%d"), (datetime.today().date() - timedelta(days=5)).strftime("%Y-%m-%d"))
-                        df_filtered = df_weather[df_weather['Tarih'].dt.month.isin(secilen_aylar)]
-                        tdays = max(len(df_filtered), 1)
-                        aylar_str = "-".join([ay_isimleri[m] for m in secilen_aylar])
-                        
-                        w_ids = [int(str(x).split('-')[1]) for x in st.session_state.risk_df['ID'].dropna() if str(x).startswith('W-') and len(str(x).split('-'))==2]
-                        nxt = max(w_ids) + 1 if w_ids else 1
-                        
-                        new_rows = []
-                        if c_yagmur: 
-                            new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Aşırı Yağış ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Yagis_mm'] >= yagis_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0}); nxt += 1
-                        if c_ruzgar: 
-                            new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Rüzgar ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Ruzgar_kmh'] >= ruzgar_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0}); nxt += 1
-                        if c_don: 
-                            new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Don/Buzlanma ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Sicaklik_min'] <= sicaklik_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0})
-                        
-                        if new_rows: 
-                            st.session_state.risk_df = pd.concat([st.session_state.risk_df, pd.DataFrame(new_rows)], ignore_index=True); st.rerun()
-                    except Exception as e: st.error(f"Hata: {e}")
+    if st.button("📡 API'den İklim Verisini Çek", type="primary", use_container_width=True):
+        if not (c_yagmur or c_ruzgar or c_don): 
+            st.error("Seçim yapınız!")
+        elif lat and lon and secilen_aylar:
+            with st.spinner("Geçmiş 5 yıl taranıyor..."):
+                try:
+                    df_weather = fetch_weather_data(lat, lon, (datetime.today().date() - timedelta(days=365*5)).strftime("%Y-%m-%d"), (datetime.today().date() - timedelta(days=5)).strftime("%Y-%m-%d"))
+                    df_filtered = df_weather[df_weather['Tarih'].dt.month.isin(secilen_aylar)]
+                    tdays = max(len(df_filtered), 1)
+                    aylar_str = "-".join([ay_isimleri[m] for m in secilen_aylar])
+                    
+                    w_ids = [int(str(x).split('-')[1]) for x in st.session_state.risk_df['ID'].dropna() if str(x).startswith('W-') and len(str(x).split('-'))==2]
+                    nxt = max(w_ids) + 1 if w_ids else 1
+                    
+                    new_rows = []
+                    if c_yagmur: 
+                        new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Aşırı Yağış ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Yagis_mm'] >= yagis_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0})
+                        nxt += 1
+                    if c_ruzgar: 
+                        new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Rüzgar ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Ruzgar_kmh'] >= ruzgar_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0})
+                        nxt += 1
+                    if c_don: 
+                        new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Don/Buzlanma ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Sicaklik_min'] <= sicaklik_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0})
+                    
+                    if new_rows: 
+                        st.session_state.risk_df = pd.concat([st.session_state.risk_df, pd.DataFrame(new_rows)], ignore_index=True)
+                        st.rerun()
+                except Exception as e: 
+                    st.error(f"Hata: {e}")
 
     # --- JSON KAYIT VE GERİ YÜKLEME SİSTEMİ ---
     st.markdown("---")
@@ -248,7 +260,6 @@ with st.sidebar:
 
     st.markdown("---")
     st.download_button("📥 Boş Excel Şablonu İndir", data=generate_excel_template(), file_name="Tez_Gantt_Sablon.xlsx", use_container_width=True)
-
 
 # ==========================================
 # 3. VERİ GİRİŞ TABLOLARI 
@@ -414,7 +425,7 @@ def run_monte_carlo(t_df, r_df, n_sim, apply_spi_flag=True, scenario_sub=None, s
     return start_times, end_times, durations
 
 if not 'total_base' in st.session_state:
-    st.info("👆 Lütfen verilerinizi ayarladıktan sonra aşağıdaki **'Modeli Çalıştır'** butonuna basın.")
+    st.info("👆 Lütfen verilerinizi ayarladıktan sonra yukarıdaki **'Modeli Çalıştır'** butonuna basın.")
 
 if st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_container_width=True):
     with st.spinner("Modeller işleniyor, Baseline & İlerleme verileri çekiliyor..."):
