@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.25 (NİHAİ DASHBOARD SÜRÜMÜ)
-Özellikler: Folium Boşluk Bug'ı 4'lü Üst Kontrol Paneli (Dashboard) Mimarisi ile Kesin Olarak Çözüldü.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.26 (NİHAİ STABİL PORTAL SÜRÜMÜ)
+Özellikler: Sol Menüye Geri Dönüldü, Harita Boşluğu Expander (Açılır Panel) ile Çözüldü.
 """
 
 import streamlit as st
@@ -117,63 +117,43 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.25)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü")
 st.divider()
 
 # ==========================================
-# MODERN ÜST KONTROL PANELİ (4 KOLON)
+# YAN MENÜ: AYARLAR VE ÖZELLİKLER
 # ==========================================
-st.markdown("### 🎛️ Proje Kontrol Paneli")
-c_ayar1, c_ayar2, c_ayar3, c_ayar4 = st.columns(4)
-
-with c_ayar1:
-    st.markdown("**1. Proje Kimliği & Dosyalar**")
-    p_adi = st.text_input("Proje Adı", placeholder="Örn: Örnek Şantiye Projesi", label_visibility="collapsed")
+with st.sidebar:
+    st.header("🏢 Proje Kimliği")
+    p_adi = st.text_input("Proje Adı", placeholder="Örn: Örnek Şantiye Projesi")
     baslangic_tarihi = st.date_input("Planlanan Başlangıç", datetime.today())
     n_simulations = st.slider("İterasyon Sayısı", 100, 5000, 1000, step=100)
-    st.download_button("📥 Boş Excel Şablonu İndir", data=generate_excel_template(), file_name="Tez_Gantt_Sablon.xlsx", use_container_width=True)
     
-    def export_to_json():
-        export_data = {"tasks": st.session_state.tasks_df.to_dict(orient="records"), "risks": st.session_state.risk_df.to_dict(orient="records")}
-        return json.dumps(export_data, ensure_ascii=False, indent=4)
-        
-    dosya_ismi = f"{p_adi.replace(' ', '_') if p_adi else 'santiye_projesi'}.json"
-    st.download_button(label="💾 Projeyi Yedekle (JSON)", data=export_to_json(), file_name=dosya_ismi, mime="application/json", use_container_width=True)
-    
-    uploaded_json = st.file_uploader("Kayıtlı Projeyi Yükle", type=["json"], label_visibility="collapsed")
-    if uploaded_json is not None:
-        if st.button("Yükle ve Güncelle", use_container_width=True, type="primary"):
-            try:
-                loaded_data = json.load(uploaded_json)
-                st.session_state.tasks_df = pd.DataFrame(loaded_data["tasks"])
-                st.session_state.risk_df = pd.DataFrame(loaded_data["risks"])
-                st.session_state.scenario_archive, st.session_state.baseline_data = {}, None
-                if 'total_base' in st.session_state: del st.session_state['total_base']
-                st.rerun()
-            except Exception as e: st.error(f"Hata: {e}")
+    st.markdown("---")
+    st.header("📉 EVM Performans Ayarı")
+    apply_spi = st.checkbox("🔮 EVM Gelecek Tahmini", value=True, help="Aktifse: Mevcut düşük performans, henüz başlanmayan işlerin de süresini uzatır. Pasifse: Başlanmayan işler planlandığı gibi biter varsayılır.")
 
-with c_ayar2:
-    st.markdown("**2. Simülasyon Senaryoları**")
-    apply_spi = st.checkbox("🔮 EVM Gelecek Tahmini Uygula", value=True)
-    
+    st.markdown("---")
+    st.header("🛡️ Senaryo 1: Risk İptali")
     risk_list = ["Uygulanmasın"] + list(st.session_state.risk_df["ID"].dropna().unique())
     secili_iptal_risk = st.selectbox("Etkisi Sıfırlanacak Risk", risk_list)
-    
+
+    st.markdown("---")
+    st.header("🎯 Senaryo 2: Taşeron Performansı")
     alt_yukleniciler = ["Uygulanmasın"] + list(st.session_state.tasks_df["Alt Yüklenici"].dropna().unique())
-    secili_tasaronlar_raw = st.multiselect("Performansı Değişecek Taşeron", alt_yukleniciler, default=["Uygulanmasın"])
+    secili_tasaronlar_raw = st.multiselect("Simüle Edilecek Alt Yüklenici", alt_yukleniciler, default=["Uygulanmasın"])
     secili_tasaronlar = [t for t in secili_tasaronlar_raw if t != "Uygulanmasın"]
     perf_iyilesme = st.slider("Performans Değişimi (%)", min_value=-50, max_value=50, value=0, step=5) if secili_tasaronlar else 0
 
-with c_ayar3:
-    st.markdown("**3. Aşama 2: K-S Testi (Veri)**")
-    st.info("Geçmiş veri analizini çalıştırır.")
-    ks_file = st.file_uploader("Tablo C (Geçmiş Veriler) Yükle", type=["xlsx"], label_visibility="collapsed")
+    st.markdown("---")
+    st.header("📈 Aşama 2: K-S Testi (Parametre Kütüphanesi)")
+    ks_file = st.file_uploader("Tablo C (Geçmiş Veriler) Yükle", type=["xlsx"])
     if ks_file:
         try:
             df_hist = pd.read_excel(ks_file, sheet_name="Tablo_C")
             if "Aktivite Kodu" in df_hist.columns and "Gercek_Sure" in df_hist.columns and "Planlanan_Sure" in df_hist.columns:
-                if st.button("K-S Testini Çalıştır", use_container_width=True):
-                    with st.spinner("İstatistiksel testler uygulanıyor..."):
+                if st.button("K-S Testini Çalıştır ve Ana Tabloyu Güncelle", use_container_width=True):
+                    with st.spinner("İstatistiksel sapma testleri uygulanıyor..."):
                         new_params = perform_ks_test(df_hist)
                         if not new_params.empty:
                             st.session_state.param_library = new_params.copy() 
@@ -185,59 +165,93 @@ with c_ayar3:
                                     st.session_state.tasks_df.at[i, 'İyimser'] = round(plan_sure * r['Min_Ratio'], 1)
                                     st.session_state.tasks_df.at[i, 'Olası'] = round(plan_sure * r['Med_Ratio'], 1)
                                     st.session_state.tasks_df.at[i, 'Kötümser'] = round(plan_sure * r['Max_Ratio'], 1)
-                            st.success(f"Başarılı! Kütüphane güncellendi.")
-        except Exception as e: st.error(f"Okuma hatası: {e}")
+                            st.success(f"Başarılı! {len(new_params)} Havuz için kütüphane oluşturuldu ve süreler hesaplandı.")
+        except Exception as e: st.error(f"Tablo okunamadı: {e}")
 
-with c_ayar4:
-    st.markdown("**4. İklim Kütüğü (API)**")
-    m = folium.Map(location=[39.0, 35.0], zoom_start=5)
-    m.add_child(folium.LatLngPopup())
-    map_data = st_folium(m, height=180, use_container_width=True, returned_objects=["last_clicked"])
-    lat, lon = (map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]) if map_data and map_data.get("last_clicked") else (41.0082, 28.9784)
-    
-    col_w1, col_w2, col_w3 = st.columns(3)
-    with col_w1: c_yagmur = st.checkbox("🌧️", value=True, help="Yağmur")
-    with col_w2: c_ruzgar = st.checkbox("💨", help="Rüzgar")
-    with col_w3: c_don = st.checkbox("❄️", help="Don")
-    
-    col_e1, col_e2, col_e3 = st.columns(3)
-    with col_e1: yagis_esik = st.number_input("Yğş", min_value=0.1, value=3.0, step=0.5, label_visibility="collapsed")
-    with col_e2: ruzgar_esik = st.number_input("Rüz", min_value=10.0, value=45.0, step=5.0, label_visibility="collapsed")
-    with col_e3: sicaklik_esik = st.number_input("Sıc", max_value=15.0, value=0.0, step=1.0, label_visibility="collapsed")
-    
-    ay_isimleri = {1:"Oca", 2:"Şub", 3:"Mar", 4:"Nis", 5:"May", 6:"Haz", 7:"Tem", 8:"Ağu", 9:"Eyl", 10:"Eki", 11:"Kas", 12:"Ara"}
-    secilen_aylar = st.multiselect("Ayları Seçin", options=list(ay_isimleri.keys()), default=[1, 2, 3], format_func=lambda x: ay_isimleri[x], label_visibility="collapsed")
+    st.markdown("---")
+    # HARİTA BOŞLUĞUNU ÇÖZEN EXPANDER MANTIĞI
+    with st.expander("⛈️ Dinamik İklim Kütüğü (API)", expanded=False):
+        st.caption("Haritadan tıklayarak konum seçin:")
+        m = folium.Map(location=[39.0, 35.0], zoom_start=5)
+        m.add_child(folium.LatLngPopup())
+        map_data = st_folium(m, width=280, height=250, returned_objects=["last_clicked"])
+        lat, lon = (map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]) if map_data and map_data.get("last_clicked") else (41.0082, 28.9784)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: c_yagmur = st.checkbox("🌧️ Yağ", value=True)
+        with c2: c_ruzgar = st.checkbox("💨 Rüz")
+        with c3: c_don = st.checkbox("❄️ Don")
+        
+        ce1, ce2, ce3 = st.columns(3)
+        with ce1: yagis_esik = st.number_input("Yağ(mm)", min_value=0.1, value=3.0, step=0.5)
+        with ce2: ruzgar_esik = st.number_input("Rüz(km)", min_value=10.0, value=45.0, step=5.0)
+        with ce3: sicaklik_esik = st.number_input("Sıc(°C)", max_value=15.0, value=0.0, step=1.0)
+        
+        ay_isimleri = {1:"Ocak", 2:"Şubat", 3:"Mart", 4:"Nisan", 5:"Mayıs", 6:"Haziran", 7:"Temmuz", 8:"Ağustos", 9:"Eylül", 10:"Ekim", 11:"Kasım", 12:"Aralık"}
+        secilen_aylar = st.multiselect("Ayları Seçin", options=list(ay_isimleri.keys()), default=[1, 2, 3], format_func=lambda x: ay_isimleri[x], label_visibility="collapsed")
 
-    if st.button("📡 İklim Verisini Çek", type="primary", use_container_width=True):
-        if not (c_yagmur or c_ruzgar or c_don): 
-            st.error("Seçim yapınız!")
-        elif lat and lon and secilen_aylar:
-            with st.spinner("Arşiv taranıyor..."):
-                try:
-                    df_weather = fetch_weather_data(lat, lon, (datetime.today().date() - timedelta(days=365*5)).strftime("%Y-%m-%d"), (datetime.today().date() - timedelta(days=5)).strftime("%Y-%m-%d"))
-                    df_filtered = df_weather[df_weather['Tarih'].dt.month.isin(secilen_aylar)]
-                    tdays = max(len(df_filtered), 1)
-                    aylar_str = "-".join([ay_isimleri[m] for m in secilen_aylar])
-                    
-                    w_ids = [int(str(x).split('-')[1]) for x in st.session_state.risk_df['ID'].dropna() if str(x).startswith('W-') and len(str(x).split('-'))==2]
-                    nxt = max(w_ids) + 1 if w_ids else 1
-                    
-                    new_rows = []
-                    if c_yagmur: 
-                        new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Aşırı Yağış ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Yagis_mm'] >= yagis_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0}); nxt += 1
-                    if c_ruzgar: 
-                        new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Rüzgar ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Ruzgar_kmh'] >= ruzgar_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0}); nxt += 1
-                    if c_don: 
-                        new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Don/Buzlanma ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Sicaklik_min'] <= sicaklik_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0})
-                    
-                    if new_rows: 
-                        st.session_state.risk_df = pd.concat([st.session_state.risk_df, pd.DataFrame(new_rows)], ignore_index=True); st.rerun()
-                except Exception as e: st.error(f"Hata: {e}")
+        if st.button("📡 İklim Verisini Çek", type="primary", use_container_width=True):
+            if not (c_yagmur or c_ruzgar or c_don): 
+                st.error("Seçim yapınız!")
+            elif lat and lon and secilen_aylar:
+                with st.spinner("Geçmiş 5 yıl taranıyor..."):
+                    try:
+                        df_weather = fetch_weather_data(lat, lon, (datetime.today().date() - timedelta(days=365*5)).strftime("%Y-%m-%d"), (datetime.today().date() - timedelta(days=5)).strftime("%Y-%m-%d"))
+                        df_filtered = df_weather[df_weather['Tarih'].dt.month.isin(secilen_aylar)]
+                        tdays = max(len(df_filtered), 1)
+                        aylar_str = "-".join([ay_isimleri[m] for m in secilen_aylar])
+                        
+                        w_ids = [int(str(x).split('-')[1]) for x in st.session_state.risk_df['ID'].dropna() if str(x).startswith('W-') and len(str(x).split('-'))==2]
+                        nxt = max(w_ids) + 1 if w_ids else 1
+                        
+                        new_rows = []
+                        if c_yagmur: 
+                            new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Aşırı Yağış ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Yagis_mm'] >= yagis_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0}); nxt += 1
+                        if c_ruzgar: 
+                            new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Rüzgar ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Ruzgar_kmh'] >= ruzgar_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0}); nxt += 1
+                        if c_don: 
+                            new_rows.append({"ID": f"W-{nxt:02d}", "Grup": "Hava (API)", "Tip": "Risk", "Tanım": f"Don/Buzlanma ({aylar_str})", "İhtimal (%)": round((len(df_filtered[df_filtered['Sicaklik_min'] <= sicaklik_esik]) / tdays)*100, 1), "Etki (Gün)": 1.0})
+                        
+                        if new_rows: 
+                            st.session_state.risk_df = pd.concat([st.session_state.risk_df, pd.DataFrame(new_rows)], ignore_index=True); st.rerun()
+                    except Exception as e: st.error(f"Hata: {e}")
 
-st.markdown("---")
+    # --- JSON KAYIT VE GERİ YÜKLEME SİSTEMİ ---
+    st.markdown("---")
+    st.header("💾 Proje Kayıt İşlemleri")
+    
+    def export_to_json():
+        export_data = {
+            "tasks": st.session_state.tasks_df.to_dict(orient="records"),
+            "risks": st.session_state.risk_df.to_dict(orient="records")
+        }
+        return json.dumps(export_data, ensure_ascii=False, indent=4)
+        
+    dosya_ismi = f"{p_adi.replace(' ', '_') if p_adi else 'santiye_projesi'}.json"
+    st.download_button(label="📥 Projeyi Kaydet (JSON)", data=export_to_json(), file_name=dosya_ismi, mime="application/json", use_container_width=True)
+    
+    st.markdown("👇 **Kayıtlı Projeyi Yükle**")
+    uploaded_json = st.file_uploader("Yüklemek için JSON dosyası seçin", type=["json"], label_visibility="collapsed")
+    if uploaded_json is not None:
+        if st.button("Yükle ve Verileri Güncelle", use_container_width=True, type="primary"):
+            try:
+                loaded_data = json.load(uploaded_json)
+                st.session_state.tasks_df = pd.DataFrame(loaded_data["tasks"])
+                st.session_state.risk_df = pd.DataFrame(loaded_data["risks"])
+                st.session_state.scenario_archive = {}
+                st.session_state.baseline_data = None
+                if 'total_base' in st.session_state: del st.session_state['total_base']
+                st.success("Proje başarıyla yüklendi!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Dosya yüklenirken bir hata oluştu: {e}")
+
+    st.markdown("---")
+    st.download_button("📥 Boş Excel Şablonu İndir", data=generate_excel_template(), file_name="Tez_Gantt_Sablon.xlsx", use_container_width=True)
+
 
 # ==========================================
-# 3. VERİ GİRİŞ TABLOLARI VE ÇALIŞTIR BUTONU
+# 3. VERİ GİRİŞ TABLOLARI 
 # ==========================================
 st.subheader("🚨 Tablo D: Dinamik Risk, Fırsat ve Hava Durumu Kütüğü")
 st.session_state.risk_df = st.data_editor(st.session_state.risk_df, num_rows="dynamic", use_container_width=True, height=200)
@@ -251,12 +265,6 @@ st.session_state.tasks_df = st.data_editor(st.session_state.tasks_df, num_rows="
     "Gerçekleşen Süre": st.column_config.NumberColumn("Gerçekleşen Süre", min_value=0.0),
     "Duruş (Gün)": st.column_config.NumberColumn("Dış Etken/Duruş (Gün)", min_value=0.0)
 })
-
-st.write("")
-if not 'total_base' in st.session_state:
-    st.info("👆 Ayarlarınızı yaptıktan sonra aşağıdaki butona basarak simülasyonu başlatabilirsiniz.")
-    
-run_simulation = st.button("🎲 KARAR DESTEK MODELİNİ ÇALIŞTIR", type="primary", use_container_width=True)
 
 # ==========================================
 # SİMÜLASYON VE AĞ ANALİZİ MOTORU
@@ -405,8 +413,10 @@ def run_monte_carlo(t_df, r_df, n_sim, apply_spi_flag=True, scenario_sub=None, s
     for t in durations.keys(): calc_times(t)
     return start_times, end_times, durations
 
+if not 'total_base' in st.session_state:
+    st.info("👆 Lütfen verilerinizi ayarladıktan sonra aşağıdaki **'Modeli Çalıştır'** butonuna basın.")
 
-if run_simulation:
+if st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_container_width=True):
     with st.spinner("Modeller işleniyor, Baseline & İlerleme verileri çekiliyor..."):
         st_base, et_base, dur_base = run_monte_carlo(st.session_state.tasks_df, st.session_state.risk_df, n_simulations, apply_spi_flag=apply_spi)
         total_base = np.maximum.reduce(list(et_base.values())) if et_base else np.zeros(n_simulations)
@@ -473,7 +483,7 @@ if run_simulation:
         else: st.session_state.df_monthly_cf = pd.DataFrame()
 
 # ==========================================
-# 5. EKRAN ÇIKTILARI VE SEKMELER 
+# 5. EKRAN ÇIKTILARI VE SEKMELER
 # ==========================================
 if 'total_base' in st.session_state and 'df_gantt' in st.session_state:
     st.divider()
@@ -624,7 +634,7 @@ if 'total_base' in st.session_state and 'df_gantt' in st.session_state:
                 "Min_Ratio": "{:.2f}", "Med_Ratio": "{:.2f}", "Max_Ratio": "{:.2f}"
             }), use_container_width=True)
         else:
-            st.warning("⚠️ Üst panelden K-S Testi çalıştırıldığında Kurumsal Parametre Kütüphanesi burada oluşacaktır.")
+            st.warning("⚠️ Sol menüden (Aşama 2) K-S Testi çalıştırıldığında Kurumsal Parametre Kütüphanesi burada oluşacaktır.")
 
     with tab6:
         st.markdown("### 📈 Aylık Nakit Akışı")
