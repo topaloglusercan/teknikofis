@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.30 (NİHAİ STABİL PORTAL SÜRÜMÜ)
-Özellikler: Harita Expander'dan Tamamen Çıkarıldı, Görünmezlik Bug'ı Giderildi.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.31 (NİHAİ STABİL PORTAL SÜRÜMÜ)
+Özellikler: 3333.py'deki Orijinal Harita Kodu Geri Getirildi, Excel/JSON Import/Export Eklendi.
 """
 
 import streamlit as st
@@ -19,6 +19,7 @@ from streamlit_folium import st_folium
 
 warnings = __import__('warnings')
 warnings.filterwarnings("ignore")
+# Portal mimarisinde çakışma yapmaması için st.set_page_config kapalı tutulmuştur.
 
 # ==========================================
 # 1. YARDIMCI VE GÜVENLİK FONKSİYONLARI
@@ -117,7 +118,7 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.30)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.31)")
 st.divider()
 
 # ==========================================
@@ -168,22 +169,15 @@ with st.sidebar:
                             st.success(f"Başarılı! {len(new_params)} Havuz için kütüphane oluşturuldu ve süreler hesaplandı.")
         except Exception as e: st.error(f"Tablo okunamadı: {e}")
 
+    # ==============================================================
+    # 3333.py (v60.17) ORİJİNAL HARİTA KODLAMASI (BİREBİR AYNISI)
+    # ==============================================================
     st.markdown("---")
     st.header("⛈️ Dinamik İklim Kütüğü (API)")
-    st.caption("Haritadan tıklayarak konum seçin:")
-    
-    # Haritayı doğrudan sidebar'a yerleştirdik. Expander TAMAMEN silindi.
     m = folium.Map(location=[39.0, 35.0], zoom_start=5)
     m.add_child(folium.LatLngPopup())
-    map_data = st_folium(m, width=280, height=250, returned_objects=["last_clicked"])
-    
-    # Koordinatları haritadan al, yoksa varsayılanı kullan
-    c_lat = map_data["last_clicked"]["lat"] if map_data and map_data.get("last_clicked") else 41.0082
-    c_lon = map_data["last_clicked"]["lng"] if map_data and map_data.get("last_clicked") else 28.9784
-    
-    col_lat, col_lon = st.columns(2)
-    with col_lat: lat = st.number_input("Enlem (Lat)", value=float(c_lat), format="%.4f")
-    with col_lon: lon = st.number_input("Boylam (Lon)", value=float(c_lon), format="%.4f")
+    map_data = st_folium(m, height=250, use_container_width=True)
+    lat, lon = (map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]) if map_data and map_data.get("last_clicked") else (41.0082, 28.9784)
     
     c1, c2, c3 = st.columns(3)
     with c1: c_yagmur = st.checkbox("🌧️ Yağ", value=True)
@@ -228,7 +222,7 @@ with st.sidebar:
                 except Exception as e: 
                     st.error(f"Hata: {e}")
 
-    # --- JSON VE EXCEL KAYIT / GERİ YÜKLEME SİSTEMİ ---
+    # --- JSON VE EXCEL KAYIT / GERİ YÜKLEME SİSTEMİ (v60.30'DAN KORUNAN ÖZELLİK) ---
     st.markdown("---")
     st.header("💾 Proje Kayıt İşlemleri")
     
@@ -444,7 +438,7 @@ def run_monte_carlo(t_df, r_df, n_sim, apply_spi_flag=True, scenario_sub=None, s
     return start_times, end_times, durations
 
 if not 'total_base' in st.session_state:
-    st.info("👆 Lütfen verilerinizi ayarladıktan sonra yukarıdaki **'Modeli Çalıştır'** butonuna basın.")
+    st.info("👆 Lütfen verilerinizi ayarladıktan sonra aşağıdaki **'Modeli Çalıştır'** butonuna basın.")
 
 if st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_container_width=True):
     with st.spinner("Modeller işleniyor, Baseline & İlerleme verileri çekiliyor..."):
