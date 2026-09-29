@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.23 (NİHAİ PORTAL SÜRÜMÜ)
-Özellikler: Folium Sidebar Boşluk Bug'ı Giderildi, Page Config Çakışması Silindi, Harita Aktif.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.24 (SAĞ MENÜ / KONTROL PANELİ SÜRÜMÜ)
+Özellikler: Sağ Menü Tasarımı, Folium Boşluk Çözümü, Tam Portal Uyumu.
 """
 
 import streamlit as st
@@ -117,42 +117,47 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.23)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.24)")
 st.divider()
 
 # ==========================================
-# YAN MENÜ: AYARLAR VE ÖZELLİKLER
+# ANA EKRANI İKİ KOLONA BÖLÜYORUZ (3/4 SOL, 1/4 SAĞ MENÜ)
 # ==========================================
-with st.sidebar:
-    st.header("🏢 Proje Kimliği")
+col_main, col_right = st.columns([3, 1], gap="large")
+
+with col_right:
+    st.markdown("<h3 style='color: #2c3e50;'>⚙️ Kontrol Paneli</h3>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    st.markdown("#### 🏢 Proje Kimliği")
     p_adi = st.text_input("Proje Adı", placeholder="Örn: Örnek Şantiye Projesi")
     baslangic_tarihi = st.date_input("Planlanan Başlangıç", datetime.today())
     n_simulations = st.slider("İterasyon Sayısı", 100, 5000, 1000, step=100)
     
     st.markdown("---")
-    st.header("📉 EVM Performans Ayarı")
+    st.markdown("#### 📉 EVM Performans Ayarı")
     apply_spi = st.checkbox("🔮 EVM Gelecek Tahmini", value=True, help="Aktifse: Mevcut düşük performans, henüz başlanmayan işlerin de süresini uzatır. Pasifse: Başlanmayan işler planlandığı gibi biter varsayılır.")
 
     st.markdown("---")
-    st.header("🛡️ Senaryo 1: Risk İptali")
+    st.markdown("#### 🛡️ Senaryo 1: Risk İptali")
     risk_list = ["Uygulanmasın"] + list(st.session_state.risk_df["ID"].dropna().unique())
     secili_iptal_risk = st.selectbox("Etkisi Sıfırlanacak Risk", risk_list)
 
     st.markdown("---")
-    st.header("🎯 Senaryo 2: Taşeron Performansı")
+    st.markdown("#### 🎯 Senaryo 2: Taşeron Performansı")
     alt_yukleniciler = ["Uygulanmasın"] + list(st.session_state.tasks_df["Alt Yüklenici"].dropna().unique())
     secili_tasaronlar_raw = st.multiselect("Simüle Edilecek Alt Yüklenici", alt_yukleniciler, default=["Uygulanmasın"])
     secili_tasaronlar = [t for t in secili_tasaronlar_raw if t != "Uygulanmasın"]
     perf_iyilesme = st.slider("Performans Değişimi (%)", min_value=-50, max_value=50, value=0, step=5) if secili_tasaronlar else 0
 
     st.markdown("---")
-    st.header("📈 Aşama 2: K-S Testi (Parametre Kütüphanesi)")
+    st.markdown("#### 📈 Aşama 2: K-S Testi")
     ks_file = st.file_uploader("Tablo C (Geçmiş Veriler) Yükle", type=["xlsx"])
     if ks_file:
         try:
             df_hist = pd.read_excel(ks_file, sheet_name="Tablo_C")
             if "Aktivite Kodu" in df_hist.columns and "Gercek_Sure" in df_hist.columns and "Planlanan_Sure" in df_hist.columns:
-                if st.button("K-S Testini Çalıştır ve Ana Tabloyu Güncelle", use_container_width=True):
+                if st.button("K-S Testini Çalıştır", use_container_width=True):
                     with st.spinner("İstatistiksel sapma testleri uygulanıyor..."):
                         new_params = perform_ks_test(df_hist)
                         if not new_params.empty:
@@ -165,13 +170,12 @@ with st.sidebar:
                                     st.session_state.tasks_df.at[i, 'İyimser'] = round(plan_sure * r['Min_Ratio'], 1)
                                     st.session_state.tasks_df.at[i, 'Olası'] = round(plan_sure * r['Med_Ratio'], 1)
                                     st.session_state.tasks_df.at[i, 'Kötümser'] = round(plan_sure * r['Max_Ratio'], 1)
-                            st.success(f"Başarılı! {len(new_params)} Havuz için kütüphane oluşturuldu ve süreler hesaplandı.")
+                            st.success(f"Başarılı! Kütüphane oluşturuldu.")
         except Exception as e: st.error(f"Tablo okunamadı: {e}")
 
     st.markdown("---")
-    st.header("⛈️ Dinamik İklim Kütüğü (API)")
-    
-    # Haritayı kapsayıcıya oturtup, sadece last_clicked döndürerek boşluk oluşumunu engelliyoruz
+    st.markdown("#### ⛈️ Dinamik İklim Kütüğü (API)")
+    # Harita artık sağ menüde, boşluk bug'ı oluşturmaz.
     m = folium.Map(location=[39.0, 35.0], zoom_start=5)
     m.add_child(folium.LatLngPopup())
     map_data = st_folium(m, height=250, use_container_width=True, returned_objects=["last_clicked"])
@@ -183,14 +187,14 @@ with st.sidebar:
     with c3: c_don = st.checkbox("❄️ Don")
     
     ce1, ce2, ce3 = st.columns(3)
-    with ce1: yagis_esik = st.number_input("Yağ.(mm)", min_value=0.1, value=3.0, step=0.5)
-    with ce2: ruzgar_esik = st.number_input("Rüz.(km)", min_value=10.0, value=45.0, step=5.0)
-    with ce3: sicaklik_esik = st.number_input("Sıc.(°C)", max_value=15.0, value=0.0, step=1.0)
+    with ce1: yagis_esik = st.number_input("Yağ(mm)", min_value=0.1, value=3.0, step=0.5)
+    with ce2: ruzgar_esik = st.number_input("Rüz(km)", min_value=10.0, value=45.0, step=5.0)
+    with ce3: sicaklik_esik = st.number_input("Sıc(°C)", max_value=15.0, value=0.0, step=1.0)
     
     ay_isimleri = {1:"Ocak", 2:"Şubat", 3:"Mart", 4:"Nisan", 5:"Mayıs", 6:"Haziran", 7:"Temmuz", 8:"Ağustos", 9:"Eylül", 10:"Ekim", 11:"Kasım", 12:"Aralık"}
     secilen_aylar = st.multiselect("Ayları Seçin", options=list(ay_isimleri.keys()), default=[1, 2, 3], format_func=lambda x: ay_isimleri[x], label_visibility="collapsed")
 
-    if st.button("📡 API'den İklim Verisini Çek", type="primary", use_container_width=True):
+    if st.button("📡 API İklim Verisini Çek", type="primary", use_container_width=True):
         if not (c_yagmur or c_ruzgar or c_don): 
             st.error("Seçim yapınız!")
         elif lat and lon and secilen_aylar:
@@ -222,7 +226,7 @@ with st.sidebar:
 
     # --- JSON KAYIT VE GERİ YÜKLEME SİSTEMİ ---
     st.markdown("---")
-    st.header("💾 Proje Kayıt İşlemleri")
+    st.markdown("#### 💾 Proje Kayıt İşlemleri")
     
     def export_to_json():
         export_data = {
@@ -253,21 +257,29 @@ with st.sidebar:
     st.markdown("---")
     st.download_button("📥 Boş Excel Şablonu İndir", data=generate_excel_template(), file_name="Tez_Gantt_Sablon.xlsx", use_container_width=True)
 
-# ==========================================
-# 3. VERİ GİRİŞ TABLOLARI 
-# ==========================================
-st.subheader("🚨 Tablo D: Dinamik Risk, Fırsat ve Hava Durumu Kütüğü")
-st.session_state.risk_df = st.data_editor(st.session_state.risk_df, num_rows="dynamic", use_container_width=True, height=200)
 
-st.write("")
-st.subheader("📋 Tablo A-B: Görevler, SPI Performans Girişi ve Belirsizlik Dağılımları")
-st.session_state.tasks_df = st.data_editor(st.session_state.tasks_df, num_rows="dynamic", height=400, use_container_width=True, column_config={
-    "Dağılım Tipi": st.column_config.SelectboxColumn("Dağılım Tipi", options=["Triangular", "BetaPERT", "Uniform", "Normal", "Lognormal"], required=True),
-    "Bütçe Tutarı (TL)": st.column_config.NumberColumn("Bütçe Tutarı (TL)", min_value=0, format="%d ₺"),
-    "İlerleme (%)": st.column_config.NumberColumn("İlerleme (%)", min_value=0, max_value=100),
-    "Gerçekleşen Süre": st.column_config.NumberColumn("Gerçekleşen Süre", min_value=0.0),
-    "Duruş (Gün)": st.column_config.NumberColumn("Dış Etken/Duruş (Gün)", min_value=0.0)
-})
+with col_main:
+    # ==========================================
+    # 3. VERİ GİRİŞ TABLOLARI (SOL KOLON)
+    # ==========================================
+    st.subheader("🚨 Tablo D: Dinamik Risk, Fırsat ve Hava Durumu Kütüğü")
+    st.session_state.risk_df = st.data_editor(st.session_state.risk_df, num_rows="dynamic", use_container_width=True, height=200)
+
+    st.write("")
+    st.subheader("📋 Tablo A-B: Görevler, SPI Performans Girişi ve Belirsizlik Dağılımları")
+    st.session_state.tasks_df = st.data_editor(st.session_state.tasks_df, num_rows="dynamic", height=400, use_container_width=True, column_config={
+        "Dağılım Tipi": st.column_config.SelectboxColumn("Dağılım Tipi", options=["Triangular", "BetaPERT", "Uniform", "Normal", "Lognormal"], required=True),
+        "Bütçe Tutarı (TL)": st.column_config.NumberColumn("Bütçe Tutarı (TL)", min_value=0, format="%d ₺"),
+        "İlerleme (%)": st.column_config.NumberColumn("İlerleme (%)", min_value=0, max_value=100),
+        "Gerçekleşen Süre": st.column_config.NumberColumn("Gerçekleşen Süre", min_value=0.0),
+        "Duruş (Gün)": st.column_config.NumberColumn("Dış Etken/Duruş (Gün)", min_value=0.0)
+    })
+    
+    st.write("")
+    if not 'total_base' in st.session_state:
+        st.info("👆 Lütfen verilerinizi ayarladıktan sonra aşağıdaki **'Modeli Çalıştır'** butonuna basın.")
+    
+    run_simulation = st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_container_width=True)
 
 # ==========================================
 # SİMÜLASYON VE AĞ ANALİZİ MOTORU
@@ -416,10 +428,8 @@ def run_monte_carlo(t_df, r_df, n_sim, apply_spi_flag=True, scenario_sub=None, s
     for t in durations.keys(): calc_times(t)
     return start_times, end_times, durations
 
-if not 'total_base' in st.session_state:
-    st.info("👆 Lütfen verilerinizi ayarladıktan sonra yukarıdaki **'Modeli Çalıştır'** butonuna basın.")
 
-if st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_container_width=True):
+if run_simulation:
     with st.spinner("Modeller işleniyor, Baseline & İlerleme verileri çekiliyor..."):
         st_base, et_base, dur_base = run_monte_carlo(st.session_state.tasks_df, st.session_state.risk_df, n_simulations, apply_spi_flag=apply_spi)
         total_base = np.maximum.reduce(list(et_base.values())) if et_base else np.zeros(n_simulations)
@@ -486,7 +496,7 @@ if st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_cont
         else: st.session_state.df_monthly_cf = pd.DataFrame()
 
 # ==========================================
-# 5. EKRAN ÇIKTILARI VE SEKMELER
+# 5. EKRAN ÇIKTILARI VE SEKMELER (TAM GENİŞLİKTE)
 # ==========================================
 if 'total_base' in st.session_state and 'df_gantt' in st.session_state:
     st.divider()
