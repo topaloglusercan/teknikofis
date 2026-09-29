@@ -28,6 +28,7 @@ def ana_sayfa():
     with c1:
         st.markdown("#### 📁 Teknik Ofis Modülleri")
         st.markdown("""
+        * **İş Programı Oluşturma:** Simülasyon ve senaryolarla akademik iş programı planlaması.
         * **İdari Hakediş:** Taşeron ve ana firma hakedişleri için sayısal kontrol.
         * **Pursantaj:** Sözleşme bedelinin kalemlere göre dağılımı ve analizi.
         * **Şantiye Tutanak:** Eklenti/kesinti tutanakları hazırlama ve PDF arşivi.
@@ -54,6 +55,7 @@ def ana_sayfa():
 giris_sayfasi = st.Page(ana_sayfa, title="Ana Sayfa", icon=":material/home:", default=True)
 
 eski_moduller = [
+    st.Page("pages/8_is_programi_olusturma.py", title="İş Programı Oluşturma", icon=":material/calendar_month:"),
     st.Page("pages/1_idari_hakedis.py", title="İdari Hakediş", icon=":material/receipt_long:"),
     st.Page("pages/2_pursantaj.py", title="Pursantaj", icon=":material/pie_chart:"),
     st.Page("pages/3_santiye_tutanak.py", title="Şantiye Tutanak", icon=":material/edit_document:"),
