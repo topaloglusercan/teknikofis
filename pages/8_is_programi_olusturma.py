@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.27 (NİHAİ STABİL PORTAL SÜRÜMÜ)
-Özellikler: Harita Expander'dan Çıkarıldı, Manuel Koordinat Kutuları Eklendi, Boşluk Bug'ı Çözüldü.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.28 (NİHAİ STABİL PORTAL SÜRÜMÜ)
+Özellikler: Çift Yönlü Excel/JSON Kayıt (Import/Export) Eklendi, Harita Boşluk Bug'ı Çözüldü.
 """
 
 import streamlit as st
@@ -117,7 +117,7 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.27)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.28)")
 st.divider()
 
 # ==========================================
@@ -170,14 +170,11 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("⛈️ Dinamik İklim Kütüğü (API)")
-    st.caption("Haritadan tıklayın veya koordinat girin:")
-    
-    # Haritayı doğrudan sidebar'a yerleştirdik, expander sildik
-    m = folium.Map(location=[39.0, 35.0], zoom_start=5)
-    m.add_child(folium.LatLngPopup())
-    map_data = st_folium(m, height=220, use_container_width=True, returned_objects=["last_clicked"])
-    
-    # Güvenlik ağı: Haritaya tıklanmışsa koordinatı al, tıklanmamışsa varsayılan yap
+    with st.expander("Haritadan Konum Seç (Tıklayınız)"):
+        m = folium.Map(location=[39.0, 35.0], zoom_start=5)
+        m.add_child(folium.LatLngPopup())
+        map_data = st_folium(m, height=220, use_container_width=True, returned_objects=["last_clicked"])
+        
     c_lat = map_data["last_clicked"]["lat"] if map_data and map_data.get("last_clicked") else 41.0082
     c_lon = map_data["last_clicked"]["lng"] if map_data and map_data.get("last_clicked") else 28.9784
     
@@ -228,7 +225,7 @@ with st.sidebar:
                 except Exception as e: 
                     st.error(f"Hata: {e}")
 
-    # --- JSON KAYIT VE GERİ YÜKLEME SİSTEMİ ---
+    # --- JSON VE EXCEL KAYIT / GERİ YÜKLEME SİSTEMİ ---
     st.markdown("---")
     st.header("💾 Proje Kayıt İşlemleri")
     
@@ -238,25 +235,44 @@ with st.sidebar:
             "risks": st.session_state.risk_df.to_dict(orient="records")
         }
         return json.dumps(export_data, ensure_ascii=False, indent=4)
+
+    def export_to_excel_current():
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            st.session_state.tasks_df.to_excel(writer, index=False, sheet_name='Görevler')
+            st.session_state.risk_df.to_excel(writer, index=False, sheet_name='Riskler')
+        return output.getvalue()
         
-    dosya_ismi = f"{p_adi.replace(' ', '_') if p_adi else 'santiye_projesi'}.json"
-    st.download_button(label="📥 Projeyi Kaydet (JSON)", data=export_to_json(), file_name=dosya_ismi, mime="application/json", use_container_width=True)
+    dosya_ismi_json = f"{p_adi.replace(' ', '_') if p_adi else 'santiye_projesi'}.json"
+    dosya_ismi_excel = f"{p_adi.replace(' ', '_') if p_adi else 'santiye_projesi'}.xlsx"
+    
+    st.markdown("**Projeyi İndir (Yedekle)**")
+    c_dl1, c_dl2 = st.columns(2)
+    with c_dl1:
+        st.download_button(label="📥 JSON", data=export_to_json(), file_name=dosya_ismi_json, mime="application/json", use_container_width=True)
+    with c_dl2:
+        st.download_button(label="📥 EXCEL", data=export_to_excel_current(), file_name=dosya_ismi_excel, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
     
     st.markdown("👇 **Kayıtlı Projeyi Yükle**")
-    uploaded_json = st.file_uploader("Yüklemek için JSON dosyası seçin", type=["json"], label_visibility="collapsed")
-    if uploaded_json is not None:
+    uploaded_file = st.file_uploader("Yüklemek için JSON veya Excel dosyası seçin", type=["json", "xlsx"], label_visibility="collapsed")
+    if uploaded_file is not None:
         if st.button("Yükle ve Verileri Güncelle", use_container_width=True, type="primary"):
             try:
-                loaded_data = json.load(uploaded_json)
-                st.session_state.tasks_df = pd.DataFrame(loaded_data["tasks"])
-                st.session_state.risk_df = pd.DataFrame(loaded_data["risks"])
+                if uploaded_file.name.endswith('.json'):
+                    loaded_data = json.load(uploaded_file)
+                    st.session_state.tasks_df = pd.DataFrame(loaded_data["tasks"])
+                    st.session_state.risk_df = pd.DataFrame(loaded_data["risks"])
+                elif uploaded_file.name.endswith('.xlsx'):
+                    st.session_state.tasks_df = pd.read_excel(uploaded_file, sheet_name='Görevler')
+                    st.session_state.risk_df = pd.read_excel(uploaded_file, sheet_name='Riskler')
+                    
                 st.session_state.scenario_archive = {}
                 st.session_state.baseline_data = None
                 if 'total_base' in st.session_state: del st.session_state['total_base']
                 st.success("Proje başarıyla yüklendi!")
                 st.rerun()
             except Exception as e:
-                st.error(f"Dosya yüklenirken bir hata oluştu: {e}")
+                st.error(f"Dosya yüklenirken bir hata oluştu: Lütfen şablona uygun bir dosya seçin. Hata detayı: {e}")
 
     st.markdown("---")
     st.download_button("📥 Boş Excel Şablonu İndir", data=generate_excel_template(), file_name="Tez_Gantt_Sablon.xlsx", use_container_width=True)
