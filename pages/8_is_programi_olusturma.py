@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.29 (KUSURSUZ PORTAL SÜRÜMÜ)
-Özellikler: Folium Expander Bug'ı Sabit Piksel (width=280) İle Kesin Olarak Çözüldü.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.30 (NİHAİ STABİL PORTAL SÜRÜMÜ)
+Özellikler: Harita Expander'dan Tamamen Çıkarıldı, Görünmezlik Bug'ı Giderildi.
 """
 
 import streamlit as st
@@ -117,7 +117,7 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.29)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.30)")
 st.divider()
 
 # ==========================================
@@ -170,13 +170,14 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("⛈️ Dinamik İklim Kütüğü (API)")
+    st.caption("Haritadan tıklayarak konum seçin:")
     
-    # KUSURSUZ ÇÖZÜM: Genişliği 280 piksel olarak sabitledik. Harita kesinlikle kaybolmayacak.
-    with st.expander("🗺️ Haritadan Konum Seç (Tıklayınız)", expanded=True):
-        m = folium.Map(location=[39.0, 35.0], zoom_start=5)
-        m.add_child(folium.LatLngPopup())
-        map_data = st_folium(m, width=280, height=250, returned_objects=["last_clicked"])
-        
+    # Haritayı doğrudan sidebar'a yerleştirdik. Expander TAMAMEN silindi.
+    m = folium.Map(location=[39.0, 35.0], zoom_start=5)
+    m.add_child(folium.LatLngPopup())
+    map_data = st_folium(m, width=280, height=250, returned_objects=["last_clicked"])
+    
+    # Koordinatları haritadan al, yoksa varsayılanı kullan
     c_lat = map_data["last_clicked"]["lat"] if map_data and map_data.get("last_clicked") else 41.0082
     c_lon = map_data["last_clicked"]["lng"] if map_data and map_data.get("last_clicked") else 28.9784
     
@@ -443,7 +444,7 @@ def run_monte_carlo(t_df, r_df, n_sim, apply_spi_flag=True, scenario_sub=None, s
     return start_times, end_times, durations
 
 if not 'total_base' in st.session_state:
-    st.info("👆 Lütfen verilerinizi ayarladıktan sonra aşağıdaki **'Modeli Çalıştır'** butonuna basın.")
+    st.info("👆 Lütfen verilerinizi ayarladıktan sonra yukarıdaki **'Modeli Çalıştır'** butonuna basın.")
 
 if st.button("🎲 Karar Destek Modelini Çalıştır", type="primary", use_container_width=True):
     with st.spinner("Modeller işleniyor, Baseline & İlerleme verileri çekiliyor..."):
