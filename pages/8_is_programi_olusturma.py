@@ -1,6 +1,6 @@
 """
-Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.19 (NİHAİ TAM SÜRÜM)
-Özellikler: Excel Şablon Butonu Düzeltildi, Tez Grafikleri (P50/P90, WBS Riskleri), Parametre Kütüphanesi.
+Yapay Zeka Destekli İş Programı & Risk Simülatörü - Sürüm 60.20 (NİHAİ TAM SÜRÜM - ARAYÜZ DÜZELTMELERİ)
+Özellikler: Sol Menü Harita Boşluğu Giderildi, Placeholder Metinleri Güncellendi, Tüm Akademik Çıktılar Korundu.
 """
 
 import streamlit as st
@@ -117,7 +117,7 @@ if 'scenario_archive' not in st.session_state: st.session_state.scenario_archive
 if 'baseline_data' not in st.session_state: st.session_state.baseline_data = None
 if 'param_library' not in st.session_state: st.session_state.param_library = None
 
-st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.19)")
+st.title("🎓 Akademik Şantiye Simülatörü & Raporlama Modülü (v60.20)")
 st.divider()
 
 # ==========================================
@@ -125,7 +125,7 @@ st.divider()
 # ==========================================
 with st.sidebar:
     st.header("🏢 Proje Kimliği")
-    p_adi = st.text_input("Proje Adı", placeholder="Örn: USÛL TEKNİK A.Ş. Merkez")
+    p_adi = st.text_input("Proje Adı", placeholder="Örn: Örnek Şantiye Projesi")
     baslangic_tarihi = st.date_input("Planlanan Başlangıç", datetime.today())
     n_simulations = st.slider("İterasyon Sayısı", 100, 5000, 1000, step=100)
     
@@ -156,7 +156,7 @@ with st.sidebar:
                     with st.spinner("İstatistiksel sapma testleri uygulanıyor..."):
                         new_params = perform_ks_test(df_hist)
                         if not new_params.empty:
-                            st.session_state.param_library = new_params.copy() # AS2-AS5 İÇİN KÜTÜPHANE KAYDI
+                            st.session_state.param_library = new_params.copy() 
                             for _, r in new_params.iterrows():
                                 idx_list = st.session_state.tasks_df.index[st.session_state.tasks_df['Aktivite Kodu'] == r['Aktivite Kodu']].tolist()
                                 for i in idx_list:
@@ -172,7 +172,9 @@ with st.sidebar:
     st.header("⛈️ Dinamik İklim Kütüğü (API)")
     m = folium.Map(location=[39.0, 35.0], zoom_start=5)
     m.add_child(folium.LatLngPopup())
-    map_data = st_folium(m, height=250, use_container_width=True)
+    
+    # BOŞLUK HATASINI GİDEREN HARİTA AYARI
+    map_data = st_folium(m, width=300, height=200, returned_objects=["last_clicked"])
     lat, lon = (map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]) if map_data and map_data.get("last_clicked") else (41.0082, 28.9784)
     
     c1, c2, c3 = st.columns(3)
@@ -248,7 +250,6 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Dosya yüklenirken bir hata oluştu: {e}")
 
-    # EKSİK OLAN EXCEL ŞABLON İNDİRME BUTONU BURAYA EKLENDİ
     st.markdown("---")
     st.download_button("📥 Boş Excel Şablonu İndir", data=generate_excel_template(), file_name="Tez_Gantt_Sablon.xlsx", use_container_width=True)
 
@@ -606,7 +607,6 @@ if 'total_base' in st.session_state and 'df_gantt' in st.session_state:
         if st.session_state.scenario_archive:
             secilen_senaryolar = st.multiselect("Karşılaştır:", options=list(st.session_state.scenario_archive.keys()))
         
-        # TEZ EKLENTİSİ: P50, P80, P90 Çizgileri
         fig_h = go.Figure()
         fig_h.add_trace(go.Histogram(x=st.session_state.total_base, name='Baz Durum', opacity=0.6, marker_color='grey'))
         fig_h.add_vline(x=st.session_state.kpi_base['p50'], line_dash="dot", line_color="green", annotation_text="Baz P50")
@@ -692,7 +692,6 @@ if 'total_base' in st.session_state and 'df_gantt' in st.session_state:
             a_kpi = st.session_state.kpi_scen if st.session_state.scen_name != "Değişiklik Yapılmadı" else st.session_state.kpi_base
             fark_p80 = a_kpi['p80'] - b_kpi['p80']
             
-            # TEZ EKLENTİSİ: Hedefe Yetişme Olasılığı (AS3)
             prob_meeting = np.sum(st.session_state.total_scen <= b_kpi['p80']) / len(st.session_state.total_scen) * 100
             
             c1, c2, c3, c4 = st.columns(4)
