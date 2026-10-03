@@ -5,6 +5,7 @@
 - Görsel temizlik ve kilitlenme karşıtı 'TextColumn' aktif.
 - Koyu temalı analiz grafiği aktif.
 - Boş veri (0,00) ile hesaplama yapıldığında oluşan KeyError ('Kullanılan Tutar') hatası giderildi.
+- Varsayılan (Default) gerçek örnek proje verileri eklendi.
 """
 
 import streamlit as st
@@ -359,17 +360,74 @@ def load_from_excel(file):
     return dfs
 
 # ==========================================
-# 5. STATE & ARAYÜZ (UI)
+# 5. STATE & ARAYÜZ (UI) - VARSAYILAN ÖRNEK VERİLER
 # ==========================================
+DEFAULT_PROG = [
+    {"AYLAR": "Eylül 25", "İŞ PROGRAMI KÜMÜLATİF": "2.165.869,79", "İMALAT TUTARI KÜMÜLATİF": "0"},
+    {"AYLAR": "Ekim 25", "İŞ PROGRAMI KÜMÜLATİF": "6.470.938,48", "İMALAT TUTARI KÜMÜLATİF": "0"},
+    {"AYLAR": "Kasım 25", "İŞ PROGRAMI KÜMÜLATİF": "17.293.937,21", "İMALAT TUTARI KÜMÜLATİF": "0"},
+    {"AYLAR": "Aralık 25", "İŞ PROGRAMI KÜMÜLATİF": "30.287.885,90", "İMALAT TUTARI KÜMÜLATİF": "0"},
+    {"AYLAR": "Ocak 26", "İŞ PROGRAMI KÜMÜLATİF": "55.011.822,59", "İMALAT TUTARI KÜMÜLATİF": "54.223.844,40"},
+    {"AYLAR": "Şubat 26", "İŞ PROGRAMI KÜMÜLATİF": "84.518.453,41", "İMALAT TUTARI KÜMÜLATİF": "54.223.844,40"},
+    {"AYLAR": "Mart 26", "İŞ PROGRAMI KÜMÜLATİF": "116.193.494,10", "İMALAT TUTARI KÜMÜLATİF": "86.775.488,80"},
+    {"AYLAR": "Nisan 26", "İŞ PROGRAMI KÜMÜLATİF": "148.697.481,54", "İMALAT TUTARI KÜMÜLATİF": "128.039.357,60"},
+    {"AYLAR": "Mayıs 26", "İŞ PROGRAMI KÜMÜLATİF": "180.326.778,21", "İMALAT TUTARI KÜMÜLATİF": "162.021.367,20"},
+    {"AYLAR": "Haziran 26", "İŞ PROGRAMI KÜMÜLATİF": "210.665.272,86", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Temmuz 26", "İŞ PROGRAMI KÜMÜLATİF": "240.061.456,36", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Ağustos 26", "İŞ PROGRAMI KÜMÜLATİF": "268.254.235,09", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Eylül 26", "İŞ PROGRAMI KÜMÜLATİF": "294.265.183,12", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Ekim 26", "İŞ PROGRAMI KÜMÜLATİF": "320.300.266,54", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Kasım 26", "İŞ PROGRAMI KÜMÜLATİF": "346.314.783,44", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Aralık 26", "İŞ PROGRAMI KÜMÜLATİF": "370.147.808,63", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Ocak 27", "İŞ PROGRAMI KÜMÜLATİF": "396.149.133,62", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Şubat 27", "İŞ PROGRAMI KÜMÜLATİF": "417.840.015,98", "İMALAT TUTARI KÜMÜLATİF": ""},
+    {"AYLAR": "Mart 27", "İŞ PROGRAMI KÜMÜLATİF": "433.444.000,00", "İMALAT TUTARI KÜMÜLATİF": ""}
+]
+
+DEFAULT_ENDEKS = [
+    {"AYLAR": "Temmuz 2025", "I o": "100,421925", "Ç o": "4972,280000", "D o": "6034,240000", "Y o": "44,717708", "K o": "3481,270000", "G o": "4409,730000", "M o": "3218,000000"},
+    {"AYLAR": "Eylül 2025", "I o": "105,780006", "Ç o": "5110,090000", "D o": "6187,730000", "Y o": "45,110900", "K o": "3572,840000", "G o": "4632,890000", "M o": "3319,760000"},
+    {"AYLAR": "Ekim 2025", "I o": "108,477581", "Ç o": "5170,070000", "D o": "6350,020000", "Y o": "44,919783", "K o": "3577,460000", "G o": "4708,200000", "M o": "3368,810000"},
+    {"AYLAR": "Kasım 2025", "I o": "109,415936", "Ç o": "5216,990000", "D o": "6453,420000", "Y o": "47,560158", "K o": "3606,930000", "G o": "4747,630000", "M o": "3419,550000"},
+    {"AYLAR": "Aralık 2025", "I o": "110,386963", "Ç o": "5277,720000", "D o": "6568,100000", "Y o": "44,895592", "K o": "3667,480000", "G o": "4783,040000", "M o": "3475,040000"},
+    {"AYLAR": "Ocak 2026", "I o": "115,730000", "Ç o": "5454,970000", "D o": "6710,150000", "Y o": "46,162817", "K o": "3786,330000", "G o": "4910,530000", "M o": "3624,850000"},
+    {"AYLAR": "Şubat 2026", "I o": "119,160000", "Ç o": "5591,460000", "D o": "6805,630000", "Y o": "48,474967", "K o": "3895,970000", "G o": "5029,760000", "M o": "3708,220000"},
+    {"AYLAR": "Mart 2026", "I o": "121,470000", "Ç o": "5683,710000", "D o": "6960,900000", "Y o": "56,330433", "K o": "3968,370000", "G o": "5145,360000", "M o": "3726,740000"},
+    {"AYLAR": "Nisan 2026", "I o": "126,550000", "Ç o": "5841,560000", "D o": "7209,790000", "Y o": "61,810350", "K o": "4068,800000", "G o": "5308,460000", "M o": "3813,110000"},
+    {"AYLAR": "Mayıs 2026", "I o": "128,720000", "Ç o": "5972,290000", "D o": "7364,500000", "Y o": "56,946300", "K o": "4233,670000", "G o": "5454,580000", "M o": "3857,200000"}
+]
+
+DEFAULT_ALT = [
+    {"Ağırlık": "a", "Katsayı": "0,15", "Temel Endeks": "100,421925", "Endeks Sütunu": "I o"},
+    {"Ağırlık": "b1", "Katsayı": "0,20", "Temel Endeks": "4972,280000", "Endeks Sütunu": "Ç o"},
+    {"Ağırlık": "b2", "Katsayı": "0,20", "Temel Endeks": "6034,240000", "Endeks Sütunu": "D o"},
+    {"Ağırlık": "b3", "Katsayı": "0,15", "Temel Endeks": "44,717708", "Endeks Sütunu": "Y o"},
+    {"Ağırlık": "b4", "Katsayı": "0,05", "Temel Endeks": "3481,270000", "Endeks Sütunu": "K o"},
+    {"Ağırlık": "b5", "Katsayı": "0,10", "Temel Endeks": "4409,730000", "Endeks Sütunu": "G o"},
+    {"Ağırlık": "c", "Katsayı": "0,15", "Temel Endeks": "3218,000000", "Endeks Sütunu": "M o"}
+]
+
+DEFAULT_B = [
+    {"AYLAR": "Eylül 25", "B": "0,9"},
+    {"AYLAR": "Ekim 25", "B": "0,9"},
+    {"AYLAR": "Kasım 25", "B": "0,9"},
+    {"AYLAR": "Aralık 25", "B": "0,9"},
+    {"AYLAR": "Ocak 26", "B": "0,9"},
+    {"AYLAR": "Şubat 26", "B": "0,9"},
+    {"AYLAR": "Mart 26", "B": "0,9"},
+    {"AYLAR": "Nisan 26", "B": "0,9"},
+    {"AYLAR": "Mayıs 26", "B": "0,9"}
+]
+
 if 'load_count' not in st.session_state: st.session_state.load_count = 0
 if 'prog_df' not in st.session_state:
-    st.session_state.prog_df = ensure_text_df(pd.DataFrame({"AYLAR": ["Oca 22"], "İŞ PROGRAMI KÜMÜLATİF": ["0,00"], "İMALAT TUTARI KÜMÜLATİF": ["0,00"]}))
+    st.session_state.prog_df = ensure_text_df(pd.DataFrame(DEFAULT_PROG))
 if 'endeks_df' not in st.session_state:
-    st.session_state.endeks_df = ensure_text_df(pd.DataFrame({"AYLAR": ["Oca 22"], "I o": ["0,00"], "Ç o": ["0,00"], "D o": ["0,00"], "Y o": ["0,00"], "K o": ["0,00"], "G o": ["0,00"], "M o": ["0,00"]}))
+    st.session_state.endeks_df = ensure_text_df(pd.DataFrame(DEFAULT_ENDEKS))
 if 'alt_df' not in st.session_state:
-    st.session_state.alt_df = ensure_text_df(pd.DataFrame({"Ağırlık": ["a", "b1", "b2", "b3", "b4", "b5", "c"], "Katsayı": ["0,00"] * 7, "Temel Endeks": ["0,00"] * 7, "Endeks Sütunu": ["I o", "Ç o", "D o", "Y o", "K o", "G o", "M o"]}))
+    st.session_state.alt_df = ensure_text_df(pd.DataFrame(DEFAULT_ALT))
 if 'b_df' not in st.session_state:
-    st.session_state.b_df = ensure_text_df(pd.DataFrame({"AYLAR": ["Oca 22"], "B": ["1,00"]}))
+    st.session_state.b_df = ensure_text_df(pd.DataFrame(DEFAULT_B))
 
 st.title("📂 İdari Hakediş & Teyit Matrisi")
 
@@ -399,7 +457,11 @@ if uploaded_json is not None:
         data = json.load(uploaded_json)
         if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']))
         if 'endeks' in data: st.session_state.endeks_df = clean_df_for_ui(pd.DataFrame(data['endeks']))
-        if 'alt' in data: st.session_state.alt_df = clean_df_for_ui(pd.DataFrame(data['alt']))
+        if 'alt' in data: 
+            df_alt_loaded = pd.DataFrame(data['alt'])
+            if 'Endeks Sütunu' not in df_alt_loaded.columns:
+                df_alt_loaded['Endeks Sütunu'] = df_alt_loaded['Ağırlık'].astype(str).str.strip().str.lower().map({'a': 'I o', 'b1': 'Ç o', 'b2': 'D o', 'b3': 'Y o', 'b4': 'K o', 'b5': 'G o', 'c': 'M o'}).fillna('')
+            st.session_state.alt_df = clean_df_for_ui(df_alt_loaded)
         if 'b' in data: st.session_state.b_df = clean_df_for_ui(pd.DataFrame(data['b']))
         st.session_state.load_count += 1
         st.session_state.last_json_bytes = file_bytes_json
@@ -429,7 +491,7 @@ col_s1, col_s2 = st.sidebar.columns(2)
 with col_s1:
     st.download_button(
         label="💾 JSON",
-        data=json.dumps({'prog': edited_prog.to_dict(orient='records'), 'endeks': edited_endeks.to_dict(orient='records'), 'alt': edited_alt.to_dict(orient='records'), 'b': edited_b.to_dict(orient='records')}, indent=4),
+        data=json.dumps({'prog': edited_prog.to_dict(orient='records'), 'endeks': edited_endeks.to_dict(orient='records'), 'alt': edited_alt.to_dict(orient='records'), 'b': edited_b.to_dict(orient='records')}, ensure_ascii=False, indent=4),
         file_name="hakedis_projem.json", mime="application/json", use_container_width=True
     )
 with col_s2:
