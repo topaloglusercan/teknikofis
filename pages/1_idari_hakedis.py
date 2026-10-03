@@ -4,6 +4,7 @@
 - Excel Şablon İndirme motoru aktif.
 - Görsel temizlik ve kilitlenme karşıtı 'TextColumn' aktif.
 - Koyu temalı analiz grafiği aktif.
+- Boş veri (0,00) ile hesaplama yapıldığında oluşan KeyError ('Kullanılan Tutar') hatası giderildi.
 """
 
 import streamlit as st
@@ -70,11 +71,6 @@ def clean_df_for_ui(df):
                     except: pass
             new_vals.append(s)
         df_clean[col] = new_vals
-    # DİKKAT: dtype'ı python 'object' değil, pandas'ın kendi StringDtype'ına
-    # (astype("string")) çeviriyoruz. Streamlit Cloud'daki pyarrow sürümü,
-    # 'object' dtype içindeki sayı-benzeri metinleri (örn. "1234") otomatik
-    # olarak sayısal tipe çevirip 2 ondalık basamağa yuvarlayabiliyor ve bu da
-    # hücrelere veri girişini bozuyor. "string" dtype bunu kesin olarak engeller.
     return df_clean.astype(str).astype("string")
 
 def get_text_config(df):
@@ -382,7 +378,6 @@ st.sidebar.markdown("### 📥 Excel ile Proje Yükle")
 uploaded_excel = st.sidebar.file_uploader("Excel Dosyası Seç (.xlsx)", type=["xlsx"])
 if uploaded_excel is not None:
     file_bytes = uploaded_excel.getvalue()
-    # Yalnızca dosya İLK KEZ yüklendiğinde çalışmasını sağlayan bayt/hafıza kontrolü
     if st.session_state.get('last_excel_bytes') != file_bytes:
         try:
             dfs = load_from_excel(uploaded_excel)
@@ -400,7 +395,6 @@ st.sidebar.markdown("### 📥 Önceki Projeyi Yükle (.json)")
 uploaded_json = st.sidebar.file_uploader("JSON Dosyası Seç", type=["json"])
 if uploaded_json is not None:
     file_bytes_json = uploaded_json.getvalue()
-    # Yalnızca JSON dosyası İLK KEZ yüklendiğinde çalışmasını sağlayan kontrol
     if st.session_state.get('last_json_bytes') != file_bytes_json:
         data = json.load(uploaded_json)
         if 'prog' in data: st.session_state.prog_df = clean_df_for_ui(pd.DataFrame(data['prog']))
@@ -462,6 +456,8 @@ if st.session_state.get('hesap_yapildi', False):
     
     if df_sonuc.empty:
         st.warning("⚠️ Lütfen tablolara geçerli veri giriniz (İş Programı ve Endeks boş olamaz).")
+    elif df_detay.empty:
+        st.info("ℹ️ Hesaplama tamamlandı ancak ödenek/imalat dilimi oluşmadı. Lütfen **'1. İş Programı ve İmalatlar'** tablosuna **0,00'dan büyük** tutarlar girdiğinizden emin olun.")
     else:
         st.success("✅ Hesaplama Başarılı!")
         tab1, tab2, tab3, tab4 = st.tabs(["🔍 Dilim Detay", "📊 Teyit Matrisi", "📑 Kümülatif Sonuç", "📈 Analiz Grafiği"])
@@ -478,10 +474,11 @@ if st.session_state.get('hesap_yapildi', False):
                 st.dataframe(df_pivot.map(tr_format).style.set_properties(subset=['HAKEDİŞ TUTARI (Toplam)'], **{'font-weight': 'bold', 'background-color': '#e6f2ff'}), use_container_width=True)
                 
         with tab3:
-            for col in df_sonuc.columns:
+            df_sonuc_gosterim = df_sonuc.copy()
+            for col in df_sonuc_gosterim.columns:
                 if any(x in col.upper() for x in ['TUTAR', 'PROGRAM', 'FARKI']):
-                    df_sonuc[col] = df_sonuc[col].apply(tr_format)
-            st.dataframe(df_sonuc, use_container_width=True)
+                    df_sonuc_gosterim[col] = df_sonuc_gosterim[col].apply(tr_format)
+            st.dataframe(df_sonuc_gosterim, use_container_width=True)
             
         with tab4:
             try:
