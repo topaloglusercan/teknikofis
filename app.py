@@ -34,6 +34,7 @@ def ana_sayfa():
         * **Şantiye Tutanak:** Eklenti/kesinti tutanakları hazırlama ve PDF arşivi.
         * **Performans Analizi:** ESA ve EVA yöntemleriyle proje performans ölçümü.
         * **Fiyat Farkı Simülatörü:** Gecikme matrisi ile fiyat farkı simülasyonu.
+        * **Endeks Tahmini:** Stokastik, zaman serisi ve karma algoritmalarla uçtan uca FF projeksiyonu.
         * **Pursantaj Revize:** İş artışlarında pursantajların otomatik yeni dağıtımı.
         * **Teklif Karşılaştırma:** TOPSIS algoritmasıyla ideal alt yüklenici seçimi.
         """)
@@ -61,6 +62,7 @@ eski_moduller = [
     st.Page("pages/3_santiye_tutanak.py", title="Şantiye Tutanak", icon=":material/edit_document:"),
     st.Page("pages/4_performans_analizi.py", title="Performans Analizi", icon=":material/insights:"),
     st.Page("pages/5_fiyat_farki_simulatoru.py", title="Fiyat Farkı Simülatörü", icon=":material/price_change:"),
+    st.Page("pages/9_endeks_tahmini.py", title="Endeks Tahmini", icon=":material/trending_up:"),
     st.Page("pages/6_pursantaj_revize.py", title="Pursantaj Revize", icon=":material/sync_alt:"),
     st.Page("pages/7_teklif_karsılastırma.py", title="Teklif Karşılaştırma", icon=":material/balance:") 
 ]
