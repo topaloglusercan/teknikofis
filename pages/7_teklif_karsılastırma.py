@@ -407,7 +407,7 @@ with tab1:
     with col_b:
         is_kalemi_sablonu = st.file_uploader("📂 Doldurulmuş Şablonu Sisteme Yükle", type=["xlsx"])
         if is_kalemi_sablonu is not None and st.button("Şablonu Aktar"):
-            df_yeni = pd.read_excel(is_kalemi_sablonu)
+            df_yeni = pd.read_excel(is_kalemi_sablonu, skiprows=3)
             if "Metraj" in df_yeni.columns: df_yeni["Metraj"] = df_yeni["Metraj"].apply(safe_float)
             st.session_state.is_kalemleri = df_yeni; st.success("Aktarıldı!"); st.rerun()
 
@@ -450,7 +450,7 @@ with tab2:
         
         yuklenen_dosya = st.file_uploader(f"{secili_firma} - İmzalı Teklif Dosyası Yükle", type=["xlsx"])
         if yuklenen_dosya is not None and st.button("Teklifi Sisteme Kaydet"):
-            st.session_state.teklifler[secili_firma] = pd.read_excel(yuklenen_dosya)
+            st.session_state.teklifler[secili_firma] = pd.read_excel(yuklenen_dosya, skiprows=3)
             st.success("Teklif alındı!")
             
         if secili_firma in st.session_state.teklifler:
