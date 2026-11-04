@@ -47,7 +47,7 @@ def ana_sayfa():
         * **P6 Lag Analizi:** Aktivite ilişkilerindeki gizlenmiş Lag (Bekleme) değerlerinin tespiti.
         * **P6 Gereksiz Bağ Analizi:** Mantıksal döngü ve gereksiz bağların tespiti.
         * **P6 Aktivite Kodu Analizi:** Proje aktivite kodlarının dağılım ve kontrolü.
-        * **P6 Change Log:** EKGYO formatında yapısal revizyon ve hakediş analizi.
+        * **P6 Change Log:** Yapısal revizyon ve hakediş analizi.
         """)
         
     st.markdown("<br><br><br>", unsafe_allow_html=True)
