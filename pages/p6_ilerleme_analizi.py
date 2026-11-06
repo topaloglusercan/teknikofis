@@ -5,7 +5,7 @@ import numpy as np
 import re
 from datetime import datetime
 
-st.set_page_config(page_title="P6 Matris Dashboard", layout="wide")
+# st.set_page_config(page_title="P6 Matris Dashboard", layout="wide")
 
 # --- SOFT UI & PASTEL CSS TASARIMI ---
 st.markdown("""
