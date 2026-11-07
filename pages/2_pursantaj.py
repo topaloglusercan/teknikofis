@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# st.set_page_config(layout="wide", page_title="Profesyonel Pursantaj Yönetimi")
+# DİKKAT: st.set_page_config() çoklu sayfa çakışmasını önlemek için buradan tamamen kaldırıldı.
 
 st.markdown("""
 <style>
@@ -166,6 +166,7 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     kaynak_agac = st.session_state.df[mask].copy()
     if kaynak_agac.empty: return
     parent = parent_bul(kaynak_wbs)
+    
     for i in range(kopya_sayisi):
         yeni_kok_wbs = sonraki_wbs_uret(parent, st.session_state.df)
         kopya_agac_i = kaynak_agac.copy()
@@ -174,6 +175,7 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
         kopya_agac_i["İlerleme_%"] = 0.0
         kopya_agac_i["Kilit"] = False
         st.session_state.df = pd.concat([st.session_state.df, kopya_agac_i], ignore_index=True)
+        
     st.session_state.df = wbs_sirala(st.session_state.df)
     st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
 
@@ -259,7 +261,7 @@ for d in range(1, df["Derinlik"].max() + 1):
             parent_genel = df.loc[df["WBS"] == rp, "Genel_%"].values
             if len(parent_genel) > 0:
                 df.loc[idx, "Genel_%"] = (row["Yerel_%"] / 100.0) * parent_genel[0]
-            else: df.loc[idx, "Genel_%"] = row["Yerel_%"]
+            else: df.loc[idx, "Genel_%"] = row["Yerel_%"] 
         else:
             df.loc[idx, "Genel_%"] = row["Yerel_%"]
 
@@ -370,14 +372,12 @@ with st.expander("📂 Dosya İşlemleri (Excel / JSON Yükle / Rapor İndir)", 
         st.download_button("📥 Projeyi Yedekle (.json)", data=st.session_state.df.to_json(orient="records", force_ascii=False), file_name="pursantaj.json", mime="application/json", use_container_width=True)
         
     with t_c3:
-        # JSON UZANTISI DA EKLENDİ
         uploaded_file = st.file_uploader("📤 Proje Yükle (Excel veya JSON)", type=["xlsx", "xls", "json"])
         if "son_yuklenen_dosya_id" not in st.session_state: st.session_state.son_yuklenen_dosya_id = None
         
         if uploaded_file is not None:
             if st.session_state.son_yuklenen_dosya_id != uploaded_file.file_id:
                 try:
-                    # JSON ise pd.read_json, Excel ise pd.read_excel kullan
                     if uploaded_file.name.endswith('.json'):
                         imp_df = pd.read_json(uploaded_file)
                     else:
