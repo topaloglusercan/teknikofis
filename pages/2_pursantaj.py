@@ -7,6 +7,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
+st.set_page_config(layout="wide", page_title="Profesyonel Pursantaj Yönetimi")
+
 st.markdown("""
 <style>
     .info-box { background-color: #0F2044; color: white; padding: 18px; border-radius: 6px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -42,14 +44,11 @@ def wbs_sirala(df_to_sort):
         parts = str(wbs_str).strip().split('.')
         key_parts = []
         for p in parts:
-            if p.isdigit():
-                key_parts.append((0, int(p)))
+            if p.isdigit(): key_parts.append((0, int(p)))
             else:
                 match = re.match(r"([a-zA-Z]+)(\d+)", p)
-                if match:
-                    key_parts.append((1, match.group(1), int(match.group(2))))
-                else:
-                    key_parts.append((2, p))
+                if match: key_parts.append((1, match.group(1), int(match.group(2))))
+                else: key_parts.append((2, p))
         return tuple(key_parts)
         
     df_to_sort["_sort_key"] = df_to_sort["WBS"].apply(sort_key)
@@ -58,16 +57,14 @@ def wbs_sirala(df_to_sort):
 
 if "df" not in st.session_state:
     data = [
-        {"WBS": "A", "Ad": "A Blok", "Yerel_%": 100.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "A.1", "Ad": "Üst Yapı", "Yerel_%": 60.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "İnşaat", "Grup 2": "Ana İşveren", "Grup 3": "Tüm Katlar"},
-        {"WBS": "A.1.1", "Ad": "Kaba İnşaat", "Yerel_%": 40.0, "Kilit": False, "İlerleme_%": 25.0, "Grup 1": "Kaba", "Grup 2": "Taşeron A", "Grup 3": "Zemin Kat"},
-        {"WBS": "A.1.2", "Ad": "İnce İşler", "Yerel_%": 60.0, "Kilit": False, "İlerleme_%": 10.0, "Grup 1": "İnce", "Grup 2": "Taşeron B", "Grup 3": "Normal Katlar"},
-        {"WBS": "A.2", "Ad": "Alt Yapı", "Yerel_%": 40.0, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "Altyapı", "Grup 2": "Taşeron C", "Grup 3": "Zemin Altı"},
+        {"WBS": "A.1", "Ad": "A Blok", "Yerel_%": 33.33, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "B.1", "Ad": "B Blok", "Yerel_%": 33.33, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "C.1", "Ad": "C Blok", "Yerel_%": 33.34, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
     ]
     st.session_state.df = wbs_sirala(pd.DataFrame(data))
 
 if "secili_wbs_listesi" not in st.session_state:
-    st.session_state.secili_wbs_listesi = ["A"]
+    st.session_state.secili_wbs_listesi = ["A.1"]
 
 # --- 3. ALFANÜMERİK WBS İŞLEMLERİ ---
 def parent_bul(wbs):
@@ -81,16 +78,13 @@ def sonraki_wbs_uret(parent_wbs, current_df):
     else:
         prefix = str(parent_wbs) + "."
         cocuklar = [w for w in current_df["WBS"].astype(str) if w.startswith(prefix) and len(w.split(".")) == len(str(parent_wbs).split(".")) + 1]
-        
         max_num = 0
         for cocuk in cocuklar:
             son_kisim = cocuk.split(".")[-1]
-            if son_kisim.isdigit():
-                max_num = max(max_num, int(son_kisim))
+            if son_kisim.isdigit(): max_num = max(max_num, int(son_kisim))
             else:
                 match = re.search(r'\d+$', son_kisim)
                 if match: max_num = max(max_num, int(match.group()))
-                
         return f"{prefix}{max_num + 1}"
 
 def wbs_degistir(eski_kok, yeni_kok, dataframe):
@@ -101,7 +95,6 @@ def wbs_degistir(eski_kok, yeni_kok, dataframe):
 def wbs_hedefe_tasi_coklu(kaynak_wbs_listesi, hedef_parent_wbs):
     df_temp = st.session_state.df.copy()
     gecerli_kaynaklar = []
-    
     kokler = df_temp[~df_temp["WBS"].astype(str).str.contains(r'\.')]["WBS"].tolist()
 
     for k_wbs in kaynak_wbs_listesi:
@@ -143,7 +136,6 @@ def wbs_girinti_azalt(kaynak_wbs):
     if parent == "KÖK": return 
     buyuk_baba = parent_bul(parent)
     if buyuk_baba == "KÖK": return 
-    
     yeni_wbs = sonraki_wbs_uret(buyuk_baba, st.session_state.df)
     st.session_state.df = wbs_degistir(kaynak_wbs, yeni_wbs, st.session_state.df)
     st.session_state.df = wbs_sirala(st.session_state.df)
@@ -174,7 +166,6 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     kaynak_agac = st.session_state.df[mask].copy()
     if kaynak_agac.empty: return
     parent = parent_bul(kaynak_wbs)
-    
     for i in range(kopya_sayisi):
         yeni_kok_wbs = sonraki_wbs_uret(parent, st.session_state.df)
         kopya_agac_i = kaynak_agac.copy()
@@ -183,17 +174,27 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
         kopya_agac_i["İlerleme_%"] = 0.0
         kopya_agac_i["Kilit"] = False
         st.session_state.df = pd.concat([st.session_state.df, kopya_agac_i], ignore_index=True)
-        
     st.session_state.df = wbs_sirala(st.session_state.df)
     st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
 
+# --- YENİ EKLENEN: ÖKSÜZ KALEMLERİ YÖNETEN AKILLI DENGELEME ---
 def akilli_dengele(old_df, new_df):
     temp_df = new_df.copy()
-    temp_df["Parent"] = temp_df["WBS"].astype(str).apply(parent_bul)
-    parents = temp_df["Parent"].unique()
+    wbs_set = set(temp_df["WBS"].astype(str))
+    
+    # Gerçek ebeveyni bulan (Öksüzleri KÖK yapan) özel fonksiyon
+    def get_real_parent(w):
+        parts = str(w).split('.')
+        for i in range(len(parts)-1, 0, -1):
+            p = ".".join(parts[:i])
+            if p in wbs_set: return p
+        return "KÖK"
+        
+    temp_df["Real_Parent"] = temp_df["WBS"].astype(str).apply(get_real_parent)
+    parents = temp_df["Real_Parent"].unique()
     
     for p in parents:
-        mask = temp_df["Parent"] == p
+        mask = temp_df["Real_Parent"] == p
         if len(old_df) != len(temp_df): continue
             
         degisen_satirlar = mask & ~np.isclose(old_df["Yerel_%"].astype(float), temp_df["Yerel_%"].astype(float), atol=0.001)
@@ -220,13 +221,22 @@ def akilli_dengele(old_df, new_df):
             else:
                 temp_df.loc[unlocked_mask, "Yerel_%"] = remaining / unlocked_mask.sum()
                 
-    return temp_df.drop(columns=["Parent"])
+    return temp_df.drop(columns=["Real_Parent"])
 
 # --- 4. HESAPLAMALAR VE GÖRSEL HAZIRLIK ---
 df = st.session_state.df.copy()
+wbs_set = set(df["WBS"].astype(str))
+
+def get_real_parent_global(w):
+    parts = str(w).split('.')
+    for i in range(len(parts)-1, 0, -1):
+        p = ".".join(parts[:i])
+        if p in wbs_set: return p
+    return "KÖK"
+
+df["Real_Parent"] = df["WBS"].astype(str).apply(get_real_parent_global)
 df["Derinlik"] = df["WBS"].astype(str).apply(lambda x: len(x.split(".")) - 1)
-df["Parent"] = df["WBS"].apply(parent_bul)
-df["Is_Leaf"] = ~df["WBS"].isin(df["Parent"])
+df["Is_Leaf"] = ~df["WBS"].isin(df["Real_Parent"])
 
 def gorsel_isim_olustur(row):
     derinlik = row["Derinlik"]
@@ -242,26 +252,29 @@ def gorsel_isim_olustur(row):
 df["Ağaç Görünümü"] = df.apply(gorsel_isim_olustur, axis=1)
 
 df["Genel_%"] = 0.0
-df.loc[df["Derinlik"] == 0, "Genel_%"] = df.loc[df["Derinlik"] == 0, "Yerel_%"]
+df.loc[df["Real_Parent"] == "KÖK", "Genel_%"] = df.loc[df["Real_Parent"] == "KÖK", "Yerel_%"]
 
 for d in range(1, df["Derinlik"].max() + 1):
     for idx, row in df[df["Derinlik"] == d].iterrows():
-        parent_genel = df.loc[df["WBS"] == row["Parent"], "Genel_%"].values
-        if len(parent_genel) > 0:
-            df.loc[idx, "Genel_%"] = (row["Yerel_%"] / 100.0) * parent_genel[0]
+        rp = row["Real_Parent"]
+        if rp != "KÖK":
+            parent_genel = df.loc[df["WBS"] == rp, "Genel_%"].values
+            if len(parent_genel) > 0:
+                df.loc[idx, "Genel_%"] = (row["Yerel_%"] / 100.0) * parent_genel[0]
+            else: df.loc[idx, "Genel_%"] = row["Yerel_%"]
         else:
-            df.loc[idx, "Genel_%"] = row["Yerel_%"] # Ebeveyni kayıpsa kök gibi davran
+            df.loc[idx, "Genel_%"] = row["Yerel_%"]
 
 df["Bütçe (TL)"] = (df["Genel_%"] / 100.0) * st.session_state.bedel
 
 df["Hakediş (TL)"] = 0.0
 df.loc[df["Is_Leaf"], "Hakediş (TL)"] = df.loc[df["Is_Leaf"], "Bütçe (TL)"] * (df.loc[df["Is_Leaf"], "İlerleme_%"] / 100.0)
 
-for d in range(df["Derinlik"].max() - 1, -1, -1):
+for d in range(df["Derinlik"].max(), -1, -1):
     for idx, row in df[df["Derinlik"] == d].iterrows():
-        child_mask = df["WBS"].str.startswith(row["WBS"] + ".") & df["Is_Leaf"]
-        child_hakedis_sum = df.loc[child_mask, "Hakediş (TL)"].sum()
-        if child_mask.sum() > 0:
+        if not row["Is_Leaf"]:
+            child_mask = df["Real_Parent"] == row["WBS"]
+            child_hakedis_sum = df.loc[child_mask, "Hakediş (TL)"].sum()
             df.loc[idx, "Hakediş (TL)"] = child_hakedis_sum
             if df.loc[idx, "Bütçe (TL)"] > 0:
                 calculated_progress = (child_hakedis_sum / df.loc[idx, "Bütçe (TL)"]) * 100.0
@@ -301,11 +314,10 @@ def excel_olustur(veri_df, proje_bedeli):
         ws.cell(row=r, column=3, value=row["Ad"])
         ws.cell(row=r, column=4, value=row["Yerel_%"] / 100.0).number_format = '0.00%'
         
-        # GÜVENLİK: Eğer kök ise veya ebeveyni tablodan silinmişse (öksüzse)
-        if row["Derinlik"] == 0 or row["Parent"] not in wbs_to_row: 
+        if row["Real_Parent"] == "KÖK": 
             ws.cell(row=r, column=5, value=f"=D{r}").number_format = '0.00%'
         else:
-            p_row = wbs_to_row[row["Parent"]]
+            p_row = wbs_to_row[row["Real_Parent"]]
             ws.cell(row=r, column=5, value=f"=D{r}*E{p_row}").number_format = '0.00%'
             
         if row["Is_Leaf"]: 
@@ -318,14 +330,13 @@ def excel_olustur(veri_df, proje_bedeli):
         if row["Is_Leaf"]: 
             ws.cell(row=r, column=8, value=f"=G{r}*F{r}").number_format = '#,##0.00 "₺"'
         else:
-            children = veri_df[veri_df["Parent"] == row["WBS"]]["WBS"].tolist()
-            # GÜVENLİK 2: Sadece sistemde tanımlı çocukları formüle dahil et
-            valid_children = [c for c in children if c in wbs_to_row]
-            if valid_children:
-                child_rows = [str(wbs_to_row[c]) for c in valid_children]
-                ws.cell(row=r, column=8, value="=" + "+".join([f"H{cr}" for cr in child_rows])).number_format = '#,##0.00 "₺"'
-            else: 
-                ws.cell(row=r, column=8, value=0).number_format = '#,##0.00 "₺"'
+            real_children = veri_df[veri_df["Real_Parent"] == row["WBS"]]["WBS"].tolist()
+            if real_children:
+                child_rows = [str(wbs_to_row[c]) for c in real_children if c in wbs_to_row]
+                if child_rows:
+                    ws.cell(row=r, column=8, value="=" + "+".join([f"H{cr}" for cr in child_rows])).number_format = '#,##0.00 "₺"'
+                else: ws.cell(row=r, column=8, value=0).number_format = '#,##0.00 "₺"'
+            else: ws.cell(row=r, column=8, value=0).number_format = '#,##0.00 "₺"'
             
         ws.cell(row=r, column=9, value=row["Grup 1"])
         ws.cell(row=r, column=10, value=row["Grup 2"])
@@ -378,6 +389,7 @@ with st.expander("📂 Dosya İşlemleri (Excel Yükle / Rapor İndir)", expande
                         st.session_state.df = wbs_sirala(imp_df[["WBS", "Ad", "Yerel_%", "Kilit", "İlerleme_%", "Grup 1", "Grup 2", "Grup 3"]])
                         st.session_state.son_yuklenen_dosya_id = uploaded_file.file_id
                         st.session_state.secili_wbs_listesi = [st.session_state.df.iloc[0]["WBS"]]
+                        st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
                         st.rerun()
                     else: st.error("❌ Excel'de 'WBS' ve 'Ad' sütunları bulunamadı.")
                 except Exception as e: st.error(f"❌ Dosya okuma hatası: {e}")
@@ -417,7 +429,7 @@ with tab1:
             gosterilecek_df[edit_cols],
             use_container_width=True, hide_index=True, num_rows="fixed", height=600,
             column_config={
-                "WBS": st.column_config.TextColumn("✏️ WBS (Değiştir)", width="small"),
+                "WBS": st.column_config.TextColumn("✏️ WBS", width="small"),
                 "Ağaç Görünümü": st.column_config.TextColumn("Hiyerarşi (Görsel)", width="medium", disabled=True),
                 "Ad": st.column_config.TextColumn("✏️ Kalem Adı"),
                 "Kilit": st.column_config.CheckboxColumn("🔒 Kilit", width="small"),
@@ -466,7 +478,7 @@ with tab1:
 
     with col_sag:
         st.markdown("### 🛠️ İşlem Paneli")
-        st.caption("Tablodaki kutucuklarla çoklu seçim yapabilirsiniz.")
+        st.caption("Kutucuklarla çoklu seçim yapabilirsiniz.")
         
         event = st.dataframe(
             gosterilecek_df[["WBS", "Ad"]],
@@ -506,7 +518,6 @@ with tab1:
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            
         else:
             toplam_butce = df[df["WBS"].isin(secili_wbsler)]["Bütçe (TL)"].sum()
             toplam_pay = df[df["WBS"].isin(secili_wbsler)]["Genel_%"].sum()
@@ -577,7 +588,7 @@ with tab1:
         k1, k2 = st.columns(2)
         with k1:
             if st.button("✂️ Kes", use_container_width=True):
-                if any(k in secili_wbsler for k in kokler): st.error("Ana Blok / Kök kesilemez.")
+                if any(k in secili_wbsler for k in kokler): st.error("Ana Kök kesilemez.")
                 else: st.session_state.kesilen_wbs_listesi = secili_wbsler.copy(); st.rerun()
         with k2:
             yapistir_disabled = len(st.session_state.kesilen_wbs_listesi) == 0 or len(secili_wbsler) != 1
@@ -595,7 +606,7 @@ with tab1:
 # SEKME 2: PİVOT RAPOR ANALİZİ
 # =========================================================================
 with tab2:
-    st.markdown("### 📊 Dinamik Pivot Rapor (Taşeron / Mahal / İş Tipi Analizi)")
+    st.markdown("### 📊 Dinamik Pivot Rapor")
     p_col1, p_col2 = st.columns([1, 3])
     with p_col1: grup_secim = st.selectbox("Raporlama Kriterini Seçin:", ["Grup 1", "Grup 2", "Grup 3"])
     with p_col2:
