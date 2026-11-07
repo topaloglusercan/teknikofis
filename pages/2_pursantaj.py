@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# st.set_page_config(layout="wide", page_title="Profesyonel Pursantaj Yönetimi")
+st.set_page_config(layout="wide", page_title="Profesyonel Pursantaj Yönetimi")
 
 st.markdown("""
 <style>
@@ -177,12 +177,10 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     st.session_state.df = wbs_sirala(st.session_state.df)
     st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
 
-# --- YENİ EKLENEN: ÖKSÜZ KALEMLERİ YÖNETEN AKILLI DENGELEME ---
 def akilli_dengele(old_df, new_df):
     temp_df = new_df.copy()
     wbs_set = set(temp_df["WBS"].astype(str))
     
-    # Gerçek ebeveyni bulan (Öksüzleri KÖK yapan) özel fonksiyon
     def get_real_parent(w):
         parts = str(w).split('.')
         for i in range(len(parts)-1, 0, -1):
@@ -357,7 +355,7 @@ def excel_olustur(veri_df, proje_bedeli):
 # --- 6. ANA EKRAN YERLEŞİMİ ---
 st.title("🏗️ Profesyonel Pursantaj Yönetimi")
 
-with st.expander("📂 Dosya İşlemleri (Excel Yükle / Rapor İndir)", expanded=False):
+with st.expander("📂 Dosya İşlemleri (Excel / JSON Yükle / Rapor İndir)", expanded=False):
     t_c1, t_c2, t_c3 = st.columns([1, 1, 1.5])
     with t_c1:
         yeni_bedel = st.number_input("Sözleşme Bedeli (₺)", min_value=0.0, value=st.session_state.bedel, step=100000.0, format="%.2f")
@@ -372,12 +370,19 @@ with st.expander("📂 Dosya İşlemleri (Excel Yükle / Rapor İndir)", expande
         st.download_button("📥 Projeyi Yedekle (.json)", data=st.session_state.df.to_json(orient="records", force_ascii=False), file_name="pursantaj.json", mime="application/json", use_container_width=True)
         
     with t_c3:
-        uploaded_file = st.file_uploader("📤 Excel'den Proje Yükle (WBS ve Ad)", type=["xlsx", "xls"])
+        # JSON UZANTISI DA EKLENDİ
+        uploaded_file = st.file_uploader("📤 Proje Yükle (Excel veya JSON)", type=["xlsx", "xls", "json"])
         if "son_yuklenen_dosya_id" not in st.session_state: st.session_state.son_yuklenen_dosya_id = None
+        
         if uploaded_file is not None:
             if st.session_state.son_yuklenen_dosya_id != uploaded_file.file_id:
                 try:
-                    imp_df = pd.read_excel(uploaded_file)
+                    # JSON ise pd.read_json, Excel ise pd.read_excel kullan
+                    if uploaded_file.name.endswith('.json'):
+                        imp_df = pd.read_json(uploaded_file)
+                    else:
+                        imp_df = pd.read_excel(uploaded_file)
+                        
                     if "WBS" in imp_df.columns and "Ad" in imp_df.columns:
                         imp_df["WBS"] = imp_df["WBS"].astype(str).str.strip()
                         if "Yerel_%" not in imp_df.columns: imp_df["Yerel_%"] = 0.0
@@ -386,14 +391,15 @@ with st.expander("📂 Dosya İşlemleri (Excel Yükle / Rapor İndir)", expande
                         if "Grup 1" not in imp_df.columns: imp_df["Grup 1"] = "-"
                         if "Grup 2" not in imp_df.columns: imp_df["Grup 2"] = "-"
                         if "Grup 3" not in imp_df.columns: imp_df["Grup 3"] = "-"
+                        
                         st.session_state.df = wbs_sirala(imp_df[["WBS", "Ad", "Yerel_%", "Kilit", "İlerleme_%", "Grup 1", "Grup 2", "Grup 3"]])
                         st.session_state.son_yuklenen_dosya_id = uploaded_file.file_id
                         st.session_state.secili_wbs_listesi = [st.session_state.df.iloc[0]["WBS"]]
                         st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
                         st.rerun()
-                    else: st.error("❌ Excel'de 'WBS' ve 'Ad' sütunları bulunamadı.")
+                    else: st.error("❌ Dosyada 'WBS' ve 'Ad' sütunları bulunamadı.")
                 except Exception as e: st.error(f"❌ Dosya okuma hatası: {e}")
-            else: st.success("✅ WBS Excel'den başarıyla yüklendi!")
+            else: st.success("✅ Proje dosyası başarıyla yüklendi!")
 
 st.divider()
 tab1, tab2 = st.tabs(["📋 Planlama & Master Tablo", "📈 Pivot Rapor Analizi"])
