@@ -7,8 +7,6 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# DİKKAT: st.set_page_config() SATIRI BURADAN SİLİNDİ! SADECE AŞAĞIDAKİ MARKDOWN KALACAK.
-
 st.markdown("""
 <style>
     .info-box { background-color: #0F2044; color: white; padding: 18px; border-radius: 6px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -303,7 +301,7 @@ def excel_olustur(veri_df, proje_bedeli):
         ws.cell(row=r, column=3, value=row["Ad"])
         ws.cell(row=r, column=4, value=row["Yerel_%"] / 100.0).number_format = '0.00%'
         
-        # Eğer öğenin parent'i Excel tablosunda yoksa veya kendisi ana kökse
+        # GÜVENLİK: Eğer kök ise veya ebeveyni tablodan silinmişse (öksüzse)
         if row["Derinlik"] == 0 or row["Parent"] not in wbs_to_row: 
             ws.cell(row=r, column=5, value=f"=D{r}").number_format = '0.00%'
         else:
@@ -321,6 +319,7 @@ def excel_olustur(veri_df, proje_bedeli):
             ws.cell(row=r, column=8, value=f"=G{r}*F{r}").number_format = '#,##0.00 "₺"'
         else:
             children = veri_df[veri_df["Parent"] == row["WBS"]]["WBS"].tolist()
+            # GÜVENLİK 2: Sadece sistemde tanımlı çocukları formüle dahil et
             valid_children = [c for c in children if c in wbs_to_row]
             if valid_children:
                 child_rows = [str(wbs_to_row[c]) for c in valid_children]
