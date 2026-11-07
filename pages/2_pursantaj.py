@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-st.set_page_config(layout="wide", page_title="Profesyonel Pursantaj Yönetimi")
+
 
 st.markdown("""
 <style>
