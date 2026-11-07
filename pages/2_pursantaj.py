@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# DİKKAT: st.set_page_config() çoklu sayfa çakışmasını önlemek için buradan tamamen kaldırıldı.
+st.set_page_config(layout="wide", page_title="Profesyonel Pursantaj Yönetimi")
 
 st.markdown("""
 <style>
@@ -36,6 +36,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if "bedel" not in st.session_state: st.session_state.bedel = 1_000_000.0
+if "bedel_str" not in st.session_state: st.session_state.bedel_str = "1.000.000,00"
 if "kesilen_wbs_listesi" not in st.session_state: st.session_state.kesilen_wbs_listesi = []
 
 # --- 2. VERİ MODELİ VE ALFANÜMERİK SIRALAMA ---
@@ -67,8 +68,13 @@ if "secili_wbs_listesi" not in st.session_state:
     st.session_state.secili_wbs_listesi = ["A.1"]
 
 # --- 3. ALFANÜMERİK WBS İŞLEMLERİ ---
-def parent_bul(wbs):
-    return str(wbs).rsplit(".", 1)[0] if "." in str(wbs) else "KÖK"
+def get_real_parent_single(w, all_wbs_set):
+    """ Bir WBS kodunun, tabloda var olan gerçek ebeveynini bulur. Yoksa KÖK döner. """
+    parts = str(w).strip().split('.')
+    for i in range(len(parts)-1, 0, -1):
+        p = ".".join(parts[:i])
+        if p in all_wbs_set: return p
+    return "KÖK"
 
 def sonraki_wbs_uret(parent_wbs, current_df):
     if parent_wbs == "KÖK":
@@ -95,7 +101,10 @@ def wbs_degistir(eski_kok, yeni_kok, dataframe):
 def wbs_hedefe_tasi_coklu(kaynak_wbs_listesi, hedef_parent_wbs):
     df_temp = st.session_state.df.copy()
     gecerli_kaynaklar = []
-    kokler = df_temp[~df_temp["WBS"].astype(str).str.contains(r'\.')]["WBS"].tolist()
+    
+    # Kökleri bulurken "Real Parent" mantığını kullanalım
+    wbs_set = set(df_temp["WBS"].astype(str))
+    kokler = df_temp[df_temp["WBS"].apply(lambda x: get_real_parent_single(x, wbs_set) == "KÖK")]["WBS"].tolist()
 
     for k_wbs in kaynak_wbs_listesi:
         if k_wbs in kokler: continue 
@@ -115,9 +124,11 @@ def wbs_hedefe_tasi_coklu(kaynak_wbs_listesi, hedef_parent_wbs):
     return df_temp
 
 def wbs_girinti_artir(kaynak_wbs):
-    parent = parent_bul(kaynak_wbs)
+    wbs_set = set(st.session_state.df["WBS"].astype(str))
+    parent = get_real_parent_single(kaynak_wbs, wbs_set)
     if parent == "KÖK": return 
-    kardesler = st.session_state.df[st.session_state.df["WBS"].apply(parent_bul) == parent]["WBS"].tolist()
+    
+    kardesler = st.session_state.df[st.session_state.df["WBS"].apply(lambda x: get_real_parent_single(x, wbs_set) == parent)]["WBS"].tolist()
     kardesler_df = pd.DataFrame({"WBS": kardesler})
     kardesler = wbs_sirala(kardesler_df)["WBS"].tolist()
     
@@ -131,10 +142,11 @@ def wbs_girinti_artir(kaynak_wbs):
         st.session_state.secili_wbs_listesi = [yeni_wbs]
 
 def wbs_girinti_azalt(kaynak_wbs):
-    if not "." in str(kaynak_wbs): return 
-    parent = parent_bul(kaynak_wbs)
+    wbs_set = set(st.session_state.df["WBS"].astype(str))
+    parent = get_real_parent_single(kaynak_wbs, wbs_set)
     if parent == "KÖK": return 
-    buyuk_baba = parent_bul(parent)
+    
+    buyuk_baba = get_real_parent_single(parent, wbs_set)
     if buyuk_baba == "KÖK": return 
     yeni_wbs = sonraki_wbs_uret(buyuk_baba, st.session_state.df)
     st.session_state.df = wbs_degistir(kaynak_wbs, yeni_wbs, st.session_state.df)
@@ -142,8 +154,10 @@ def wbs_girinti_azalt(kaynak_wbs):
     st.session_state.secili_wbs_listesi = [yeni_wbs]
 
 def wbs_tasi(kaynak_wbs, yon):
-    parent = parent_bul(kaynak_wbs)
-    kardesler = st.session_state.df[st.session_state.df["WBS"].apply(parent_bul) == parent]["WBS"].tolist()
+    wbs_set = set(st.session_state.df["WBS"].astype(str))
+    parent = get_real_parent_single(kaynak_wbs, wbs_set)
+    
+    kardesler = st.session_state.df[st.session_state.df["WBS"].apply(lambda x: get_real_parent_single(x, wbs_set) == parent)]["WBS"].tolist()
     kardesler_df = pd.DataFrame({"WBS": kardesler})
     kardesler = wbs_sirala(kardesler_df)["WBS"].tolist()
     
@@ -165,7 +179,9 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     mask = (st.session_state.df["WBS"] == kaynak_wbs) | (st.session_state.df["WBS"].astype(str).str.startswith(kaynak_wbs + "."))
     kaynak_agac = st.session_state.df[mask].copy()
     if kaynak_agac.empty: return
-    parent = parent_bul(kaynak_wbs)
+    
+    wbs_set = set(st.session_state.df["WBS"].astype(str))
+    parent = get_real_parent_single(kaynak_wbs, wbs_set)
     
     for i in range(kopya_sayisi):
         yeni_kok_wbs = sonraki_wbs_uret(parent, st.session_state.df)
@@ -179,18 +195,12 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     st.session_state.df = wbs_sirala(st.session_state.df)
     st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
 
+# --- YENİ AKILLI DENGELEME (KÖKLERİ BİRLİKTE DEĞERLENDİRİR) ---
 def akilli_dengele(old_df, new_df):
     temp_df = new_df.copy()
     wbs_set = set(temp_df["WBS"].astype(str))
     
-    def get_real_parent(w):
-        parts = str(w).split('.')
-        for i in range(len(parts)-1, 0, -1):
-            p = ".".join(parts[:i])
-            if p in wbs_set: return p
-        return "KÖK"
-        
-    temp_df["Real_Parent"] = temp_df["WBS"].astype(str).apply(get_real_parent)
+    temp_df["Real_Parent"] = temp_df["WBS"].astype(str).apply(lambda x: get_real_parent_single(x, wbs_set))
     parents = temp_df["Real_Parent"].unique()
     
     for p in parents:
@@ -227,26 +237,31 @@ def akilli_dengele(old_df, new_df):
 df = st.session_state.df.copy()
 wbs_set = set(df["WBS"].astype(str))
 
-def get_real_parent_global(w):
-    parts = str(w).split('.')
-    for i in range(len(parts)-1, 0, -1):
-        p = ".".join(parts[:i])
-        if p in wbs_set: return p
-    return "KÖK"
-
-df["Real_Parent"] = df["WBS"].astype(str).apply(get_real_parent_global)
+df["Real_Parent"] = df["WBS"].astype(str).apply(lambda x: get_real_parent_single(x, wbs_set))
 df["Derinlik"] = df["WBS"].astype(str).apply(lambda x: len(x.split(".")) - 1)
 df["Is_Leaf"] = ~df["WBS"].isin(df["Real_Parent"])
 
 def gorsel_isim_olustur(row):
     derinlik = row["Derinlik"]
-    if derinlik == 0: icon = "🏗️"
+    if row["Real_Parent"] == "KÖK": icon = "🏗️"
     elif derinlik == 1: icon = "🏢"
     elif derinlik == 2: icon = "🗂️"
     elif derinlik == 3: icon = "📂"
     elif derinlik == 4: icon = "📑"
     else: icon = "📄"
-    prefix = " " * derinlik + ("└─ " if derinlik > 0 else "")
+    
+    # Görsel Ağaç Yapısını Real_Parent'e Göre Hizala
+    if row["Real_Parent"] == "KÖK": 
+        gorsel_derinlik = 0
+    else:
+        # Gerçek derinliği hesaplamak için ebeveyn ağacını sayıyoruz
+        gorsel_derinlik = 1
+        current_p = row["Real_Parent"]
+        while current_p != "KÖK":
+            current_p = get_real_parent_single(current_p, wbs_set)
+            if current_p != "KÖK": gorsel_derinlik += 1
+            
+    prefix = " " * gorsel_derinlik + ("└─ " if gorsel_derinlik > 0 else "")
     return f"{prefix}{icon} {row['Ad']}"
 
 df["Ağaç Görünümü"] = df.apply(gorsel_isim_olustur, axis=1)
@@ -358,17 +373,31 @@ def excel_olustur(veri_df, proje_bedeli):
 st.title("🏗️ Profesyonel Pursantaj Yönetimi")
 
 with st.expander("📂 Dosya İşlemleri (Excel / JSON Yükle / Rapor İndir)", expanded=False):
-    t_c1, t_c2, t_c3 = st.columns([1, 1, 1.5])
+    t_c1, t_c2, t_c3 = st.columns([1.2, 1, 1.5])
     with t_c1:
-        yeni_bedel = st.number_input("Sözleşme Bedeli (₺)", min_value=0.0, value=st.session_state.bedel, step=100000.0, format="%.2f")
-        if yeni_bedel != st.session_state.bedel:
-            st.session_state.bedel = yeni_bedel
-            st.rerun()
-        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+        # BİNLİK AYRAÇLI ÖZEL SÖZLEŞME BEDELİ GİRİŞİ (METİN TABANLI)
+        yeni_bedel_str = st.text_input("Sözleşme Bedeli (₺)", value=st.session_state.bedel_str)
+        
+        # Sadece rakam ve virgül kalacak şekilde temizle
+        temiz_bedel = ''.join(c for c in yeni_bedel_str if c.isdigit() or c == ',')
+        if temiz_bedel:
+            temiz_bedel = temiz_bedel.replace(',', '.')
+            try:
+                yeni_bedel_float = float(temiz_bedel)
+                if yeni_bedel_float != st.session_state.bedel:
+                    st.session_state.bedel = yeni_bedel_float
+                    # Doğru formata geri çevir (Örn: 1.000.000,00)
+                    st.session_state.bedel_str = f"{yeni_bedel_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                    st.rerun()
+            except: pass
+            
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         st.download_button("📊 Raporu İndir (Formüllü Excel)", data=excel_olustur(df, st.session_state.bedel), file_name="pursantaj_raporu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
         
     with t_c2:
+        st.markdown("<div style='margin-top: 17px;'></div>", unsafe_allow_html=True)
         st.download_button("📥 Excel Yükleme Şablonunu İndir", data=excel_sablon_olustur(), file_name="wbs_sablon.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
         st.download_button("📥 Projeyi Yedekle (.json)", data=st.session_state.df.to_json(orient="records", force_ascii=False), file_name="pursantaj.json", mime="application/json", use_container_width=True)
         
     with t_c3:
@@ -418,8 +447,21 @@ with tab1:
         with f_c3: filtre_g2 = st.selectbox("Grup 2:", ["Tümü"] + sorted(list(df["Grup 2"].dropna().unique())))
         with f_c4: filtre_g3 = st.selectbox("Grup 3:", ["Tümü"] + sorted(list(df["Grup 3"].dropna().unique())))
         with f_c5:
-            mevcut_seviyeler = sorted(df["Derinlik"].unique())
-            secilen_seviyeler = st.multiselect("Gösterilecek Seviyeler:", options=mevcut_seviyeler, default=mevcut_seviyeler, format_func=lambda x: f"Seviye {x}")
+            # Filtreleme için sadece KÖK'leri ve alt seviyeleri gösterecek şekilde düzeltme
+            gorsel_derinlikler = []
+            for i, r in df.iterrows():
+                if r["Real_Parent"] == "KÖK": d = 0
+                else:
+                    d = 1
+                    cp = r["Real_Parent"]
+                    while cp != "KÖK":
+                        cp = get_real_parent_single(cp, wbs_set)
+                        if cp != "KÖK": d += 1
+                gorsel_derinlikler.append(d)
+            
+            df["Gorsel_Derinlik"] = gorsel_derinlikler
+            mevcut_seviyeler = sorted(df["Gorsel_Derinlik"].unique())
+            secilen_seviyeler = st.multiselect("Gösterilecek Seviyeler:", options=mevcut_seviyeler, default=mevcut_seviyeler, format_func=lambda x: f"Seviye {x+1}")
         st.markdown("</div>", unsafe_allow_html=True)
 
         gosterilecek_df = df.copy()
@@ -427,7 +469,7 @@ with tab1:
         if filtre_g1 != "Tümü": gosterilecek_df = gosterilecek_df[gosterilecek_df["Grup 1"] == filtre_g1]
         if filtre_g2 != "Tümü": gosterilecek_df = gosterilecek_df[gosterilecek_df["Grup 2"] == filtre_g2]
         if filtre_g3 != "Tümü": gosterilecek_df = gosterilecek_df[gosterilecek_df["Grup 3"] == filtre_g3]
-        if secilen_seviyeler: gosterilecek_df = gosterilecek_df[gosterilecek_df["Derinlik"].isin(secilen_seviyeler)]
+        if secilen_seviyeler: gosterilecek_df = gosterilecek_df[gosterilecek_df["Gorsel_Derinlik"].isin(secilen_seviyeler)]
 
         edit_cols = ["WBS", "Ağaç Görünümü", "Ad", "Kilit", "Yerel_%", "İlerleme_%", "Bütçe (TL)", "Hakediş (TL)", "Grup 1", "Grup 2", "Grup 3"]
         
@@ -583,11 +625,12 @@ with tab1:
             if st.button("📋 Kopyala", use_container_width=True, disabled=len(secili_wbsler)>1): wbs_agaci_kopyala(ilk_secili_wbs, int(kopya_adet)); st.rerun()
 
         kokler = df[~df["WBS"].astype(str).str.contains(r'\.')]["WBS"].tolist()
-        if not any(k in secili_wbsler for k in kokler):
+        # Eğer sistemde KÖK dışında bir şey kalmışsa silmeye izin ver, yoksa son kökü silip sistemi çökertmeyelim
+        if len(df) > len(secili_wbsler) or not any(k in secili_wbsler for k in kokler):
             if st.button("🗑️ Seçili Kalemleri Sil", use_container_width=True, type="primary"):
                 maskeler = [st.session_state.df["WBS"].astype(str).str.startswith(w + ".") | (st.session_state.df["WBS"] == w) for w in secili_wbsler]
                 st.session_state.df = st.session_state.df[~pd.concat(maskeler, axis=1).any(axis=1)]
-                st.session_state.secili_wbs_listesi = [kokler[0]] if kokler else ["1"]
+                st.session_state.secili_wbs_listesi = [st.session_state.df.iloc[0]["WBS"]] if not st.session_state.df.empty else ["1"]
                 st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df); st.rerun()
                 
         st.markdown("#### 📦 Çoklu Taşıma (Kes/Yapıştır)")
