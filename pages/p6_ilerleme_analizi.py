@@ -95,13 +95,11 @@ if uploaded_file is not None:
         df_task['EV_NonLabor'] = df_task['target_equip_qty'] * (df_task['phys_complete_pct'] / 100)
         df_task['EV_Labor'] = df_task['target_work_qty'] * (df_task['phys_complete_pct'] / 100)
         
-        # PV Hesaplaması (Lineer Yaklaşım)
+        # PV Hesaplaması (SADECE NONLABOR / EK-PARA DİKKATE ALINIR)
         def calculate_pv(row):
             start = row.get('target_start_date')
             end = row.get('target_end_date')
-            budget_labor = row.get('target_work_qty', 0)
-            budget_nonlabor = row.get('target_equip_qty', 0)
-            total_budget = budget_labor + budget_nonlabor
+            total_budget = row.get('target_equip_qty', 0) # Sadece EK-PARA
             
             if pd.isna(start) or pd.isna(end) or pd.isna(data_date):
                 return 0
@@ -183,9 +181,10 @@ if uploaded_file is not None:
             if len(selected_vals) > 0:
                 df_filtered = df_filtered[df_filtered[col_name].isin(selected_vals)]
 
-        df_filtered['Total_Target'] = df_filtered['target_work_qty'] + df_filtered['target_equip_qty']
-        df_filtered['Total_EV'] = df_filtered['EV_Labor'] + df_filtered['EV_NonLabor']
-        df_filtered['Total_AC'] = df_filtered['act_work_qty'] + df_filtered['act_equip_qty']
+        # FİNANSAL DEĞERLER SADECE NONLABOR (EK-PARA) BAZINDA ALINIR
+        df_filtered['Total_Target'] = df_filtered['target_equip_qty']
+        df_filtered['Total_EV'] = df_filtered['EV_NonLabor']
+        df_filtered['Total_AC'] = df_filtered['act_equip_qty']
 
         tot_target_all = df_filtered['Total_Target'].sum()
         tot_ev_all = df_filtered['Total_EV'].sum()
@@ -295,7 +294,6 @@ if uploaded_file is not None:
 
             st.divider()
             
-            # --- YENİ: GRAFİK METRİĞİ SEÇİMİ ---
             g_col1, g_col2, g_col3 = st.columns([1, 1, 1])
             with g_col1:
                 mat_y2 = st.selectbox("Satırlar", cat_columns, index=0, key="y_para")
@@ -303,7 +301,6 @@ if uploaded_file is not None:
                 def_x2 = next((i for i, col in enumerate(cat_columns) if col in ['DİSİPLİN', 'LVL3', 'KAT']), min(1, len(cat_columns)-1))
                 mat_x2 = st.selectbox("Sütunlar", cat_columns, index=def_x2, key="x_para")
             with g_col3:
-                # Kullanıcı Bütçeyi mi, Kazanılanı mı yoksa Gerçekleşeni mi görmek istiyor?
                 metric_secim = st.selectbox(
                     "Grafikte Gösterilecek Metrik",
                     ["Planlanan/Bütçe (Target)", "Kazanılmış Değer (EV)", "Gerçekleşen Miktar (AC)"],
@@ -311,7 +308,6 @@ if uploaded_file is not None:
                 )
 
             if mat_y2 != mat_x2:
-                # Seçime göre Pivot Tabloyu oluştur ve Renk Skalasını ayarla
                 if metric_secim == "Planlanan/Bütçe (Target)":
                     matrix_val = df_filtered.groupby([mat_y2, mat_x2])['Total_Target'].sum().unstack(fill_value=0).round(0)
                     renk_skalasi = "Blues"
@@ -322,7 +318,6 @@ if uploaded_file is not None:
                     matrix_val = df_filtered.groupby([mat_y2, mat_x2])['Total_AC'].sum().unstack(fill_value=0).round(0)
                     renk_skalasi = "Reds"
                     
-                # text_auto='.2s' sayesinde 28.17538M gibi sayılar 28M'e yuvarlanarak okunaklı hale gelir
                 fig2 = px.imshow(matrix_val, text_auto='.2s', aspect="auto", color_continuous_scale=renk_skalasi, labels=dict(color=metric_secim))
                 fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#525f7f'))
                 fig2.update_xaxes(side="top")
