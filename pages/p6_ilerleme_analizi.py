@@ -5,8 +5,6 @@ import numpy as np
 import re
 from datetime import datetime
 
-# st.set_page_config(page_title="P6 Matris Dashboard", layout="wide")
-
 # --- SOFT UI & PASTEL CSS TASARIMI ---
 st.markdown("""
     <style>
@@ -217,7 +215,7 @@ if uploaded_file is not None:
             show_cols.insert(2, 'DİSİPLİN')
             
         rename_dict = {'task_code': 'Aktivite Kodu', 'task_name': 'Aktivite Adı', 'status_code': 'Durum', 
-                       'phys_complete_pct': 'Fiziksel (%)', 'Total_Target': 'Planlanan/Bütçe', 'Total_EV': 'Kazanılmış (EV)', 'Total_AC': 'Gerçekleşen (AC)'}
+                       'phys_complete_pct': 'Fiziksel (%)', 'Total_Target': 'Planlanan/Bütçe (Target)', 'Total_EV': 'Kazanılmış Değer (EV)', 'Total_AC': 'Gerçekleşen (AC)'}
 
         # ==========================================
         # 1. SEKME: YÜZDESEL (PERCENTAGE)
@@ -278,7 +276,7 @@ if uploaded_file is not None:
                         fc3.download_button(label="📥 Veriyi Excel/CSV İndir", data=csv, file_name=f"Detay_{m_y_val}_{m_x_val}.csv", mime='text/csv')
 
                         st.dataframe(
-                            detail_df[show_cols].rename(columns=rename_dict).style.format({'Fiziksel (%)': '{:.1f}%', 'Planlanan/Bütçe': '{:,.0f}', 'Kazanılmış Değer': '{:,.0f}', 'Gerçekleşen (AC)': '{:,.0f}'}),
+                            detail_df[show_cols].rename(columns=rename_dict).style.format({'Fiziksel (%)': '{:.1f}%', 'Planlanan/Bütçe (Target)': '{:,.0f}', 'Kazanılmış Değer (EV)': '{:,.0f}', 'Gerçekleşen (AC)': '{:,.0f}'}),
                             use_container_width=True, hide_index=True
                         )
 
@@ -288,49 +286,68 @@ if uploaded_file is not None:
         with tab_para:
             st.write("")
             kp1, kp2, kp3, kp4 = st.columns(4)
-            kp1.markdown(f"""<div class="soft-card"><h3>Toplam Planlanan (PV)</h3><h2 class="val-blue">{tot_target_all:,.0f}</h2><span class="kpi-note">Total Budgeted Units</span></div>""", unsafe_allow_html=True)
-            kp2.markdown(f"""<div class="soft-card"><h3>Kazanılmış Değer (EV)</h3><h2 class="val-green">{tot_ev_all:,.0f}</h2><span class="kpi-note">Earned Value (Ağırlıklı İlerleme)</span></div>""", unsafe_allow_html=True)
-            kp3.markdown(f"""<div class="soft-card"><h3>Gerçekleşen Miktar (AC)</h3><h2 class="val-red">{tot_ac_all:,.0f}</h2><span class="kpi-note">Actual Units</span></div>""", unsafe_allow_html=True)
+            kp1.markdown(f"""<div class="soft-card"><h3>Toplam Planlanan Bütçe (Target)</h3><h2 class="val-blue">{tot_target_all:,.0f}</h2><span class="kpi-note">Tüm İşler İçin Ayrılan Toplam Kaynak</span></div>""", unsafe_allow_html=True)
+            kp2.markdown(f"""<div class="soft-card"><h3>Kazanılmış Değer (EV)</h3><h2 class="val-green">{tot_ev_all:,.0f}</h2><span class="kpi-note">Fiziksel İlerlemeye Göre Hakedilen</span></div>""", unsafe_allow_html=True)
+            kp3.markdown(f"""<div class="soft-card"><h3>Gerçekleşen Miktar (AC)</h3><h2 class="val-red">{tot_ac_all:,.0f}</h2><span class="kpi-note">Şu Ana Kadar Harcanan/Gerçekleşen</span></div>""", unsafe_allow_html=True)
             
             health_text = "🟢 İYİ (Bütçe İçi)" if cpi >= 1.0 else ("🟡 RİSKLİ" if cpi >= 0.85 else "🔴 KRİTİK (Bütçe Aşımı)")
             kp4.markdown(f"""<div class="soft-card"><h3>Proje Maliyet Sağlığı</h3><h2 class="{cpi_color}">{health_text}</h2><span class="kpi-note">CPI endeksine göre durum tespiti</span></div>""", unsafe_allow_html=True)
 
-            if len(cat_columns) >= 2:
-                mp_col1, mp_col2 = st.columns(2)
-                with mp_col1:
-                    mat_y2 = st.selectbox("Satırlar (Parasal)", cat_columns, index=0, key="y_para")
-                with mp_col2:
-                    def_x2 = next((i for i, col in enumerate(cat_columns) if col in ['DİSİPLİN', 'LVL3', 'KAT']), min(1, len(cat_columns)-1))
-                    mat_x2 = st.selectbox("Sütunlar (Parasal)", cat_columns, index=def_x2, key="x_para")
+            st.divider()
+            
+            # --- YENİ: GRAFİK METRİĞİ SEÇİMİ ---
+            g_col1, g_col2, g_col3 = st.columns([1, 1, 1])
+            with g_col1:
+                mat_y2 = st.selectbox("Satırlar", cat_columns, index=0, key="y_para")
+            with g_col2:
+                def_x2 = next((i for i, col in enumerate(cat_columns) if col in ['DİSİPLİN', 'LVL3', 'KAT']), min(1, len(cat_columns)-1))
+                mat_x2 = st.selectbox("Sütunlar", cat_columns, index=def_x2, key="x_para")
+            with g_col3:
+                # Kullanıcı Bütçeyi mi, Kazanılanı mı yoksa Gerçekleşeni mi görmek istiyor?
+                metric_secim = st.selectbox(
+                    "Grafikte Gösterilecek Metrik",
+                    ["Planlanan/Bütçe (Target)", "Kazanılmış Değer (EV)", "Gerçekleşen Miktar (AC)"],
+                    index=1, key="metrik_para"
+                )
 
-                if mat_y2 != mat_x2:
-                    matrix_ev = df_filtered.groupby([mat_y2, mat_x2])['Total_EV'].sum().unstack(fill_value=0).round(0)
+            if mat_y2 != mat_x2:
+                # Seçime göre Pivot Tabloyu oluştur ve Renk Skalasını ayarla
+                if metric_secim == "Planlanan/Bütçe (Target)":
+                    matrix_val = df_filtered.groupby([mat_y2, mat_x2])['Total_Target'].sum().unstack(fill_value=0).round(0)
+                    renk_skalasi = "Blues"
+                elif metric_secim == "Kazanılmış Değer (EV)":
+                    matrix_val = df_filtered.groupby([mat_y2, mat_x2])['Total_EV'].sum().unstack(fill_value=0).round(0)
+                    renk_skalasi = "Greens"
+                else:
+                    matrix_val = df_filtered.groupby([mat_y2, mat_x2])['Total_AC'].sum().unstack(fill_value=0).round(0)
+                    renk_skalasi = "Reds"
                     
-                    fig2 = px.imshow(matrix_ev, text_auto=True, aspect="auto", color_continuous_scale="Greens", labels=dict(color="Kazanılmış Değer (EV)"))
-                    fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#525f7f'))
-                    fig2.update_xaxes(side="top")
-                    
-                    sel2 = st.plotly_chart(fig2, use_container_width=True, on_select="rerun", selection_mode="points", key="fig_ev")
-                    
-                    st.markdown("<span class='kpi-note'>💡 Grafikte hücreye tıklayabilir veya tıklama çalışmıyorsa aşağıdaki kutulardan detay seçebilirsiniz:</span>", unsafe_allow_html=True)
-                    
-                    sel_y_val2, sel_x_val2 = None, None
-                    if sel2 and isinstance(sel2, dict) and "selection" in sel2 and sel2["selection"].get("points"):
-                        pt = sel2["selection"]["points"][0]
-                        sel_x_val2, sel_y_val2 = pt.get("x"), pt.get("y")
-                    
-                    fca, fcb, fcc = st.columns([2,2,1])
-                    m_y_val2 = fca.selectbox("Detay Satır Seçimi", ['Seçiniz...'] + list(matrix_ev.index), index=0 if not sel_y_val2 else list(matrix_ev.index).index(sel_y_val2)+1, key="man_y2")
-                    m_x_val2 = fcb.selectbox("Detay Sütun Seçimi", ['Seçiniz...'] + list(matrix_ev.columns), index=0 if not sel_x_val2 else list(matrix_ev.columns).index(sel_x_val2)+1, key="man_x2")
+                # text_auto='.2s' sayesinde 28.17538M gibi sayılar 28M'e yuvarlanarak okunaklı hale gelir
+                fig2 = px.imshow(matrix_val, text_auto='.2s', aspect="auto", color_continuous_scale=renk_skalasi, labels=dict(color=metric_secim))
+                fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#525f7f'))
+                fig2.update_xaxes(side="top")
+                
+                sel2 = st.plotly_chart(fig2, use_container_width=True, on_select="rerun", selection_mode="points", key="fig_ev")
+                
+                st.markdown("<span class='kpi-note'>💡 Grafikte hücreye tıklayabilir veya tıklama çalışmıyorsa aşağıdaki kutulardan detay seçebilirsiniz:</span>", unsafe_allow_html=True)
+                
+                sel_y_val2, sel_x_val2 = None, None
+                if sel2 and isinstance(sel2, dict) and "selection" in sel2 and sel2["selection"].get("points"):
+                    pt = sel2["selection"]["points"][0]
+                    sel_x_val2, sel_y_val2 = pt.get("x"), pt.get("y")
+                
+                fca, fcb, fcc = st.columns([2,2,1])
+                m_y_val2 = fca.selectbox("Detay Satır Seçimi", ['Seçiniz...'] + list(matrix_val.index), index=0 if not sel_y_val2 else list(matrix_val.index).index(sel_y_val2)+1, key="man_y2")
+                m_x_val2 = fcb.selectbox("Detay Sütun Seçimi", ['Seçiniz...'] + list(matrix_val.columns), index=0 if not sel_x_val2 else list(matrix_val.columns).index(sel_x_val2)+1, key="man_x2")
 
-                    if m_y_val2 != 'Seçiniz...' and m_x_val2 != 'Seçiniz...':
-                        st.markdown(f"##### 🔍 Aktivite Detayları: {mat_y2} = **{m_y_val2}** | {mat_x2} = **{m_x_val2}**")
-                        detail_df2 = df_filtered[(df_filtered[mat_y2] == m_y_val2) & (df_filtered[mat_x2] == m_x_val2)]
-                        
-                        csv2 = detail_df2[show_cols].rename(columns=rename_dict).to_csv(index=False).encode('utf-8-sig')
-                        fcc.download_button(label="📥 Veriyi Excel/CSV İndir", data=csv2, file_name=f"Detay_Parasal_{m_y_val2}_{m_x_val2}.csv", mime='text/csv')
+                if m_y_val2 != 'Seçiniz...' and m_x_val2 != 'Seçiniz...':
+                    st.markdown(f"##### 🔍 Aktivite Detayları: {mat_y2} = **{m_y_val2}** | {mat_x2} = **{m_x_val2}**")
+                    detail_df2 = df_filtered[(df_filtered[mat_y2] == m_y_val2) & (df_filtered[mat_x2] == m_x_val2)]
+                    
+                    csv2 = detail_df2[show_cols].rename(columns=rename_dict).to_csv(index=False).encode('utf-8-sig')
+                    fcc.download_button(label="📥 Veriyi Excel/CSV İndir", data=csv2, file_name=f"Detay_Parasal_{m_y_val2}_{m_x_val2}.csv", mime='text/csv')
 
-                        st.dataframe(
-                            detail_df2[show_cols].rename(columns=rename_dict).style.format({'Fiziksel (%)': '{:.1f}%', 'Planlanan/Bütçe': '{:,.0f}', 'Kazanılmış Değer': '{:,.0f}', 'Gerçekleşen (AC)': '{:,.0f}'}),
-                            use_container_width=True, hide_index=True
-                        )
+                    st.dataframe(
+                        detail_df2[show_cols].rename(columns=rename_dict).style.format({'Fiziksel (%)': '{:.1f}%', 'Planlanan/Bütçe (Target)': '{:,.0f}', 'Kazanılmış Değer (EV)': '{:,.0f}', 'Gerçekleşen (AC)': '{:,.0f}'}),
+                        use_container_width=True, hide_index=True
+                    )
