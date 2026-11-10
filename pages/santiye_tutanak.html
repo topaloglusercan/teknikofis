@@ -67,12 +67,9 @@
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-blue); }
     textarea { resize: vertical; min-height: 80px; }
     select option { background: var(--surface); }
-
-    /* TARİH İKONU RENGİ DÜZELTİLDİ */
-    input[type="date"]::-webkit-calendar-picker-indicator {
-      filter: invert(1) opacity(0.7);
-      cursor: pointer;
-    }
+    
+    /* YENİ: TARİH İKONUNU BEYAZ/GRİ YAPAR */
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.6); cursor: pointer; }
 
     /* BUTTONS */
     .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font); }
@@ -84,8 +81,6 @@
     .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
     .btn-green { background: var(--accent-green); color: #fff; }
     .btn-green:hover { background: #16a34a; }
-    .btn-warning { background: var(--accent-yellow); color: #fff; }
-    .btn-warning:hover { background: #d97706; }
     .btn-sm { padding: 5px 11px; font-size: 12px; }
     .btn-icon { padding: 6px 8px; }
 
@@ -131,13 +126,9 @@
 
     /* TOAST */
     .toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; }
-    .toast-msg { background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--accent-green); padding: 12px 18px; border-radius: 8px; font-size: 13px; color: var(--text); box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: fadeIn 0.2s ease; }
+    .toast-msg { background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--accent-green); padding: 12px 18px; border-radius: 8px; font-size: 13px; color: var(--text); box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: fadeIn 0.2s ease; margin-top:10px; }
     .toast-msg.error { border-left-color: var(--accent-red); }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* TUTANAK FORM */
-    .form-section { margin-bottom: 20px; }
-    .form-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-blue); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 
     /* PDF PREVIEW */
     .pdf-preview { background: #ffffff; color: #1f2937; padding: 32px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
@@ -197,7 +188,6 @@
       <button class="btn btn-primary" onclick="tutanakKaydet()" id="kaydet-btn">
         💾 Kaydet
       </button>
-      <!-- PDF Butonundan Kayıt Çıkarıldı -->
       <button class="btn btn-green" onclick="pdfIndir()" id="pdf-btn">
         ⬇ PDF İndir
       </button>
@@ -353,6 +343,7 @@
     </div>
     <div class="flex gap-2">
       <button class="btn btn-ghost btn-sm" onclick="arsivExcelIndir()">⬇ Excel</button>
+      <button class="btn btn-ghost btn-sm" onclick="topluPdfIndir()" style="color:var(--accent-blue)">📄 Toplu PDF İndir</button>
       <button class="btn btn-ghost btn-sm" onclick="arsivTemizle()" style="color:var(--accent-red)">🗑 Arşivi Temizle</button>
     </div>
   </div>
@@ -599,9 +590,9 @@
 
 <script>
 // ============================================================
-// GLOBAL CURRENT EVRAK NO
+// GLOBAL CURRENT EVRAK NO (Aktif form için)
 // ============================================================
-let activeEvrakNo = ""; 
+let activeEvrakNo = "";
 
 // ============================================================
 // ZAMAN MÜHRÜ  →  202606081404  (YYYYMMDDHHmm)
@@ -703,7 +694,7 @@ function idbDeleteByIndex(store, index, val) {
 }
 
 // ============================================================
-// db RAM objesi 
+// db RAM objesi  
 // ============================================================
 let db = { firmalar: [], projeler: [], tutanaklar: [], ayarlar: { sirket: '', logo: '', evrakNoPrefix: 'SNT' } };
 
@@ -724,7 +715,7 @@ async function dbMetaKaydet() {
 }
 
 // ============================================================
-// FOTOĞRAF KAYDET / YÜKLe 
+// FOTOĞRAF KAYDET / YÜKLe  
 // ============================================================
 async function fotoKaydet(tutanak_id, no, base64) {
   if (!base64) return;
@@ -922,7 +913,7 @@ function buildPdfHtml(data) {
   const toplam  = new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2}).format(
     (data.kalemler||[]).reduce((a,k) => a+(+k.miktar||0)*(+k.birim_fiyat||0),0));
   const sirket  = db.ayarlar.sirket || '';
-  const logo    = db.ayarlar.logo   || ''; // base64
+  const logo    = db.ayarlar.logo   || ''; 
 
   const kalemRows = (data.kalemler||[]).map(k => `
     <tr>
@@ -934,7 +925,6 @@ function buildPdfHtml(data) {
       <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:bold">${new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2}).format((+k.miktar||0)*(+k.birim_fiyat||0))} TL</td>
     </tr>`).join('');
 
-  // Zaman mührü gösterimi
   const zm = data.zaman_muhru || '';
   const zmGoster = zm.length === 12
     ? `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`
@@ -1062,7 +1052,7 @@ function formVerisi() {
     foto2: fotografBase64[2] || null,
     foto3: fotografBase64[3] || null,
     foto4: fotografBase64[4] || null,
-    evrak_no:    activeEvrakNo, 
+    evrak_no:    activeEvrakNo,
     zaman_muhru: zamanMuhrU(now),
     olusturma:   now.toISOString(),
   };
@@ -1088,7 +1078,6 @@ function formValidasyonu(data) {
   return true;
 }
 
-// SADECE ARŞİVE KAYDET
 async function tutanakKaydet() {
   const btn = document.getElementById('kaydet-btn');
   btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
@@ -1096,9 +1085,10 @@ async function tutanakKaydet() {
     const data = formVerisi();
     if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
     
+    // Evrak no kontrolü
     const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
     if (mevcutMu) {
-      toast('Bu tutanak (' + data.evrak_no + ') zaten kayıtlı! Yeni oluşturmak için Temizle\'ye veya Şablon Yükle\'ye basın.', 'error');
+      toast(`Bu tutanak (${data.evrak_no}) zaten arşive kaydedilmiş!`, 'error');
       return;
     }
 
@@ -1113,14 +1103,16 @@ async function tutanakKaydet() {
       toplam: toplamHesapla(),
       foto_var: !!(data.foto1||data.foto2||data.foto3||data.foto4)
     };
+    
     await idbPut(STORE_TUT, null, kayit);
     for (const no of [1,2,3,4]) {
       if (fotografBase64[no]) await fotoKaydet(id, no, fotografBase64[no]);
     }
+    
     db.tutanaklar.unshift(kayit);
     updateNavCount();
     
-    toast(`✅ ${data.evrak_no} arşive kaydedildi.`);
+    toast(`✅ ${data.evrak_no} arşive başarıyla kaydedildi.`);
   } catch(err) {
     console.error(err);
     toast('Kayıt hatası: ' + err.message, 'error');
@@ -1130,46 +1122,7 @@ async function tutanakKaydet() {
 }
 
 // ============================================================
-// ŞABLON (CLONE) OLARAK YÜKLE
-// ============================================================
-async function sablonOlarakYukle(id) {
-    const t = db.tutanaklar.find(x => x.id === id);
-    if (!t) return;
-    
-    // Verileri forma doldur
-    document.getElementById('f-cins').value = t.cins;
-    document.getElementById('f-tarih').value = t.tarih;
-    document.getElementById('f-proje').value = t.proje_id;
-    document.getElementById('f-konum').value = t.konum || '';
-    document.getElementById('f-taseron').value = t.taseron_id;
-    document.getElementById('f-isveren').value = t.isveren_id;
-    document.getElementById('f-aciklama').value = t.aciklama || '';
-    
-    kalemler = JSON.parse(JSON.stringify(t.kalemler || [])); // derin kopya
-    if(kalemler.length === 0) {
-        kalemler = [{ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 }];
-    }
-    renderKalemler();
-    
-    // Fotoğrafları bilerek KOPYALAMIYORUZ çünkü saha kanıtı yeni olmalı
-    fotografBase64={1:null,2:null,3:null,4:null};
-    [1,2,3,4].forEach(n => {
-        document.getElementById(`foto${n}-img`).src='';
-        document.getElementById(`foto${n}-preview`).style.display='none';
-        document.getElementById(`foto${n}-input`).value='';
-    });
-
-    // En kritik nokta: YENİ EVRAK NO üret
-    activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
-    
-    updatePreview();
-    showPage('tutanak');
-    toast(`Şablon yüklendi! Yeni evrak no: ${activeEvrakNo}`);
-}
-
-
-// ============================================================
-// PDF İNDİR (Sadece indirir, kaydetmez)
+// PDF İNDİR (Sadece bilgisayara indirir, arşive gizli kayıt yapmaz)
 // ============================================================
 async function pdfIndir() {
   const btn = document.getElementById('pdf-btn');
@@ -1214,7 +1167,7 @@ async function pdfIndir() {
 }
 
 // ============================================================
-// FORM TEMİZLE
+// FORM TEMİZLE VE YENİ EVRAK NO ATAMASI
 // ============================================================
 function tutanakTemizle() {
   document.getElementById('f-cins').value  = 'EKLENTİ';
@@ -1231,11 +1184,49 @@ function tutanakTemizle() {
     document.getElementById(`foto${n}-input`).value = '';
   });
   
+  // Sıfırdan bir form oluşturulduğu için yeni evrak no ver!
   activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
   
   updatePreview();
   toast('Form temizlendi.');
 }
+
+// ============================================================
+// ŞABLON (CLONE) OLARAK YÜKLE
+// ============================================================
+function sablonOlarakYukle(id) {
+    const t = db.tutanaklar.find(x => x.id === id);
+    if (!t) return;
+    
+    // Verileri forma doldur
+    document.getElementById('f-cins').value = t.cins || 'EKLENTİ';
+    document.getElementById('f-tarih').value = t.tarih || '';
+    document.getElementById('f-proje').value = t.proje_id || '';
+    document.getElementById('f-konum').value = t.konum || '';
+    document.getElementById('f-taseron').value = t.taseron_id || '';
+    document.getElementById('f-isveren').value = t.isveren_id || '';
+    document.getElementById('f-aciklama').value = t.aciklama || '';
+    
+    kalemler = JSON.parse(JSON.stringify(t.kalemler || [])); // derin kopya
+    if(kalemler.length === 0) kalemler = [{ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 }];
+    renderKalemler();
+    
+    // Saha fotoğrafları yepyeni olacağı için eskileri kopyalamıyoruz
+    fotografBase64 = {1:null,2:null,3:null,4:null};
+    [1,2,3,4].forEach(n => {
+        document.getElementById(`foto${n}-img`).src='';
+        document.getElementById(`foto${n}-preview`).style.display='none';
+        document.getElementById(`foto${n}-input`).value='';
+    });
+
+    // EN KRİTİK NOKTA: Evrak No o anki zamana göre yeniden üretilir (çakışma olmaz)
+    activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+    
+    updatePreview();
+    showPage('tutanak');
+    toast(`Şablon başarıyla yüklendi! Yeni evrak no: ${activeEvrakNo}`);
+}
+
 
 // ============================================================
 // ARŞİV + FİLTRELEME
@@ -1267,9 +1258,10 @@ function arsivFiltreSelectleriDoldur() {
   firmaEl.innerHTML  = '<option value="">Tümü</option>'+db.firmalar.map(f=>`<option value="${f.id}"${f.id==sf?' selected':''}>${f.adi}</option>`).join('');
 }
 
-function arsivFiltrele() {
+// Ortak filtreleme fonksiyonu (Hem HTML tablo için hem de Excel/Toplu PDF için kullanılır)
+function getFiltrelenmisArsiv() {
   const q = arsivFiltreSorgusu();
-  const sonuclar = db.tutanaklar.filter(t => {
+  return db.tutanaklar.filter(t => {
     const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'';
     const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'';
     const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'';
@@ -1286,6 +1278,10 @@ function arsivFiltrele() {
     if (q.minTutar && (t.toplam||0)<q.minTutar) return false;
     return true;
   });
+}
+
+function arsivFiltrele() {
+  const sonuclar = getFiltrelenmisArsiv();
   renderArsivSonuc(sonuclar);
 }
 
@@ -1329,9 +1325,11 @@ function renderArsivSonuc(liste) {
         <td class="font-mono" style="font-size:12px;color:var(--accent-blue);white-space:nowrap">${formatTL(t.toplam)}</td>
         <td>
           <div class="flex gap-2">
-            <button class="btn btn-ghost btn-sm" onclick="sablonOlarakYukle(${t.id})" title="Şablon Olarak Yükle">📑</button>
-            <button class="btn btn-ghost btn-sm" onclick="arsivDetayAc(${t.id})" title="Detay">👁</button>
-            <button class="btn btn-ghost btn-sm" onclick="tutanakSil(${t.id})" title="Sil" style="color:var(--accent-red)">✕</button>
+            <!-- YENİ: Şablon ve Tekil PDF indirme butonları yerleştirildi -->
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="sablonOlarakYukle(${t.id})" title="Şablon Olarak Yükle (Kopyala)">📑</button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="arsivdenPdfAl(${t.id})" title="PDF Olarak İndir" style="color:var(--accent-blue)">⬇</button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="arsivDetayAc(${t.id})" title="Detaylı İncele">👁</button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="tutanakSil(${t.id})" title="Sil" style="color:var(--accent-red)">✕</button>
           </div>
         </td>
       </tr>`;
@@ -1344,6 +1342,7 @@ function renderArsivSonuc(liste) {
   document.getElementById('arsiv-sonuc-bilgi').textContent=`${db.tutanaklar.length} kayıttan ${liste.length} sonuç`;
 }
 
+// Arşivden tek tutanak sil
 async function tutanakSil(id) {
   if (!confirm('Bu tutanak silinecek. Fotoğrafları da silinir. Emin misiniz?')) return;
   await idbDelete(STORE_TUT, id);
@@ -1419,6 +1418,7 @@ async function arsivDetayAc(id) {
       ${fotoHTML}
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Kapat</button>
+        <button class="btn btn-primary" onclick="arsivdenPdfAl(${t.id});this.closest('.modal-overlay').remove()">⬇ PDF İndir</button>
       </div>
     </div>`;
   overlay.addEventListener('click', e=>{if(e.target===overlay)overlay.remove();});
@@ -1426,20 +1426,12 @@ async function arsivDetayAc(id) {
 }
 
 function arsivExcelIndir() {
-  const q = arsivFiltreSorgusu();
-  const liste = db.tutanaklar.filter(t => {
-    const taseron=db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'';
-    const isveren=db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'';
-    const proje  =db.projeler.find(p=>p.id==t.proje_id)?.adi||'';
-    if(q.metin){const h=[t.evrak_no,t.cins,proje,taseron,isveren,t.konum,t.aciklama].join(' ').toLowerCase();if(!h.includes(q.metin))return false;}
-    if(q.cins&&t.cins!==q.cins)return false;
-    if(q.projeId&&String(t.proje_id)!==String(q.projeId))return false;
-    if(q.firmaId&&String(t.taseron_id)!==String(q.firmaId)&&String(t.isveren_id)!==String(q.firmaId))return false;
-    if(q.tarih1&&t.tarih<q.tarih1)return false;
-    if(q.tarih2&&t.tarih>q.tarih2)return false;
-    if(q.minTutar&&(t.toplam||0)<q.minTutar)return false;
-    return true;
-  });
+  const liste = getFiltrelenmisArsiv();
+  if (liste.length === 0) {
+      toast('İndirilecek kayıt bulunamadı.', 'error');
+      return;
+  }
+  
   const zm = t => { const z=t.zaman_muhru||''; return z.length===12?`${z.slice(6,8)}.${z.slice(4,6)}.${z.slice(0,4)} ${z.slice(8,10)}:${z.slice(10,12)}`:''};
   const satirlar=[['Evrak No','Zaman Mührü','Tür','Proje','Taşeron','İşveren','Konum','Tarih','Toplam TL','Açıklama']];
   liste.forEach(t=>satirlar.push([
@@ -1452,8 +1444,95 @@ function arsivExcelIndir() {
   const csv=satirlar.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=`arsiv_${zamanMuhrU()}.csv`; a.click();
+  a.download=`Tutanak_Arsivi_${zamanMuhrU()}.csv`; a.click();
   toast(`${liste.length} kayıt Excel'e aktarıldı.`);
+}
+
+// ============================================================
+// TOPLU PDF İNDİR (Filtrelenmiş kayıtların tümünü birleştirir)
+// ============================================================
+async function topluPdfIndir() {
+    const liste = getFiltrelenmisArsiv();
+    
+    if (liste.length === 0) {
+        toast('İndirilecek kayıt bulunamadı! Önce filtreleri kontrol edin.', 'error');
+        return;
+    }
+    
+    toast(`Toplu PDF hazırlanıyor (${liste.length} adet). Lütfen sekmeyi kapatmayın...`);
+    
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    
+    // html2canvas kütüphanesini yükle
+    await new Promise((res, rej) => {
+        if (window.html2canvas) { res(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = res; s.onerror = rej; document.head.appendChild(s);
+    });
+
+    // Her bir tutanağı sırayla render et
+    for (let i = 0; i < liste.length; i++) {
+        const t = liste[i];
+        
+        // Fotoğrafları DB'den çek
+        const fotolar = await fotolariGetir(t.id);
+        const data = { ...t, foto1:fotolar[1]||null, foto2:fotolar[2]||null, foto3:fotolar[3]||null, foto4:fotolar[4]||null };
+        
+        const htmlIcerigi = buildPdfHtml(data);
+        const container = document.createElement('div');
+        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+        container.innerHTML = htmlIcerigi;
+        document.body.appendChild(container);
+        
+        const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        document.body.removeChild(container);
+        
+        const imgData = canvas.toDataURL('image/png');
+        let fw = pdfW, fh = (canvas.height * fw) / canvas.width, xOff = 0;
+        if (fh > pdfH) { const r = pdfH / fh; fh = pdfH; fw = fw * r; xOff = (pdfW - fw) / 2; }
+        
+        // İlk sayfa hariç yeni sayfa ekle
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', xOff, 0, fw, fh);
+    }
+    
+    pdf.save(`Toplu_Tutanak_Arsivi_${zamanMuhrU()}.pdf`);
+    toast(`✅ ${liste.length} adet tutanak tek bir PDF'te birleştirildi.`);
+}
+
+
+// Tekil PDF İndirme Fonksiyonu
+async function arsivdenPdfAl(id) {
+  const t = db.tutanaklar.find(x=>x.id===id);
+  if (!t) return;
+  toast('PDF hazırlanıyor...');
+  const fotolar = await fotolariGetir(id);
+  const data = { ...t, foto1:fotolar[1]||null, foto2:fotolar[2]||null, foto3:fotolar[3]||null, foto4:fotolar[4]||null };
+  const htmlIcerigi = buildPdfHtml(data);
+  const container = document.createElement('div');
+  container.style.cssText='position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+  container.innerHTML=htmlIcerigi; document.body.appendChild(container);
+  await new Promise((res,rej)=>{
+    if(window.html2canvas){res();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=res;s.onerror=rej;document.head.appendChild(s);
+  });
+  const canvas=await html2canvas(container,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+  document.body.removeChild(container);
+  const imgData=canvas.toDataURL('image/png');
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF('p','mm','a4');
+  const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight();
+  let fw=pdfW, fh=(canvas.height*fw)/canvas.width, xOff=0;
+  if(fh>pdfH){const r=pdfH/fh;fh=pdfH;fw=fw*r;xOff=(pdfW-fw)/2;}
+  pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
+  pdf.save(`tutanak_${t.evrak_no||id}.pdf`);
+  toast('PDF indirildi.');
 }
 
 function arsivTemizle() {
@@ -1641,10 +1720,12 @@ async function idbBoyutGoster() {
 async function ayarlariKaydet() {
   db.ayarlar.sirket=document.getElementById('s-sirket').value;
   db.ayarlar.evrakNoPrefix=document.getElementById('s-evrakno-prefix').value||'SNT';
-  // Prefiks değiştiyse evrak numarasını güncelle (sadece henüz kaydedilmemiş bir belgeyse)
+  
+  // Ana formda üzerinde çalışılan tutanak henüz arşive kaydedilmemişse prefixi canlı güncelle
   if(!db.tutanaklar.find(t=>t.evrak_no === activeEvrakNo)){
       activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
   }
+  
   await dbMetaKaydet();
   updatePreview();
 }
@@ -1679,9 +1760,10 @@ async function veriYukle(event) {
       }
       db.tutanaklar=parsed.tutanaklar||[];
       db.tutanaklar.sort((a,b)=>b.id-a.id);
-      selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv(); ayarlariYukle();
       
       activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+      
+      selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv(); ayarlariYukle();
       updatePreview();
       
       toast(`✅ Yedek yüklendi: ${db.tutanaklar.length} tutanak, ${db.firmalar.length} firma.`);
