@@ -68,6 +68,12 @@
     textarea { resize: vertical; min-height: 80px; }
     select option { background: var(--surface); }
 
+    /* TARİH İKONU RENGİ DÜZELTİLDİ */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(1) opacity(0.7);
+      cursor: pointer;
+    }
+
     /* BUTTONS */
     .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: var(--font); }
     .btn-primary { background: var(--accent-blue); color: #fff; }
@@ -78,6 +84,8 @@
     .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
     .btn-green { background: var(--accent-green); color: #fff; }
     .btn-green:hover { background: #16a34a; }
+    .btn-warning { background: var(--accent-yellow); color: #fff; }
+    .btn-warning:hover { background: #d97706; }
     .btn-sm { padding: 5px 11px; font-size: 12px; }
     .btn-icon { padding: 6px 8px; }
 
@@ -189,6 +197,7 @@
       <button class="btn btn-primary" onclick="tutanakKaydet()" id="kaydet-btn">
         💾 Kaydet
       </button>
+      <!-- PDF Butonundan Kayıt Çıkarıldı -->
       <button class="btn btn-green" onclick="pdfIndir()" id="pdf-btn">
         ⬇ PDF İndir
       </button>
@@ -590,6 +599,11 @@
 
 <script>
 // ============================================================
+// GLOBAL CURRENT EVRAK NO
+// ============================================================
+let activeEvrakNo = ""; 
+
+// ============================================================
 // ZAMAN MÜHRÜ  →  202606081404  (YYYYMMDDHHmm)
 // ============================================================
 function zamanMuhrU(d) {
@@ -607,9 +621,9 @@ function evrakNoUret(prefix) {
 // ============================================================
 const IDB_NAME    = 'SantiyeDB';
 const IDB_VER     = 2;
-const STORE_META  = 'meta';       // firmalar, projeler, ayarlar, evrakSayac
-const STORE_TUT   = 'tutanaklar'; // tutanak metin verisi (fotoğraf yok)
-const STORE_FOTO  = 'fotolar';    // { tutanak_id, no, data } — blob/base64
+const STORE_META  = 'meta';       
+const STORE_TUT   = 'tutanaklar'; 
+const STORE_FOTO  = 'fotolar';    
 
 let idb = null;
 
@@ -622,7 +636,7 @@ function idbAc() {
       if (!db.objectStoreNames.contains(STORE_META))  db.createObjectStore(STORE_META);
       if (!db.objectStoreNames.contains(STORE_TUT))   db.createObjectStore(STORE_TUT, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(STORE_FOTO)) {
-        const fs = db.createObjectStore(STORE_FOTO, { keyPath: 'key' }); // key = "id_no"
+        const fs = db.createObjectStore(STORE_FOTO, { keyPath: 'key' }); 
         fs.createIndex('tutanak_id', 'tutanak_id', { unique: false });
       }
     };
@@ -689,7 +703,7 @@ function idbDeleteByIndex(store, index, val) {
 }
 
 // ============================================================
-// db RAM objesi  (firmalar, projeler, ayarlar — fotoğrafsız)
+// db RAM objesi 
 // ============================================================
 let db = { firmalar: [], projeler: [], tutanaklar: [], ayarlar: { sirket: '', logo: '', evrakNoPrefix: 'SNT' } };
 
@@ -710,7 +724,7 @@ async function dbMetaKaydet() {
 }
 
 // ============================================================
-// FOTOĞRAF KAYDET / YÜKLe  (IndexedDB — store: fotolar)
+// FOTOĞRAF KAYDET / YÜKLe 
 // ============================================================
 async function fotoKaydet(tutanak_id, no, base64) {
   if (!base64) return;
@@ -721,7 +735,7 @@ async function fotolariGetir(tutanak_id) {
   const kayitlar = await idbGetByIndex(STORE_FOTO, 'tutanak_id', tutanak_id);
   const sonuc = {};
   kayitlar.forEach(k => { sonuc[k.no] = k.data; });
-  return sonuc; // { 1: base64, 2: base64, ... }
+  return sonuc; 
 }
 
 async function fotolariSil(tutanak_id) {
@@ -771,13 +785,10 @@ function parseSayi(str) {
   const noktaVar  = str.includes('.');
   const virgulVar = str.includes(',');
   if (noktaVar && virgulVar) {
-    // TR formatı: 1.500,50 → nokta=binlik, virgül=ondalık
     return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
   } else if (virgulVar) {
-    // Sadece virgül: 1,5 veya 1500,50 → virgül ondalık
     return parseFloat(str.replace(',', '.')) || 0;
   } else if (noktaVar) {
-    // Sadece nokta: noktadan sonra tam 3 hane → binlik (1.500→1500), değilse ondalık (1.5)
     const parcalar = str.split('.');
     if (parcalar.length === 2 && parcalar[1].length === 3) {
       return parseFloat(str.replace('.', '')) || 0;
@@ -786,6 +797,16 @@ function parseSayi(str) {
   } else {
     return parseFloat(str) || 0;
   }
+}
+
+function formatSayi(val) {
+  if (!val && val !== 0) return '';
+  const n = +val;
+  if (isNaN(n) || n === 0) return '';
+  const str = n.toFixed(10).replace(/\.?0+$/, ''); 
+  const [tam, ondalik] = str.split('.');
+  const tamStr = parseInt(tam).toLocaleString('tr-TR');
+  return ondalik ? `${tamStr},${ondalik}` : tamStr;
 }
 
 // ============================================================
@@ -809,7 +830,6 @@ function kalemSil(i) {
 function kalemGuncelle(i, field, val) {
   if (field === 'miktar' || field === 'birim_fiyat') {
     kalemler[i][field] = parseSayi(val);
-    // Sadece toplam hücresini güncelle — input'a dokunma (focus/cursor korunur)
     const satirlar = document.getElementById('kalemler-container').querySelectorAll('tr');
     if (satirlar[i]) {
       const toplam = (+kalemler[i].miktar||0) * (+kalemler[i].birim_fiyat||0);
@@ -825,18 +845,6 @@ function kalemGuncelle(i, field, val) {
 
 function toplamHesapla() {
   return kalemler.reduce((acc, k) => acc + ((+k.miktar||0) * (+k.birim_fiyat||0)), 0);
-}
-
-function formatSayi(val) {
-  // Sayıyı TR formatında göster (binlik nokta, ondalık virgül) — input alanları için
-  if (!val && val !== 0) return '';
-  const n = +val;
-  if (isNaN(n) || n === 0) return '';
-  // Ondalık varsa göster, yoksa gösterme
-  const str = n.toFixed(10).replace(/\.?0+$/, ''); // fazla sıfırları kırp
-  const [tam, ondalik] = str.split('.');
-  const tamStr = parseInt(tam).toLocaleString('tr-TR');
-  return ondalik ? `${tamStr},${ondalik}` : tamStr;
 }
 
 function renderKalemler() {
@@ -932,7 +940,6 @@ function buildPdfHtml(data) {
     ? `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`
     : (data.olusturma ? new Date(data.olusturma).toLocaleString('tr-TR') : '');
 
-  // Başlık alanı: logo varsa solda logo + sağda şirket adı, yoksa sadece şirket adı sağda
   const headerHTML = (logo || sirket) ? `
     <div style="display:flex;align-items:center;justify-content:${logo ? 'space-between' : 'flex-end'};margin-bottom:8px">
       ${logo ? `<img src="${logo}" style="max-height:56px;max-width:180px;object-fit:contain" />` : ''}
@@ -1055,7 +1062,7 @@ function formVerisi() {
     foto2: fotografBase64[2] || null,
     foto3: fotografBase64[3] || null,
     foto4: fotografBase64[4] || null,
-    evrak_no:    evrakNoUret(db.ayarlar.evrakNoPrefix),
+    evrak_no:    activeEvrakNo, 
     zaman_muhru: zamanMuhrU(now),
     olusturma:   now.toISOString(),
   };
@@ -1078,52 +1085,42 @@ function formValidasyonu(data) {
     toast('Tarih seçiniz.', 'error');
     return false;
   }
-  if (!data.kalemler || data.kalemler.length === 0 || toplamHesapla() === 0) {
-    // Uyarı ver ama engelleme
-    // toast('Uyarı: Kalem tutarı 0 TL.', 'warn');
-  }
   return true;
 }
 
-async function tutanakArsivaEkle(data) {
-  // Aynı evrak_no ile daha önce kaydedilmiş mi kontrol et
-  const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
-  if (mevcutMu) {
-    toast('Bu tutanak zaten arşivde kayıtlı.', 'error');
-    return null;
-  }
-  const id = Date.now();
-  const kayit = {
-    id, cins: data.cins, tarih: data.tarih,
-    proje_id: data.proje_id, konum: data.konum,
-    taseron_id: data.taseron_id, isveren_id: data.isveren_id,
-    aciklama: data.aciklama, kalemler: data.kalemler,
-    evrak_no: data.evrak_no, zaman_muhru: data.zaman_muhru,
-    olusturma: data.olusturma,
-    toplam: toplamHesapla(),
-    foto_var: !!(data.foto1||data.foto2||data.foto3||data.foto4)
-  };
-  await idbPut(STORE_TUT, null, kayit);
-  for (const no of [1,2,3,4]) {
-    if (fotografBase64[no]) await fotoKaydet(id, no, fotografBase64[no]);
-  }
-  db.tutanaklar.unshift(kayit);
-  updateNavCount();
-  return kayit;
-}
-
-// Sadece kaydet (PDF yok)
+// SADECE ARŞİVE KAYDET
 async function tutanakKaydet() {
   const btn = document.getElementById('kaydet-btn');
   btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
   try {
     const data = formVerisi();
     if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
-    const kayit = await tutanakArsivaEkle(data);
-    if (!kayit) { btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
+    
+    const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
+    if (mevcutMu) {
+      toast('Bu tutanak (' + data.evrak_no + ') zaten kayıtlı! Yeni oluşturmak için Temizle\'ye veya Şablon Yükle\'ye basın.', 'error');
+      return;
+    }
+
+    const id = Date.now();
+    const kayit = {
+      id, cins: data.cins, tarih: data.tarih,
+      proje_id: data.proje_id, konum: data.konum,
+      taseron_id: data.taseron_id, isveren_id: data.isveren_id,
+      aciklama: data.aciklama, kalemler: data.kalemler,
+      evrak_no: data.evrak_no, zaman_muhru: data.zaman_muhru,
+      olusturma: data.olusturma,
+      toplam: toplamHesapla(),
+      foto_var: !!(data.foto1||data.foto2||data.foto3||data.foto4)
+    };
+    await idbPut(STORE_TUT, null, kayit);
+    for (const no of [1,2,3,4]) {
+      if (fotografBase64[no]) await fotoKaydet(id, no, fotografBase64[no]);
+    }
+    db.tutanaklar.unshift(kayit);
+    updateNavCount();
+    
     toast(`✅ ${data.evrak_no} arşive kaydedildi.`);
-    // Forma yeni evrak no ver (bir sonraki tutanak için)
-    // Formu temizlemiyoruz — kullanıcı isterse PDF de alabilir
   } catch(err) {
     console.error(err);
     toast('Kayıt hatası: ' + err.message, 'error');
@@ -1133,7 +1130,46 @@ async function tutanakKaydet() {
 }
 
 // ============================================================
-// PDF İNDİR (kaydet + PDF)
+// ŞABLON (CLONE) OLARAK YÜKLE
+// ============================================================
+async function sablonOlarakYukle(id) {
+    const t = db.tutanaklar.find(x => x.id === id);
+    if (!t) return;
+    
+    // Verileri forma doldur
+    document.getElementById('f-cins').value = t.cins;
+    document.getElementById('f-tarih').value = t.tarih;
+    document.getElementById('f-proje').value = t.proje_id;
+    document.getElementById('f-konum').value = t.konum || '';
+    document.getElementById('f-taseron').value = t.taseron_id;
+    document.getElementById('f-isveren').value = t.isveren_id;
+    document.getElementById('f-aciklama').value = t.aciklama || '';
+    
+    kalemler = JSON.parse(JSON.stringify(t.kalemler || [])); // derin kopya
+    if(kalemler.length === 0) {
+        kalemler = [{ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 }];
+    }
+    renderKalemler();
+    
+    // Fotoğrafları bilerek KOPYALAMIYORUZ çünkü saha kanıtı yeni olmalı
+    fotografBase64={1:null,2:null,3:null,4:null};
+    [1,2,3,4].forEach(n => {
+        document.getElementById(`foto${n}-img`).src='';
+        document.getElementById(`foto${n}-preview`).style.display='none';
+        document.getElementById(`foto${n}-input`).value='';
+    });
+
+    // En kritik nokta: YENİ EVRAK NO üret
+    activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+    
+    updatePreview();
+    showPage('tutanak');
+    toast(`Şablon yüklendi! Yeni evrak no: ${activeEvrakNo}`);
+}
+
+
+// ============================================================
+// PDF İNDİR (Sadece indirir, kaydetmez)
 // ============================================================
 async function pdfIndir() {
   const btn = document.getElementById('pdf-btn');
@@ -1142,13 +1178,6 @@ async function pdfIndir() {
     const data = formVerisi();
     if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='⬇ PDF İndir'; return; }
 
-    // Arşive ekle (zaten kayıtlıysa atla, yine de PDF üret)
-    const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
-    if (!mevcutMu) {
-      await tutanakArsivaEkle(data);
-    }
-
-    // PDF üret
     const htmlIcerigi = buildPdfHtml(data);
     const container = document.createElement('div');
     container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
@@ -1174,7 +1203,7 @@ async function pdfIndir() {
     pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
     pdf.save(`tutanak_${data.evrak_no}.pdf`);
 
-    toast(`✅ ${data.evrak_no} indirildi${mevcutMu ? '' : ' ve arşive kaydedildi'}.`);
+    toast(`✅ ${data.evrak_no} PDF olarak indirildi.`);
 
   } catch(err) {
     console.error(err);
@@ -1201,6 +1230,9 @@ function tutanakTemizle() {
     document.getElementById(`foto${n}-preview`).style.display = 'none';
     document.getElementById(`foto${n}-input`).value = '';
   });
+  
+  activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+  
   updatePreview();
   toast('Form temizlendi.');
 }
@@ -1273,7 +1305,6 @@ function renderArsivSonuc(liste) {
   }
   const toplamTutar = liste.reduce((a,t)=>a+(t.toplam||0),0);
 
-  // Zaman mührü okunabilir gösterim
   function zmGoster(t) {
     const zm = t.zaman_muhru||'';
     if (zm.length===12) return `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`;
@@ -1298,8 +1329,8 @@ function renderArsivSonuc(liste) {
         <td class="font-mono" style="font-size:12px;color:var(--accent-blue);white-space:nowrap">${formatTL(t.toplam)}</td>
         <td>
           <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="sablonOlarakYukle(${t.id})" title="Şablon Olarak Yükle">📑</button>
             <button class="btn btn-ghost btn-sm" onclick="arsivDetayAc(${t.id})" title="Detay">👁</button>
-            <button class="btn btn-ghost btn-sm" onclick="arsivdenPdfAl(${t.id})" title="PDF İndir">⬇</button>
             <button class="btn btn-ghost btn-sm" onclick="tutanakSil(${t.id})" title="Sil" style="color:var(--accent-red)">✕</button>
           </div>
         </td>
@@ -1313,7 +1344,6 @@ function renderArsivSonuc(liste) {
   document.getElementById('arsiv-sonuc-bilgi').textContent=`${db.tutanaklar.length} kayıttan ${liste.length} sonuç`;
 }
 
-// Arşivden tek tutanak sil
 async function tutanakSil(id) {
   if (!confirm('Bu tutanak silinecek. Fotoğrafları da silinir. Emin misiniz?')) return;
   await idbDelete(STORE_TUT, id);
@@ -1331,7 +1361,6 @@ async function arsivDetayAc(id) {
   const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'—';
   const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'—';
 
-  // Zaman mührü
   const zm = t.zaman_muhru||'';
   const zmStr = zm.length===12
     ? `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`
@@ -1344,7 +1373,6 @@ async function arsivDetayAc(id) {
     <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right">${formatTL(k.birim_fiyat)}</td>
     <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:bold">${formatTL(k.miktar*k.birim_fiyat)}</td></tr>`).join('');
 
-  // Fotoğraf var mı göster
   let fotoHTML = '';
   if (t.foto_var) {
     const fotolar = await fotolariGetir(id);
@@ -1391,7 +1419,6 @@ async function arsivDetayAc(id) {
       ${fotoHTML}
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Kapat</button>
-        <button class="btn btn-primary" onclick="arsivdenPdfAl(${t.id});this.closest('.modal-overlay').remove()">⬇ PDF İndir</button>
       </div>
     </div>`;
   overlay.addEventListener('click', e=>{if(e.target===overlay)overlay.remove();});
@@ -1427,36 +1454,6 @@ function arsivExcelIndir() {
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`arsiv_${zamanMuhrU()}.csv`; a.click();
   toast(`${liste.length} kayıt Excel'e aktarıldı.`);
-}
-
-async function arsivdenPdfAl(id) {
-  const t = db.tutanaklar.find(x=>x.id===id);
-  if (!t) return;
-  toast('PDF hazırlanıyor...');
-  // Fotoğrafları IDB'den çek
-  const fotolar = await fotolariGetir(id);
-  const data = { ...t, foto1:fotolar[1]||null, foto2:fotolar[2]||null, foto3:fotolar[3]||null, foto4:fotolar[4]||null };
-  const htmlIcerigi = buildPdfHtml(data);
-  const container = document.createElement('div');
-  container.style.cssText='position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
-  container.innerHTML=htmlIcerigi; document.body.appendChild(container);
-  await new Promise((res,rej)=>{
-    if(window.html2canvas){res();return;}
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    s.onload=res;s.onerror=rej;document.head.appendChild(s);
-  });
-  const canvas=await html2canvas(container,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
-  document.body.removeChild(container);
-  const imgData=canvas.toDataURL('image/png');
-  const {jsPDF}=window.jspdf;
-  const pdf=new jsPDF('p','mm','a4');
-  const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight();
-  let fw=pdfW, fh=(canvas.height*fw)/canvas.width, xOff=0;
-  if(fh>pdfH){const r=pdfH/fh;fh=pdfH;fw=fw*r;xOff=(pdfW-fw)/2;}
-  pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
-  pdf.save(`tutanak_${t.evrak_no||id}.pdf`);
-  toast('PDF indirildi.');
 }
 
 function arsivTemizle() {
@@ -1595,7 +1592,6 @@ function renderProjeler() {
 function ayarlariYukle() {
   document.getElementById('s-sirket').value=db.ayarlar.sirket||'';
   document.getElementById('s-evrakno-prefix').value=db.ayarlar.evrakNoPrefix||'SNT';
-  // Logo önizleme
   if (db.ayarlar.logo) {
     document.getElementById('logo-preview-img').src = db.ayarlar.logo;
     document.getElementById('logo-preview-wrap').style.display = 'block';
@@ -1645,12 +1641,15 @@ async function idbBoyutGoster() {
 async function ayarlariKaydet() {
   db.ayarlar.sirket=document.getElementById('s-sirket').value;
   db.ayarlar.evrakNoPrefix=document.getElementById('s-evrakno-prefix').value||'SNT';
+  // Prefiks değiştiyse evrak numarasını güncelle (sadece henüz kaydedilmemiş bir belgeyse)
+  if(!db.tutanaklar.find(t=>t.evrak_no === activeEvrakNo)){
+      activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+  }
   await dbMetaKaydet();
   updatePreview();
 }
 
 async function veriIndir() {
-  // Fotoğrafları da JSON'a dahil et (tam yedek)
   const tumFotolar = await idbGetAll(STORE_FOTO);
   const yedek = { ...db, fotolar: tumFotolar, yedek_tarihi: new Date().toISOString(), versiyon: 2 };
   const blob=new Blob([JSON.stringify(yedek,null,2)],{type:'application/json'});
@@ -1666,16 +1665,13 @@ async function veriYukle(event) {
     try{
       const parsed=JSON.parse(e.target.result);
       if(!parsed.firmalar||!parsed.projeler) throw new Error('Geçersiz format');
-      // Meta kaydet
       db.firmalar=parsed.firmalar||[];
       db.projeler=parsed.projeler||[];
       db.ayarlar=parsed.ayarlar||{sirket:'',logo:'',evrakNoPrefix:'SNT'};
       await dbMetaKaydet();
-      // Tutanakları kaydet
       const tx=(await idbAc()).transaction(STORE_TUT,'readwrite');
       tx.objectStore(STORE_TUT).clear();
       (parsed.tutanaklar||[]).forEach(t=>tx.objectStore(STORE_TUT).put(t));
-      // Fotoğrafları kaydet
       if(parsed.fotolar?.length){
         const tx2=(await idbAc()).transaction(STORE_FOTO,'readwrite');
         tx2.objectStore(STORE_FOTO).clear();
@@ -1684,6 +1680,10 @@ async function veriYukle(event) {
       db.tutanaklar=parsed.tutanaklar||[];
       db.tutanaklar.sort((a,b)=>b.id-a.id);
       selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv(); ayarlariYukle();
+      
+      activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+      updatePreview();
+      
       toast(`✅ Yedek yüklendi: ${db.tutanaklar.length} tutanak, ${db.firmalar.length} firma.`);
     }catch(err){toast('Yedek dosyası okunamadı: '+err.message,'error');}
   };
@@ -1697,7 +1697,9 @@ async function tumVeriyiSil() {
   [STORE_META,STORE_TUT,STORE_FOTO].forEach(s=>tx.objectStore(s).clear());
   tx.oncomplete=async()=>{
     db={firmalar:[],projeler:[],tutanaklar:[],ayarlar:{sirket:'',logo:'',evrakNoPrefix:'SNT'}};
+    activeEvrakNo = evrakNoUret('SNT');
     selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv();
+    updatePreview();
     toast('Tüm veri sıfırlandı.','error');
   };
 }
@@ -1741,6 +1743,7 @@ function fotoSil(no) {
 // ============================================================
 async function init() {
   await dbYukle();
+  activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
   document.getElementById('f-tarih').value=new Date().toISOString().split('T')[0];
   selectleriDoldur();
   renderKalemler();
