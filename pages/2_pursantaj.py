@@ -3,11 +3,11 @@ import pandas as pd
 import numpy as np
 import io
 import re
+import time
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# DİKKAT: Çoklu sayfa kullanıyorsanız st.set_page_config() satırını silebilirsiniz.
 st.markdown("""
 <style>
     .block-container {
@@ -481,13 +481,16 @@ with tab1:
             key="master_editor"
         )
         
+        # FLOAT HASSASİYETİ VE EBEVEYN DÖNGÜ KORUMASI
         degisim_var = False
         wbs_hatasi = False
         wbs_degisti = False
+        ebeveyn_edit_hatasi = False
         
         for i in range(len(gosterilecek_df)):
             eski_w = str(gosterilecek_df.iloc[i]["WBS"]).strip()
             yeni_w = str(edited_df.iloc[i]["WBS"]).strip()
+            is_leaf = gosterilecek_df.iloc[i]["Is_Leaf"]
             
             if eski_w != yeni_w:
                 degisim_var = True
@@ -515,20 +518,34 @@ with tab1:
                     
             for col in ["Yerel_%", "İlerleme_%"]:
                 if not np.isclose(float(gosterilecek_df.iloc[i][col]), float(edited_df.iloc[i][col]), atol=0.015):
+                    # YENİ KORUMA: Eğer ebeveyn satırına ilerleme girilirse bunu YASAKLA!
+                    if col == "İlerleme_%" and not is_leaf:
+                        ebeveyn_edit_hatasi = True
+                        continue
                     degisim_var = True
                     
             if wbs_degisti or wbs_hatasi: break
 
         if wbs_hatasi:
             st.stop()
+        elif ebeveyn_edit_hatasi:
+            st.warning("⚠️ Grup başlıklarına (Ana Kalemlere) manuel ilerleme girilemez! İlerleme alt kalemlerden otomatik hesaplanır.")
+            time.sleep(1.5)
+            st.rerun() # Kullanıcının girdiği yanlış veriyi ekrandan silmek için zorunlu rerun
         elif degisim_var:
             if wbs_degisti:
                 st.rerun()
             else:
                 yeni_ana_df = st.session_state.df.copy()
-                for idx, row in edited_df.iterrows():
-                    for col in ["Ad", "Yerel_%", "Kilit", "İlerleme_%", "Grup 1", "Grup 2", "Grup 3"]:
-                        yeni_ana_df.loc[yeni_ana_df["WBS"] == row["WBS"], col] = row[col]
+                for i in range(len(edited_df)):
+                    row = edited_df.iloc[i]
+                    is_leaf = gosterilecek_df.iloc[i]["Is_Leaf"]
+                    wbs = row["WBS"]
+                    for col in ["Ad", "Yerel_%", "Kilit", "Grup 1", "Grup 2", "Grup 3"]:
+                        yeni_ana_df.loc[yeni_ana_df["WBS"] == wbs, col] = row[col]
+                    
+                    if is_leaf: # Sadece yaprakların ilerlemesini kaydet (Ebeveynlere dokunma)
+                        yeni_ana_df.loc[yeni_ana_df["WBS"] == wbs, "İlerleme_%"] = row["İlerleme_%"]
                 
                 dengeli_df = akilli_dengele(st.session_state.df, yeni_ana_df)
                 dengeli_df["Yerel_%"] = dengeli_df["Yerel_%"].round(4)
@@ -542,11 +559,9 @@ with tab1:
         wbs_to_display = {w: f"[{w}] {a}" for w, a in zip(df["WBS"], df["Ad"])}
         display_to_wbs = {v: k for k, v in wbs_to_display.items()}
         
-        # Sadece tablodan mevcut ve geçerli olanları seçilmiş kabul et
         gecerli_secimler = [w for w in st.session_state.secili_wbs_listesi if w in wbs_to_display]
         mevcut_display = [wbs_to_display[w] for w in gecerli_secimler]
         
-        # DÖNGÜYÜ ENGELLEYEN YER: Kullanıcı kutuyu boşalttığında sistem paniğe kapılıp oto-seçim yapmaz
         yeni_secim = st.multiselect(
             "👉 İşlem Yapılacak Kalem(ler):",
             options=list(wbs_to_display.values()),
