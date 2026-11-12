@@ -186,7 +186,6 @@ def wbs_tasi(kaynak_wbs, yon):
         df_temp = wbs_degistir(hedef_wbs, kaynak_wbs, df_temp)
         df_temp = wbs_degistir(temp_wbs, hedef_wbs, df_temp)
         st.session_state.df = wbs_sirala(df_temp)
-        # SİHİR BURADA: Öğe yer değiştirdiğinde hedef wbs kodunu alıyor, biz de seçimi yeni hedefe kitliyoruz!
         st.session_state.secili_wbs_listesi = [hedef_wbs] 
 
 def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
@@ -540,34 +539,35 @@ with tab1:
     with col_sag:
         st.markdown("### 🛠️ İşlem Paneli")
         
-        # YENİ: Akıllı Çoklu Seçim Kutusu (Multiselect) - Tablodan Tıklama Kaldırıldı!
         wbs_to_display = {w: f"[{w}] {a}" for w, a in zip(df["WBS"], df["Ad"])}
         display_to_wbs = {v: k for k, v in wbs_to_display.items()}
         
+        # Sadece tablodan mevcut ve geçerli olanları seçilmiş kabul et
         gecerli_secimler = [w for w in st.session_state.secili_wbs_listesi if w in wbs_to_display]
-        if not gecerli_secimler and not df.empty:
-            gecerli_secimler = [df.iloc[0]["WBS"]]
-            st.session_state.secili_wbs_listesi = gecerli_secimler
-            
-        secili_degerler = [wbs_to_display[w] for w in gecerli_secimler]
+        mevcut_display = [wbs_to_display[w] for w in gecerli_secimler]
         
+        # DÖNGÜYÜ ENGELLEYEN YER: Kullanıcı kutuyu boşalttığında sistem paniğe kapılıp oto-seçim yapmaz
         yeni_secim = st.multiselect(
             "👉 İşlem Yapılacak Kalem(ler):",
             options=list(wbs_to_display.values()),
-            default=secili_degerler,
-            help="Arama yapabilir, çoklu seçim yapabilirsiniz."
+            default=mevcut_display,
+            help="Kalem arayabilir veya çoklu seçim yapabilirsiniz."
         )
         
-        if set(yeni_secim) != set(secili_degerler):
+        if set(yeni_secim) != set(mevcut_display):
             st.session_state.secili_wbs_listesi = [display_to_wbs[v] for v in yeni_secim]
             st.rerun()
             
         secili_wbsler = st.session_state.secili_wbs_listesi
         
-        if len(secili_wbsler) == 1:
-            ilk_secili_wbs = secili_wbsler[0]
+        is_single = len(secili_wbsler) == 1
+        is_multi = len(secili_wbsler) > 0
+        ilk_secili_wbs = secili_wbsler[0] if is_multi else None
+
+        if not is_multi:
+            st.info("👆 Lütfen işlem yapmak için yukarıdaki kutudan kalem seçiniz.")
+        elif is_single:
             secili_row = df[df["WBS"] == ilk_secili_wbs].iloc[0]
-            
             st.markdown(f"""
             <div class="selected-card">
                 <div class="sc-title">SEÇİLİ ÖĞE</div>
@@ -606,31 +606,29 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-        ilk_secili_wbs = secili_wbsler[0] 
-        
         st.markdown("#### Hiyerarşi & Sıralama")
         s1, s2 = st.columns(2)
         with s1:
-            if st.button("⬆️ Yukarı", use_container_width=True, disabled=len(secili_wbsler)>1): wbs_tasi(ilk_secili_wbs, "yukari"); st.rerun()
+            if st.button("⬆️ Yukarı", use_container_width=True, disabled=not is_single): wbs_tasi(ilk_secili_wbs, "yukari"); st.rerun()
         with s2:
-            if st.button("⬇️ Aşağı", use_container_width=True, disabled=len(secili_wbsler)>1): wbs_tasi(ilk_secili_wbs, "asagi"); st.rerun()
+            if st.button("⬇️ Aşağı", use_container_width=True, disabled=not is_single): wbs_tasi(ilk_secili_wbs, "asagi"); st.rerun()
         i1, i2 = st.columns(2)
         with i1:
-            if st.button("➡️ İçeri (Girinti)", use_container_width=True, disabled=len(secili_wbsler)>1): wbs_girinti_artir(ilk_secili_wbs); st.rerun()
+            if st.button("➡️ İçeri (Girinti)", use_container_width=True, disabled=not is_single): wbs_girinti_artir(ilk_secili_wbs); st.rerun()
         with i2:
-            if st.button("⬅️ Dışarı", use_container_width=True, disabled=len(secili_wbsler)>1): wbs_girinti_azalt(ilk_secili_wbs); st.rerun()
+            if st.button("⬅️ Dışarı", use_container_width=True, disabled=not is_single): wbs_girinti_azalt(ilk_secili_wbs); st.rerun()
 
         st.markdown("#### Ekle / Sil / Kopyala")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("➕ Alt Kırılım", use_container_width=True, disabled=len(secili_wbsler)>1):
+            if st.button("➕ Alt Kırılım", use_container_width=True, disabled=not is_single):
                 yeni_wbs = sonraki_wbs_uret(ilk_secili_wbs, st.session_state.df)
                 st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([{"WBS": yeni_wbs, "Ad": "Yeni Kırılım", "Yerel_%": 0.0, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"}])], ignore_index=True)
                 st.session_state.df = wbs_sirala(st.session_state.df)
                 st.session_state.secili_wbs_listesi = [yeni_wbs]
                 st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df); st.rerun()
         with c2:
-            if st.button("↔️ Kardeş Ekle", use_container_width=True, disabled=len(secili_wbsler)>1):
+            if st.button("↔️ Kardeş Ekle", use_container_width=True, disabled=not is_single):
                 yeni_wbs = sonraki_wbs_uret(get_dynamic_parent(st.session_state.df, ilk_secili_wbs), st.session_state.df)
                 st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([{"WBS": yeni_wbs, "Ad": "Yeni Kardeş", "Yerel_%": 0.0, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"}])], ignore_index=True)
                 st.session_state.df = wbs_sirala(st.session_state.df)
@@ -638,14 +636,14 @@ with tab1:
                 st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df); st.rerun()
 
         c_kopya1, c_kopya2 = st.columns([1, 1])
-        with c_kopya1: kopya_adet = st.number_input("Adet", min_value=1, max_value=50, value=1)
+        with c_kopya1: kopya_adet = st.number_input("Adet", min_value=1, max_value=50, value=1, disabled=not is_single)
         with c_kopya2:
             st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("📋 Kopyala", use_container_width=True, disabled=len(secili_wbsler)>1): wbs_agaci_kopyala(ilk_secili_wbs, int(kopya_adet)); st.rerun()
+            if st.button("📋 Kopyala", use_container_width=True, disabled=not is_single): wbs_agaci_kopyala(ilk_secili_wbs, int(kopya_adet)); st.rerun()
 
         kokler = df[~df["WBS"].astype(str).str.contains(r'\.')]["WBS"].tolist()
         if len(df) > len(secili_wbsler) or not any(k in secili_wbsler for k in kokler):
-            if st.button("🗑️ Seçili Kalemleri Sil", use_container_width=True, type="primary"):
+            if st.button("🗑️ Seçili Kalemleri Sil", use_container_width=True, type="primary", disabled=not is_multi):
                 maskeler = [st.session_state.df["WBS"].astype(str).str.startswith(w + ".") | (st.session_state.df["WBS"] == w) for w in secili_wbsler]
                 st.session_state.df = st.session_state.df[~pd.concat(maskeler, axis=1).any(axis=1)]
                 st.session_state.secili_wbs_listesi = [st.session_state.df.iloc[0]["WBS"]] if not st.session_state.df.empty else ["1"]
@@ -654,17 +652,17 @@ with tab1:
         st.markdown("#### 📦 Çoklu Taşıma (Kes/Yapıştır)")
         k1, k2 = st.columns(2)
         with k1:
-            if st.button("✂️ Kes", use_container_width=True):
+            if st.button("✂️ Kes", use_container_width=True, disabled=not is_multi):
                 if any(k in secili_wbsler for k in kokler): st.error("Ana Kök kesilemez.")
                 else: st.session_state.kesilen_wbs_listesi = secili_wbsler.copy(); st.rerun()
         with k2:
-            yapistir_disabled = len(st.session_state.kesilen_wbs_listesi) == 0 or len(secili_wbsler) != 1
+            yapistir_disabled = len(st.session_state.kesilen_wbs_listesi) == 0 or not is_single
             if st.button("📋 İçine Yapıştır", use_container_width=True, disabled=yapistir_disabled):
-                st.session_state.df = wbs_hedefe_tasi_coklu(st.session_state.kesilen_wbs_listesi, secili_wbsler[0])
+                st.session_state.df = wbs_hedefe_tasi_coklu(st.session_state.kesilen_wbs_listesi, ilk_secili_wbs)
                 st.session_state.df = wbs_sirala(st.session_state.df)
                 st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
                 st.session_state.kesilen_wbs_listesi = []
-                st.session_state.secili_wbs_listesi = [secili_wbsler[0]] 
+                st.session_state.secili_wbs_listesi = [ilk_secili_wbs] 
                 st.rerun()
                 
         if st.session_state.kesilen_wbs_listesi: st.warning(f"📦 **{len(st.session_state.kesilen_wbs_listesi)}** öğe kesildi.")
