@@ -7,16 +7,15 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# DİKKAT: st.set_page_config() kullanılmadığı için sayfanın genişlemesini CSS ile sağlıyoruz.
+# DİKKAT: Çoklu sayfa kullanıyorsanız st.set_page_config() satırını silebilirsiniz, 
+# tekil kullanıyorsanız sayfanın en başında kalmalıdır.
 st.markdown("""
 <style>
-    /* SAYFAYI GENİŞ EKRAN (WIDE) YAPMAYA ZORLAYAN CSS */
     .block-container {
         max-width: 95% !important;
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
     }
-
     .info-box { background-color: #0F2044; color: white; padding: 18px; border-radius: 6px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .info-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600;}
     .info-val { font-size: 1.5rem; font-weight: 700; margin-top: 4px; color: #f8fafc; }
@@ -64,10 +63,12 @@ def wbs_sirala(df_to_sort):
 
 if "df" not in st.session_state:
     data = [
-        {"WBS": "1", "Ad": "Proje Geneli", "Yerel_%": 100.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "A.1", "Ad": "A Blok", "Yerel_%": 30.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "B.1", "Ad": "B Blok", "Yerel_%": 55.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "C.1", "Ad": "C Blok", "Yerel_%": 15.0, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "1", "Ad": "DUVAR KAPLAMA İŞLERİ", "Yerel_%": 100.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "1.1", "Ad": "İZOLASYON İŞLERİ (ISI,SES VE SU)", "Yerel_%": 13.5, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "1.2", "Ad": "BRÜT YÜZEY TAMİR, KARA SIVA VE ALÇI SIVA İŞLERİ", "Yerel_%": 48.9, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "A.1", "Ad": "SERAMİK KAPLAMA İŞLERİ", "Yerel_%": 14.5, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "B.1", "Ad": "AHŞAP KAPLAMA İŞLERİ", "Yerel_%": 9.4, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "C.1", "Ad": "BOYA İŞLERİ", "Yerel_%": 13.7, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
     ]
     st.session_state.df = wbs_sirala(pd.DataFrame(data))
 
@@ -206,7 +207,7 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     st.session_state.df = wbs_sirala(st.session_state.df)
     st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
 
-# --- YENİ AKILLI DENGELEME (DİNAMİK EBEVEYNE GÖRE) ---
+# --- YENİ AKILLI DENGELEME (FLOAT YUVARLAMA KORUMALI) ---
 def akilli_dengele(old_df, new_df):
     temp_df = new_df.copy()
     temp_df["Dyn_Parent"] = temp_df["WBS"].astype(str).apply(lambda x: get_dynamic_parent(temp_df, x))
@@ -236,9 +237,9 @@ def akilli_dengele(old_df, new_df):
             remaining = max(0.0, 100.0 - locked_sum)
             unlocked_current_sum = temp_df.loc[unlocked_mask, "Yerel_%"].sum()
             if unlocked_current_sum > 0:
-                temp_df.loc[unlocked_mask, "Yerel_%"] = temp_df.loc[unlocked_mask, "Yerel_%"] * (remaining / unlocked_current_sum)
+                temp_df.loc[unlocked_mask, "Yerel_%"] = (temp_df.loc[unlocked_mask, "Yerel_%"] * (remaining / unlocked_current_sum)).round(4)
             else:
-                temp_df.loc[unlocked_mask, "Yerel_%"] = remaining / unlocked_mask.sum()
+                temp_df.loc[unlocked_mask, "Yerel_%"] = round(remaining / unlocked_mask.sum(), 4)
                 
     return temp_df.drop(columns=["Dyn_Parent"])
 
@@ -370,9 +371,7 @@ st.title("🏗️ Profesyonel Pursantaj Yönetimi")
 with st.expander("📂 Dosya İşlemleri (Excel / JSON Yükle / Rapor İndir)", expanded=False):
     t_c1, t_c2, t_c3 = st.columns([1.2, 1, 1.5])
     with t_c1:
-        # BİNLİK AYRAÇLI ÖZEL SÖZLEŞME BEDELİ GİRİŞİ
         yeni_bedel_str = st.text_input("Sözleşme Bedeli (₺)", value=st.session_state.bedel_str)
-        
         temiz_bedel = ''.join(c for c in yeni_bedel_str if c.isdigit() or c == ',')
         if temiz_bedel:
             temiz_bedel = temiz_bedel.replace(',', '.')
@@ -440,7 +439,6 @@ with tab1:
         with f_c3: filtre_g2 = st.selectbox("Grup 2:", ["Tümü"] + sorted(list(df["Grup 2"].dropna().unique())))
         with f_c4: filtre_g3 = st.selectbox("Grup 3:", ["Tümü"] + sorted(list(df["Grup 3"].dropna().unique())))
         with f_c5:
-            # GORSEL DERINLIK HESABI (DİNAMİK EBEVEYNE GÖRE)
             gorsel_derinlikler = []
             for i, r in df.iterrows():
                 if r["Dyn_Parent"] == "KÖK": d = 0
@@ -485,37 +483,62 @@ with tab1:
             key="master_editor"
         )
         
-        if not edited_df.equals(gosterilecek_df[edit_cols]):
-            wbs_degisti = False
-            for i in range(len(gosterilecek_df)):
-                eski_w = str(gosterilecek_df.iloc[i]["WBS"]).strip()
-                yeni_w = str(edited_df.iloc[i]["WBS"]).strip()
-                
-                if eski_w != yeni_w:
-                    if yeni_w in st.session_state.df["WBS"].values:
-                        st.error(f"❌ Hata: '{yeni_w}' numaralı WBS kodu zaten kullanılıyor!")
-                        st.stop()
-                    elif not yeni_w:
-                        st.error("❌ Hata: WBS kodu boş olamaz!")
-                        st.stop()
-                    else:
-                        st.session_state.df = wbs_degistir(eski_w, yeni_w, st.session_state.df)
-                        st.session_state.df = wbs_sirala(st.session_state.df)
-                        if st.session_state.secili_wbs_listesi == [eski_w]:
-                            st.session_state.secili_wbs_listesi = [yeni_w]
-                        elif eski_w in st.session_state.secili_wbs_listesi:
-                            st.session_state.secili_wbs_listesi = [yeni_w if x==eski_w else x for x in st.session_state.secili_wbs_listesi]
-                        wbs_degisti = True
-                        break 
-                        
-            if wbs_degisti: st.rerun()
+        # FLOAT HASSASİYETİ (SONSUZ DÖNGÜ) KORUMASI
+        degisim_var = False
+        wbs_hatasi = False
+        wbs_degisti = False
+        
+        for i in range(len(gosterilecek_df)):
+            eski_w = str(gosterilecek_df.iloc[i]["WBS"]).strip()
+            yeni_w = str(edited_df.iloc[i]["WBS"]).strip()
+            
+            if eski_w != yeni_w:
+                degisim_var = True
+                wbs_degisti = True
+                if yeni_w in st.session_state.df["WBS"].values:
+                    st.error(f"❌ Hata: '{yeni_w}' numaralı WBS kodu zaten kullanılıyor!")
+                    wbs_hatasi = True
+                    break
+                elif not yeni_w:
+                    st.error("❌ Hata: WBS kodu boş olamaz!")
+                    wbs_hatasi = True
+                    break
+                else:
+                    st.session_state.df = wbs_degistir(eski_w, yeni_w, st.session_state.df)
+                    st.session_state.df = wbs_sirala(st.session_state.df)
+                    if st.session_state.secili_wbs_listesi == [eski_w]:
+                        st.session_state.secili_wbs_listesi = [yeni_w]
+                    elif eski_w in st.session_state.secili_wbs_listesi:
+                        st.session_state.secili_wbs_listesi = [yeni_w if x==eski_w else x for x in st.session_state.secili_wbs_listesi]
+                    break 
 
-            yeni_ana_df = st.session_state.df.copy()
-            for idx, row in edited_df.iterrows():
-                for col in ["Ad", "Yerel_%", "Kilit", "İlerleme_%", "Grup 1", "Grup 2", "Grup 3"]:
-                    yeni_ana_df.loc[yeni_ana_df["WBS"] == row["WBS"], col] = row[col]
-            st.session_state.df = akilli_dengele(st.session_state.df, yeni_ana_df)
-            st.rerun()
+            for col in ["Ad", "Kilit", "Grup 1", "Grup 2", "Grup 3"]:
+                if gosterilecek_df.iloc[i][col] != edited_df.iloc[i][col]:
+                    degisim_var = True
+                    
+            # DİKKAT: Birebir Eşitlik Yerine %0.1 Hassasiyet Toleransı Getirildi
+            for col in ["Yerel_%", "İlerleme_%"]:
+                if not np.isclose(float(gosterilecek_df.iloc[i][col]), float(edited_df.iloc[i][col]), atol=0.001):
+                    degisim_var = True
+                    
+            if wbs_degisti or wbs_hatasi: break
+
+        if wbs_hatasi:
+            st.stop()
+        elif degisim_var:
+            if wbs_degisti:
+                st.rerun()
+            else:
+                yeni_ana_df = st.session_state.df.copy()
+                for idx, row in edited_df.iterrows():
+                    for col in ["Ad", "Yerel_%", "Kilit", "İlerleme_%", "Grup 1", "Grup 2", "Grup 3"]:
+                        yeni_ana_df.loc[yeni_ana_df["WBS"] == row["WBS"], col] = row[col]
+                
+                dengeli_df = akilli_dengele(st.session_state.df, yeni_ana_df)
+                dengeli_df["Yerel_%"] = dengeli_df["Yerel_%"].round(4) # Güvenlik yuvarlaması
+                
+                st.session_state.df = dengeli_df
+                st.rerun()
 
     with col_sag:
         st.markdown("### 🛠️ İşlem Paneli")
