@@ -186,6 +186,7 @@ def wbs_tasi(kaynak_wbs, yon):
         df_temp = wbs_degistir(hedef_wbs, kaynak_wbs, df_temp)
         df_temp = wbs_degistir(temp_wbs, hedef_wbs, df_temp)
         st.session_state.df = wbs_sirala(df_temp)
+        # SİHİR BURADA: Öğe yer değiştirdiğinde hedef wbs kodunu alıyor, biz de seçimi yeni hedefe kitliyoruz!
         st.session_state.secili_wbs_listesi = [hedef_wbs] 
 
 def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
@@ -274,7 +275,6 @@ for d in range(1, df["Derinlik"].max() + 1):
         else:
             df.loc[idx, "Genel_%"] = row["Yerel_%"]
 
-# DİKKAT: Sonsuz küsurat hatasını önlemek için Bütçe ve Hakediş 2 haneye yuvarlanır
 df["Bütçe (TL)"] = ((df["Genel_%"] / 100.0) * st.session_state.bedel).round(2)
 
 df["Hakediş (TL)"] = 0.0
@@ -287,7 +287,7 @@ for d in range(df["Derinlik"].max(), -1, -1):
             child_hakedis_sum = df.loc[child_mask, "Hakediş (TL)"].sum()
             df.loc[idx, "Hakediş (TL)"] = round(child_hakedis_sum, 2)
             if df.loc[idx, "Bütçe (TL)"] > 0:
-                calculated_progress = (child_hakedis_sum / df.loc[idx, "Bütçe (TL)"]) * 100.0
+                calculated_progress = round((child_hakedis_sum / df.loc[idx, "Bütçe (TL)"]) * 100.0, 2)
                 df.loc[idx, "İlerleme_%"] = calculated_progress
                 st.session_state.df.loc[idx, "İlerleme_%"] = calculated_progress
 
@@ -463,7 +463,6 @@ with tab1:
 
         edit_cols = ["WBS", "Ağaç Görünümü", "Ad", "Kilit", "Yerel_%", "İlerleme_%", "Bütçe (TL)", "Hakediş (TL)", "Grup 1", "Grup 2", "Grup 3"]
         
-        # Bütçe ve Hakediş sütunlarının formatı %.2f (Kuruşlu) olarak ayarlandı
         edited_df = st.data_editor(
             gosterilecek_df[edit_cols],
             use_container_width=True, hide_index=True, num_rows="fixed", height=600,
@@ -516,7 +515,7 @@ with tab1:
                     degisim_var = True
                     
             for col in ["Yerel_%", "İlerleme_%"]:
-                if not np.isclose(float(gosterilecek_df.iloc[i][col]), float(edited_df.iloc[i][col]), atol=0.001):
+                if not np.isclose(float(gosterilecek_df.iloc[i][col]), float(edited_df.iloc[i][col]), atol=0.015):
                     degisim_var = True
                     
             if wbs_degisti or wbs_hatasi: break
@@ -540,22 +539,28 @@ with tab1:
 
     with col_sag:
         st.markdown("### 🛠️ İşlem Paneli")
-        st.caption("Kutucuklarla çoklu seçim yapabilirsiniz.")
         
-        event = st.dataframe(
-            gosterilecek_df[["WBS", "Ad"]],
-            on_select="rerun",
-            selection_mode="multi-row",
-            hide_index=True,
-            height=150,
-            column_config={"WBS": st.column_config.TextColumn(width="small")}
+        # YENİ: Akıllı Çoklu Seçim Kutusu (Multiselect) - Tablodan Tıklama Kaldırıldı!
+        wbs_to_display = {w: f"[{w}] {a}" for w, a in zip(df["WBS"], df["Ad"])}
+        display_to_wbs = {v: k for k, v in wbs_to_display.items()}
+        
+        gecerli_secimler = [w for w in st.session_state.secili_wbs_listesi if w in wbs_to_display]
+        if not gecerli_secimler and not df.empty:
+            gecerli_secimler = [df.iloc[0]["WBS"]]
+            st.session_state.secili_wbs_listesi = gecerli_secimler
+            
+        secili_degerler = [wbs_to_display[w] for w in gecerli_secimler]
+        
+        yeni_secim = st.multiselect(
+            "👉 İşlem Yapılacak Kalem(ler):",
+            options=list(wbs_to_display.values()),
+            default=secili_degerler,
+            help="Arama yapabilir, çoklu seçim yapabilirsiniz."
         )
         
-        if event.selection and event.selection.rows:
-            st.session_state.secili_wbs_listesi = gosterilecek_df.iloc[event.selection.rows]["WBS"].tolist()
-        else:
-            if len(st.session_state.secili_wbs_listesi) == 0: 
-                st.session_state.secili_wbs_listesi = [gosterilecek_df.iloc[0]["WBS"]]
+        if set(yeni_secim) != set(secili_degerler):
+            st.session_state.secili_wbs_listesi = [display_to_wbs[v] for v in yeni_secim]
+            st.rerun()
             
         secili_wbsler = st.session_state.secili_wbs_listesi
         
