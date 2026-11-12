@@ -7,8 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 # --- 1. ARAYÜZ VE TEMA AYARLARI ---
-# DİKKAT: Çoklu sayfa kullanıyorsanız st.set_page_config() satırını silebilirsiniz, 
-# tekil kullanıyorsanız sayfanın en başında kalmalıdır.
+# DİKKAT: Çoklu sayfa kullanıyorsanız st.set_page_config() satırını silebilirsiniz.
 st.markdown("""
 <style>
     .block-container {
@@ -207,7 +206,6 @@ def wbs_agaci_kopyala(kaynak_wbs, kopya_sayisi):
     st.session_state.df = wbs_sirala(st.session_state.df)
     st.session_state.df = akilli_dengele(st.session_state.df, st.session_state.df)
 
-# --- YENİ AKILLI DENGELEME (FLOAT YUVARLAMA KORUMALI) ---
 def akilli_dengele(old_df, new_df):
     temp_df = new_df.copy()
     temp_df["Dyn_Parent"] = temp_df["WBS"].astype(str).apply(lambda x: get_dynamic_parent(temp_df, x))
@@ -276,17 +274,18 @@ for d in range(1, df["Derinlik"].max() + 1):
         else:
             df.loc[idx, "Genel_%"] = row["Yerel_%"]
 
-df["Bütçe (TL)"] = (df["Genel_%"] / 100.0) * st.session_state.bedel
+# DİKKAT: Sonsuz küsurat hatasını önlemek için Bütçe ve Hakediş 2 haneye yuvarlanır
+df["Bütçe (TL)"] = ((df["Genel_%"] / 100.0) * st.session_state.bedel).round(2)
 
 df["Hakediş (TL)"] = 0.0
-df.loc[df["Is_Leaf"], "Hakediş (TL)"] = df.loc[df["Is_Leaf"], "Bütçe (TL)"] * (df.loc[df["Is_Leaf"], "İlerleme_%"] / 100.0)
+df.loc[df["Is_Leaf"], "Hakediş (TL)"] = (df.loc[df["Is_Leaf"], "Bütçe (TL)"] * (df.loc[df["Is_Leaf"], "İlerleme_%"] / 100.0)).round(2)
 
 for d in range(df["Derinlik"].max(), -1, -1):
     for idx, row in df[df["Derinlik"] == d].iterrows():
         if not row["Is_Leaf"]:
             child_mask = df["Dyn_Parent"] == row["WBS"]
             child_hakedis_sum = df.loc[child_mask, "Hakediş (TL)"].sum()
-            df.loc[idx, "Hakediş (TL)"] = child_hakedis_sum
+            df.loc[idx, "Hakediş (TL)"] = round(child_hakedis_sum, 2)
             if df.loc[idx, "Bütçe (TL)"] > 0:
                 calculated_progress = (child_hakedis_sum / df.loc[idx, "Bütçe (TL)"]) * 100.0
                 df.loc[idx, "İlerleme_%"] = calculated_progress
@@ -464,6 +463,7 @@ with tab1:
 
         edit_cols = ["WBS", "Ağaç Görünümü", "Ad", "Kilit", "Yerel_%", "İlerleme_%", "Bütçe (TL)", "Hakediş (TL)", "Grup 1", "Grup 2", "Grup 3"]
         
+        # Bütçe ve Hakediş sütunlarının formatı %.2f (Kuruşlu) olarak ayarlandı
         edited_df = st.data_editor(
             gosterilecek_df[edit_cols],
             use_container_width=True, hide_index=True, num_rows="fixed", height=600,
@@ -474,8 +474,8 @@ with tab1:
                 "Kilit": st.column_config.CheckboxColumn("🔒 Kilit", width="small"),
                 "Yerel_%": st.column_config.NumberColumn("Ağırlık (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
                 "İlerleme_%": st.column_config.NumberColumn("✏️ İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
-                "Bütçe (TL)": st.column_config.NumberColumn("Bütçe", format="%,.0f ₺", disabled=True, width="small"),
-                "Hakediş (TL)": st.column_config.NumberColumn("Hakediş", format="%,.0f ₺", disabled=True, width="small"),
+                "Bütçe (TL)": st.column_config.NumberColumn("Bütçe", format="%,.2f ₺", disabled=True, width="small"),
+                "Hakediş (TL)": st.column_config.NumberColumn("Hakediş", format="%,.2f ₺", disabled=True, width="small"),
                 "Grup 1": st.column_config.TextColumn("Grup 1", width="small"),
                 "Grup 2": st.column_config.TextColumn("Grup 2", width="small"),
                 "Grup 3": st.column_config.TextColumn("Grup 3", width="small"),
@@ -483,7 +483,6 @@ with tab1:
             key="master_editor"
         )
         
-        # FLOAT HASSASİYETİ (SONSUZ DÖNGÜ) KORUMASI
         degisim_var = False
         wbs_hatasi = False
         wbs_degisti = False
@@ -516,7 +515,6 @@ with tab1:
                 if gosterilecek_df.iloc[i][col] != edited_df.iloc[i][col]:
                     degisim_var = True
                     
-            # DİKKAT: Birebir Eşitlik Yerine %0.1 Hassasiyet Toleransı Getirildi
             for col in ["Yerel_%", "İlerleme_%"]:
                 if not np.isclose(float(gosterilecek_df.iloc[i][col]), float(edited_df.iloc[i][col]), atol=0.001):
                     degisim_var = True
@@ -535,7 +533,7 @@ with tab1:
                         yeni_ana_df.loc[yeni_ana_df["WBS"] == row["WBS"], col] = row[col]
                 
                 dengeli_df = akilli_dengele(st.session_state.df, yeni_ana_df)
-                dengeli_df["Yerel_%"] = dengeli_df["Yerel_%"].round(4) # Güvenlik yuvarlaması
+                dengeli_df["Yerel_%"] = dengeli_df["Yerel_%"].round(4)
                 
                 st.session_state.df = dengeli_df
                 st.rerun()
