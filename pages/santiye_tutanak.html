@@ -133,10 +133,47 @@
     /* PDF PREVIEW */
     .pdf-preview { background: #ffffff; color: #1f2937; padding: 32px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
 
+    /* Fotoğraf gridini mobilde de 2 sütun tutmak için özel sınıf */
+    .foto-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    /* Dosya yükleme butonunu mobil uyumlu ve şık yap */
+    input[type="file"] {
+      padding: 6px;
+      font-size: 11px;
+      background: var(--bg);
+      color: var(--text-muted);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    input[type="file"]::file-selector-button {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-right: 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    input[type="file"]::file-selector-button:hover {
+      background: var(--border);
+    }
+
     /* RESPONSIVE */
     @media (max-width: 768px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       .kalem-row { grid-template-columns: 1fr 1fr; }
+      .foto-grid { gap: 10px; }
+      .foto-img { height: 110px !important; }
     }
 
     .divider { height: 1px; background: var(--border); margin: 20px 0; }
@@ -251,43 +288,41 @@
       <div class="card mb-4">
         <div class="card-header"><span class="card-title">Saha Kanıtları (Fotoğraflar)</span></div>
         <div class="card-body">
-          <div class="grid grid-2">
+          <div class="foto-grid">
             <div class="form-group">
               <label>Fotoğraf 1</label>
-              <div id="foto1-preview" style="display:none;position:relative;margin-bottom:8px">
-                <img id="foto1-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+              <div id="foto1-preview" style="display:none;position:relative;margin-bottom:6px">
+                <img id="foto1-img" class="foto-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
                 <button onclick="fotoSil(1)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
               </div>
-              <input type="file" id="foto1-input" accept="image/*" onchange="fotoYukle(1, event)" style="cursor:pointer" />
+              <input type="file" id="foto1-input" accept="image/*" onchange="fotoYukle(1, event)" />
             </div>
             <div class="form-group">
               <label>Fotoğraf 2</label>
-              <div id="foto2-preview" style="display:none;position:relative;margin-bottom:8px">
-                <img id="foto2-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+              <div id="foto2-preview" style="display:none;position:relative;margin-bottom:6px">
+                <img id="foto2-img" class="foto-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
                 <button onclick="fotoSil(2)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
               </div>
-              <input type="file" id="foto2-input" accept="image/*" onchange="fotoYukle(2, event)" style="cursor:pointer" />
+              <input type="file" id="foto2-input" accept="image/*" onchange="fotoYukle(2, event)" />
             </div>
-          </div>
-          <div class="grid grid-2" style="margin-top:14px">
             <div class="form-group">
               <label>Fotoğraf 3 (opsiyonel)</label>
-              <div id="foto3-preview" style="display:none;position:relative;margin-bottom:8px">
-                <img id="foto3-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+              <div id="foto3-preview" style="display:none;position:relative;margin-bottom:6px">
+                <img id="foto3-img" class="foto-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
                 <button onclick="fotoSil(3)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
               </div>
-              <input type="file" id="foto3-input" accept="image/*" onchange="fotoYukle(3, event)" style="cursor:pointer" />
+              <input type="file" id="foto3-input" accept="image/*" onchange="fotoYukle(3, event)" />
             </div>
             <div class="form-group">
               <label>Fotoğraf 4 (opsiyonel)</label>
-              <div id="foto4-preview" style="display:none;position:relative;margin-bottom:8px">
-                <img id="foto4-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+              <div id="foto4-preview" style="display:none;position:relative;margin-bottom:6px">
+                <img id="foto4-img" class="foto-img" style="width:100%;height:140px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
                 <button onclick="fotoSil(4)" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:3px 7px;font-size:12px">✕</button>
               </div>
-              <input type="file" id="foto4-input" accept="image/*" onchange="fotoYukle(4, event)" style="cursor:pointer" />
+              <input type="file" id="foto4-input" accept="image/*" onchange="fotoYukle(4, event)" />
             </div>
           </div>
-          <div class="text-muted" style="margin-top:10px">📌 PDF'e otomatik eklenir. 2 fotoğraf yan yana, 3-4 ise alt satırda görünür.</div>
+          <div class="text-muted" style="margin-top:12px">📌 PDF'e otomatik eklenir. Mobilde de yan yana (2x2) görünür.</div>
         </div>
       </div>
 
@@ -1216,7 +1251,7 @@ function tutanakTemizle() {
 // ============================================================
 // ŞABLON (CLONE) OLARAK YÜKLE
 // ============================================================
-function sablonOlarakYukle(id) {
+async function sablonOlarakYukle(id) {
     const t = db.tutanaklar.find(x => x.id === id);
     if (!t) return;
     
@@ -1233,12 +1268,31 @@ function sablonOlarakYukle(id) {
     if(kalemler.length === 0) kalemler = [{ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 }];
     renderKalemler();
     
-    // Saha fotoğrafları yepyeni olacağı için eskileri kopyalamıyoruz
-    fotografBase64 = {1:null,2:null,3:null,4:null};
-    [1,2,3,4].forEach(n => {
-        document.getElementById(`foto${n}-img`).src='';
-        document.getElementById(`foto${n}-preview`).style.display='none';
-        document.getElementById(`foto${n}-input`).value='';
+    // YENİ: IndexedDB'den eski tutanağın fotoğraflarını çek ve global state'e (fotografBase64) ata
+    const eskiFotolar = await fotolariGetir(id);
+    fotografBase64 = {
+        1: eskiFotolar[1] || null,
+        2: eskiFotolar[2] || null,
+        3: eskiFotolar[3] || null,
+        4: eskiFotolar[4] || null
+    };
+
+    // YENİ: Fotoğrafları DOM (HTML) önizleme kutularına yerleştir
+    [1, 2, 3, 4].forEach(n => {
+        const previewWrap = document.getElementById(`foto${n}-preview`);
+        const imgEl = document.getElementById(`foto${n}-img`);
+        const inputEl = document.getElementById(`foto${n}-input`);
+        
+        // Yeni dosya seçilmemiş gibi görünmesi için input'u sıfırlıyoruz ama base64 hafızada kalıyor
+        inputEl.value = ''; 
+
+        if (fotografBase64[n]) {
+            imgEl.src = fotografBase64[n];
+            previewWrap.style.display = 'block';
+        } else {
+            imgEl.src = '';
+            previewWrap.style.display = 'none';
+        }
     });
 
     // EN KRİTİK NOKTA: Evrak No o anki zamana göre yeniden üretilir (çakışma olmaz)
