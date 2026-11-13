@@ -931,4 +931,939 @@ function buildPdfHtml(data) {
     : (data.olusturma ? new Date(data.olusturma).toLocaleString('tr-TR') : '');
 
   const headerHTML = (logo || sirket) ? `
-    <div style="display:flex;align-items:center;justify-content:${logo ? 'space-between' : 'flex
+    <div style="display:flex;align-items:center;justify-content:${logo ? 'space-between' : 'flex-end'};margin-bottom:8px">
+      ${logo ? `<img src="${logo}" style="max-height:56px;max-width:180px;object-fit:contain" />` : ''}
+      ${sirket ? `<div style="font-size:11px;color:#6b7280;text-align:right">${sirket}</div>` : ''}
+    </div>` : '';
+
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;line-height:1.5;padding:28px 32px;background:#fff">
+      ${headerHTML}
+      <h1 style="text-align:center;font-size:22px;font-weight:bold;margin-bottom:8px;letter-spacing:0.5px;color:#111827">${baslik}</h1>
+      <div style="border-bottom:3px solid ${renk};margin-bottom:14px"></div>
+      <div style="text-align:center;font-size:11px;color:#4b5563;margin-bottom:24px">
+        <b>Evrak No:</b> ${data.evrak_no||'—'} &nbsp;|&nbsp;
+        <b>Oluşturma:</b> ${zmGoster}
+      </div>
+
+      <table style="width:100%;font-size:13px;margin-bottom:24px;border-collapse:collapse">
+        <colgroup>
+          <col style="width:90px">
+          <col>
+          <col style="width:80px">
+          <col>
+        </colgroup>
+        <tr>
+          <td style="font-weight:bold;padding:5px 8px 5px 0;color:#374151;vertical-align:top;white-space:nowrap">TARİH:</td>
+          <td style="padding:5px 16px 5px 0;vertical-align:top">${data.tarih||'—'}</td>
+          <td style="font-weight:bold;padding:5px 8px;color:#374151;vertical-align:top;white-space:nowrap">KONUM:</td>
+          <td style="padding:5px 0;vertical-align:top">${data.konum||'—'}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold;padding:5px 8px 5px 0;color:#374151;vertical-align:top;white-space:nowrap">PROJE:</td>
+          <td style="padding:5px 16px 5px 0;vertical-align:top">${proje}</td>
+          <td style="font-weight:bold;padding:5px 8px;color:#374151;vertical-align:top;white-space:nowrap">İŞVEREN:</td>
+          <td style="padding:5px 0;vertical-align:top">${isveren}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold;padding:5px 8px 5px 0;color:#374151;vertical-align:top;white-space:nowrap">TAŞERON:</td>
+          <td style="padding:5px 16px 5px 0;vertical-align:top">${taseron}</td>
+          <td style="font-weight:bold;padding:5px 8px;color:#374151;vertical-align:top;white-space:nowrap">TÜR:</td>
+          <td style="padding:5px 0;font-weight:bold;color:${renk};vertical-align:top">${data.cins||'—'}</td>
+        </tr>
+      </table>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+        <colgroup>
+          <col style="width:13%">
+          <col style="width:35%">
+          <col style="width:9%">
+          <col style="width:10%">
+          <col style="width:16%">
+          <col style="width:17%">
+        </colgroup>
+        <thead>
+          <tr style="background:#f3f4f6;color:#111827">
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:left">GRUP</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:left">KISA TANIM</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:center">MİKTAR</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:center">BİRİM</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:right">B. FİYAT</th>
+            <th style="padding:10px;border:1px solid #d1d5db;text-align:right">TOPLAM</th>
+          </tr>
+        </thead>
+        <tbody>${kalemRows}</tbody>
+      </table>
+      <div style="text-align:right;font-size:15px;font-weight:bold;margin-bottom:36px;color:#111827;padding:10px;background:#f9fafb;border:1px solid #e5e7eb">
+        GENEL TOPLAM: ${toplam} TL
+      </div>
+      ${data.aciklama ? `
+        <div style="margin-bottom:36px">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:6px;color:#374151">AÇIKLAMA / NOTLAR:</div>
+          <div style="font-size:13px;color:#4b5563;background:#f9fafb;padding:12px;border-radius:6px;border:1px solid #e5e7eb">${data.aciklama}</div>
+        </div>` : ''}
+      ${(data.foto1||data.foto2||data.foto3||data.foto4) ? `
+        <div style="margin-bottom:40px">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:12px;color:#374151">SAHA KANITLARI:</div>
+          ${(data.foto1||data.foto2) ? `<div style="display:flex;gap:10px;margin-bottom:10px">
+            ${data.foto1?`<img src="${data.foto1}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+            ${data.foto2?`<img src="${data.foto2}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+          </div>`:''}
+          ${(data.foto3||data.foto4) ? `<div style="display:flex;gap:10px">
+            ${data.foto3?`<img src="${data.foto3}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+            ${data.foto4?`<img src="${data.foto4}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
+          </div>`:''}
+        </div>` : ''}
+      <div style="margin-top:40px">
+        <table style="width:100%; border-collapse:collapse; text-align:center; font-size:11px; table-layout:fixed;">
+          <tr>
+            <!-- TAŞERON KISMI (SOL KUTU) -->
+            <td style="width:28%; vertical-align:top; padding:0;">
+              <table style="width:100%; border-collapse:collapse; border:1px solid #000; height:100%;">
+                <tr>
+                  <td style="border:1px solid #000; padding:8px 4px; font-weight:bold; height:45px; vertical-align:middle; line-height:1.3;">
+                    TESLİM EDEN (TAŞERON)<br>
+                    <span style="font-weight:normal; font-size:10px;">${taseron}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="height:100px; border:1px solid #000; vertical-align:bottom; text-align:right; padding:6px; font-size:10px; font-weight:bold;">
+                    ....... / ....... / 202..
+                  </td>
+                </tr>
+              </table>
+            </td>
+            
+            <!-- İKİ KUTU ARASI BOŞLUK -->
+            <td style="width:2%; padding:0;"></td>
+            
+            <!-- İŞVEREN KISMI (SAĞ KUTULAR) -->
+            <td style="width:70%; vertical-align:top; padding:0;">
+              <table style="width:100%; border-collapse:collapse; border:1px solid #000; table-layout:fixed; height:100%;">
+                <tr>
+                  <td colspan="4" style="border:1px solid #000; padding:8px 4px; font-weight:bold; height:45px; vertical-align:middle; line-height:1.3;">
+                    TESLİM ALAN (İŞVEREN)<br>
+                    <span style="font-weight:normal; font-size:10px;">${isveren}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="border:1px solid #000; padding:4px 2px; font-weight:bold; font-size:10px; height:25px; vertical-align:middle;">Saha Mühendisi</td>
+                  <td style="border:1px solid #000; padding:4px 2px; font-weight:bold; font-size:10px; height:25px; vertical-align:middle;">Teknik Ofis</td>
+                  <td style="border:1px solid #000; padding:4px 2px; font-weight:bold; font-size:10px; height:25px; vertical-align:middle;">Şantiye Şefi</td>
+                  <td style="border:1px solid #000; padding:4px 2px; font-weight:bold; font-size:10px; height:25px; vertical-align:middle;">Proje Müdürü</td>
+                </tr>
+                <tr>
+                  <td style="height:75px; border:1px solid #000; vertical-align:bottom; text-align:right; padding:6px; font-size:10px; font-weight:bold;">....... / ....... / 202..</td>
+                  <td style="height:75px; border:1px solid #000; vertical-align:bottom; text-align:right; padding:6px; font-size:10px; font-weight:bold;">....... / ....... / 202..</td>
+                  <td style="height:75px; border:1px solid #000; vertical-align:bottom; text-align:right; padding:6px; font-size:10px; font-weight:bold;">....... / ....... / 202..</td>
+                  <td style="height:75px; border:1px solid #000; vertical-align:bottom; text-align:right; padding:6px; font-size:10px; font-weight:bold;">....... / ....... / 202..</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// FORM VERİSİ
+// ============================================================
+function formVerisi() {
+  const now = new Date();
+  return {
+    cins:        document.getElementById('f-cins').value,
+    tarih:       document.getElementById('f-tarih').value,
+    proje_id:    document.getElementById('f-proje').value,
+    konum:       document.getElementById('f-konum').value,
+    taseron_id:  document.getElementById('f-taseron').value,
+    isveren_id:  document.getElementById('f-isveren').value,
+    aciklama:    document.getElementById('f-aciklama').value,
+    kalemler:    kalemler,
+    foto1: fotografBase64[1] || null,
+    foto2: fotografBase64[2] || null,
+    foto3: fotografBase64[3] || null,
+    foto4: fotografBase64[4] || null,
+    evrak_no:    activeEvrakNo,
+    zaman_muhru: zamanMuhrU(now),
+    olusturma:   now.toISOString(),
+  };
+}
+
+function updatePreview() {
+  const data = formVerisi();
+  document.getElementById('pdf-preview-area').innerHTML = buildPdfHtml(data);
+}
+
+// ============================================================
+// ORTAK KAYIT MANTIĞI
+// ============================================================
+function formValidasyonu(data) {
+  if (!data.proje_id && !data.taseron_id && !data.isveren_id) {
+    toast('Lütfen en az proje veya firma seçin.', 'error');
+    return false;
+  }
+  if (!data.tarih) {
+    toast('Tarih seçiniz.', 'error');
+    return false;
+  }
+  return true;
+}
+
+async function tutanakKaydet() {
+  const btn = document.getElementById('kaydet-btn');
+  btn.disabled = true; btn.textContent = '⏳ Kaydediliyor...';
+  try {
+    const data = formVerisi();
+    if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='💾 Kaydet'; return; }
+    
+    // Evrak no kontrolü
+    const mevcutMu = db.tutanaklar.find(t => t.evrak_no === data.evrak_no);
+    if (mevcutMu) {
+      toast(`Bu tutanak (${data.evrak_no}) zaten arşive kaydedilmiş!`, 'error');
+      return;
+    }
+
+    const id = Date.now();
+    const kayit = {
+      id, cins: data.cins, tarih: data.tarih,
+      proje_id: data.proje_id, konum: data.konum,
+      taseron_id: data.taseron_id, isveren_id: data.isveren_id,
+      aciklama: data.aciklama, kalemler: data.kalemler,
+      evrak_no: data.evrak_no, zaman_muhru: data.zaman_muhru,
+      olusturma: data.olusturma,
+      toplam: toplamHesapla(),
+      foto_var: !!(data.foto1||data.foto2||data.foto3||data.foto4)
+    };
+    
+    await idbPut(STORE_TUT, null, kayit);
+    for (const no of [1,2,3,4]) {
+      if (fotografBase64[no]) await fotoKaydet(id, no, fotografBase64[no]);
+    }
+    
+    db.tutanaklar.unshift(kayit);
+    updateNavCount();
+    
+    toast(`✅ ${data.evrak_no} arşive başarıyla kaydedildi.`);
+  } catch(err) {
+    console.error(err);
+    toast('Kayıt hatası: ' + err.message, 'error');
+  } finally {
+    btn.disabled=false; btn.textContent='💾 Kaydet';
+  }
+}
+
+// ============================================================
+// PDF İNDİR (Sadece bilgisayara indirir, arşive gizli kayıt yapmaz)
+// ============================================================
+async function pdfIndir() {
+  const btn = document.getElementById('pdf-btn');
+  btn.disabled = true; btn.textContent = '⏳ Hazırlanıyor...';
+  try {
+    const data = formVerisi();
+    if (!formValidasyonu(data)) { btn.disabled=false; btn.textContent='⬇ PDF İndir'; return; }
+
+    const htmlIcerigi = buildPdfHtml(data);
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+    container.innerHTML = htmlIcerigi;
+    document.body.appendChild(container);
+
+    await new Promise((res, rej) => {
+      if (window.html2canvas) { res(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = res; s.onerror = rej; document.head.appendChild(s);
+    });
+
+    const canvas = await html2canvas(container, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+    document.body.removeChild(container);
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    let fw=pdfW, fh=(canvas.height*fw)/canvas.width, xOff=0;
+    if (fh>pdfH) { const r=pdfH/fh; fh=pdfH; fw=fw*r; xOff=(pdfW-fw)/2; }
+    pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
+    pdf.save(`tutanak_${data.evrak_no}.pdf`);
+
+    toast(`✅ ${data.evrak_no} PDF olarak indirildi.`);
+
+  } catch(err) {
+    console.error(err);
+    toast('Hata: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬇ PDF İndir';
+  }
+}
+
+// ============================================================
+// FORM TEMİZLE VE YENİ EVRAK NO ATAMASI
+// ============================================================
+function tutanakTemizle() {
+  document.getElementById('f-cins').value  = 'EKLENTİ';
+  document.getElementById('f-tarih').value = new Date().toISOString().split('T')[0];
+  ['f-proje','f-konum','f-taseron','f-isveren','f-aciklama'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value='';
+  });
+  kalemler = [{ grup: KALEM_GRUPLARI[0], tanim:'', miktar:0, birim:BIRIMLER[0], birim_fiyat:0 }];
+  renderKalemler();
+  fotografBase64 = {1:null,2:null,3:null,4:null};
+  [1,2,3,4].forEach(n => {
+    document.getElementById(`foto${n}-img`).src = '';
+    document.getElementById(`foto${n}-preview`).style.display = 'none';
+    document.getElementById(`foto${n}-input`).value = '';
+  });
+  
+  // Sıfırdan bir form oluşturulduğu için yeni evrak no ver!
+  activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+  
+  updatePreview();
+  toast('Form temizlendi.');
+}
+
+// ============================================================
+// ŞABLON (CLONE) OLARAK YÜKLE
+// ============================================================
+function sablonOlarakYukle(id) {
+    const t = db.tutanaklar.find(x => x.id === id);
+    if (!t) return;
+    
+    // Verileri forma doldur
+    document.getElementById('f-cins').value = t.cins || 'EKLENTİ';
+    document.getElementById('f-tarih').value = t.tarih || '';
+    document.getElementById('f-proje').value = t.proje_id || '';
+    document.getElementById('f-konum').value = t.konum || '';
+    document.getElementById('f-taseron').value = t.taseron_id || '';
+    document.getElementById('f-isveren').value = t.isveren_id || '';
+    document.getElementById('f-aciklama').value = t.aciklama || '';
+    
+    kalemler = JSON.parse(JSON.stringify(t.kalemler || [])); // derin kopya
+    if(kalemler.length === 0) kalemler = [{ grup: KALEM_GRUPLARI[0], tanim: '', miktar: 0, birim: BIRIMLER[0], birim_fiyat: 0 }];
+    renderKalemler();
+    
+    // Saha fotoğrafları yepyeni olacağı için eskileri kopyalamıyoruz
+    fotografBase64 = {1:null,2:null,3:null,4:null};
+    [1,2,3,4].forEach(n => {
+        document.getElementById(`foto${n}-img`).src='';
+        document.getElementById(`foto${n}-preview`).style.display='none';
+        document.getElementById(`foto${n}-input`).value='';
+    });
+
+    // EN KRİTİK NOKTA: Evrak No o anki zamana göre yeniden üretilir (çakışma olmaz)
+    activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+    
+    updatePreview();
+    showPage('tutanak');
+    toast(`Şablon başarıyla yüklendi! Yeni evrak no: ${activeEvrakNo}`);
+}
+
+
+// ============================================================
+// ARŞİV + FİLTRELEME
+// ============================================================
+function arsivFiltreSorgusu() {
+  return {
+    metin:   (document.getElementById('f-ara-metin')?.value||'').toLowerCase().trim(),
+    cins:    document.getElementById('f-ara-cins')?.value||'',
+    projeId: document.getElementById('f-ara-proje')?.value||'',
+    firmaId: document.getElementById('f-ara-firma')?.value||'',
+    tarih1:  document.getElementById('f-ara-tarih1')?.value||'',
+    tarih2:  document.getElementById('f-ara-tarih2')?.value||'',
+    minTutar: parseFloat(document.getElementById('f-ara-min')?.value)||0,
+  };
+}
+
+function arsivFiltreTemizle() {
+  ['f-ara-metin','f-ara-tarih1','f-ara-tarih2','f-ara-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-ara-cins','f-ara-proje','f-ara-firma'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  arsivFiltrele();
+}
+
+function arsivFiltreSelectleriDoldur() {
+  const projeEl = document.getElementById('f-ara-proje');
+  const firmaEl = document.getElementById('f-ara-firma');
+  if (!projeEl||!firmaEl) return;
+  const sp=projeEl.value, sf=firmaEl.value;
+  projeEl.innerHTML = '<option value="">Tümü</option>'+db.projeler.map(p=>`<option value="${p.id}"${p.id==sp?' selected':''}>${p.adi}</option>`).join('');
+  firmaEl.innerHTML  = '<option value="">Tümü</option>'+db.firmalar.map(f=>`<option value="${f.id}"${f.id==sf?' selected':''}>${f.adi}</option>`).join('');
+}
+
+// Ortak filtreleme fonksiyonu (Hem HTML tablo için hem de Excel/Toplu PDF için kullanılır)
+function getFiltrelenmisArsiv() {
+  const q = arsivFiltreSorgusu();
+  return db.tutanaklar.filter(t => {
+    const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'';
+    const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'';
+    const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'';
+    if (q.metin) {
+      const havuz = [t.evrak_no,t.zaman_muhru,t.cins,proje,taseron,isveren,t.konum,t.aciklama,
+        ...(t.kalemler||[]).map(k=>k.tanim+' '+k.grup)].join(' ').toLowerCase();
+      if (!havuz.includes(q.metin)) return false;
+    }
+    if (q.cins    && t.cins!==q.cins) return false;
+    if (q.projeId && String(t.proje_id)!==String(q.projeId)) return false;
+    if (q.firmaId && String(t.taseron_id)!==String(q.firmaId) && String(t.isveren_id)!==String(q.firmaId)) return false;
+    if (q.tarih1  && t.tarih<q.tarih1) return false;
+    if (q.tarih2  && t.tarih>q.tarih2) return false;
+    if (q.minTutar && (t.toplam||0)<q.minTutar) return false;
+    return true;
+  });
+}
+
+function arsivFiltrele() {
+  const sonuclar = getFiltrelenmisArsiv();
+  renderArsivSonuc(sonuclar);
+}
+
+function renderArsiv() {
+  arsivFiltreSelectleriDoldur();
+  arsivFiltrele();
+}
+
+function renderArsivSonuc(liste) {
+  const tbody = document.getElementById('arsiv-tbody');
+  const bar   = document.getElementById('arsiv-toplam-bar');
+  if (!liste.length) {
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-icon">${db.tutanaklar.length?'🔍':'📂'}</div><div class="empty-text">${db.tutanaklar.length?'Arama kriterlerine uyan tutanak bulunamadı.':'Henüz tutanak kaydedilmedi.'}</div></div></td></tr>`;
+    if(bar) bar.style.display='none';
+    document.getElementById('arsiv-sonuc-bilgi').textContent = db.tutanaklar.length?`${db.tutanaklar.length} kayıttan 0 sonuç`:'Kaydedilen tüm tutanaklar';
+    return;
+  }
+  const toplamTutar = liste.reduce((a,t)=>a+(t.toplam||0),0);
+
+  function zmGoster(t) {
+    const zm = t.zaman_muhru||'';
+    if (zm.length===12) return `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`;
+    if (t.olusturma) return new Date(t.olusturma).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'});
+    return '—';
+  }
+
+  tbody.innerHTML = liste.map(t => {
+    const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'—';
+    const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'—';
+    const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'—';
+    const isKesinti = t.cins==='KESİNTİ';
+    return `
+      <tr>
+        <td class="font-mono" style="font-size:11px;color:var(--text-dim)">${t.evrak_no||'—'}</td>
+        <td><span class="badge ${isKesinti?'badge-red':'badge-blue'}">${t.cins||'—'}</span></td>
+        <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${proje}">${proje}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${taseron}">${taseron}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${isveren}">${isveren}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${t.konum||'—'}</td>
+        <td class="font-mono" style="font-size:11px;white-space:nowrap">${zmGoster(t)}</td>
+        <td class="font-mono" style="font-size:12px;color:var(--accent-blue);white-space:nowrap">${formatTL(t.toplam)}</td>
+        <td>
+          <div class="flex gap-2">
+            <!-- YENİ: Şablon ve Tekil PDF indirme butonları yerleştirildi -->
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="sablonOlarakYukle(${t.id})" title="Şablon Olarak Yükle (Kopyala)">📑</button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="arsivdenPdfAl(${t.id})" title="PDF Olarak İndir" style="color:var(--accent-blue)">⬇</button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="arsivDetayAc(${t.id})" title="Detaylı İncele">👁</button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="tutanakSil(${t.id})" title="Sil" style="color:var(--accent-red)">✕</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  if(bar){ bar.style.display='flex';
+    document.getElementById('arsiv-kayit-say').textContent=liste.length;
+    document.getElementById('arsiv-toplam-tutar').textContent=formatTL(toplamTutar);
+  }
+  document.getElementById('arsiv-sonuc-bilgi').textContent=`${db.tutanaklar.length} kayıttan ${liste.length} sonuç`;
+}
+
+// Arşivden tek tutanak sil
+async function tutanakSil(id) {
+  if (!confirm('Bu tutanak silinecek. Fotoğrafları da silinir. Emin misiniz?')) return;
+  await idbDelete(STORE_TUT, id);
+  await fotolariSil(id);
+  db.tutanaklar = db.tutanaklar.filter(t=>t.id!==id);
+  updateNavCount();
+  arsivFiltrele();
+  toast('Tutanak silindi.');
+}
+
+async function arsivDetayAc(id) {
+  const t = db.tutanaklar.find(x=>x.id===id);
+  if (!t) return;
+  const taseron = db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'—';
+  const isveren = db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'—';
+  const proje   = db.projeler.find(p=>p.id==t.proje_id)?.adi||'—';
+
+  const zm = t.zaman_muhru||'';
+  const zmStr = zm.length===12
+    ? `${zm.slice(6,8)}.${zm.slice(4,6)}.${zm.slice(0,4)} ${zm.slice(8,10)}:${zm.slice(10,12)}`
+    : (t.olusturma?new Date(t.olusturma).toLocaleString('tr-TR'):'—');
+
+  const kalemSatirlar=(t.kalemler||[]).map(k=>`
+    <tr><td style="padding:6px 10px;border:1px solid #e5e7eb">${k.grup}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb">${k.tanim}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center">${k.miktar} ${k.birim}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right">${formatTL(k.birim_fiyat)}</td>
+    <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:bold">${formatTL(k.miktar*k.birim_fiyat)}</td></tr>`).join('');
+
+  let fotoHTML = '';
+  if (t.foto_var) {
+    const fotolar = await fotolariGetir(id);
+    const fotoSrc = Object.values(fotolar).filter(Boolean);
+    if (fotoSrc.length) {
+      fotoHTML = `<div style="margin-top:14px"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Saha Kanıtları</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${fotoSrc.map(s=>`<img src="${s}" style="height:100px;width:auto;border-radius:6px;border:1px solid var(--border);object-fit:cover"/>`).join('')}
+        </div></div>`;
+    }
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className='modal-overlay'; overlay.style.display='flex';
+  overlay.innerHTML=`
+    <div class="modal" style="max-width:700px;max-height:88vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div class="modal-title" style="margin-bottom:2px">📋 ${t.evrak_no||'Tutanak'}</div>
+          <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">🕒 ${zmStr}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="grid grid-2" style="gap:10px;margin-bottom:14px;font-size:13px">
+        <div><span style="color:var(--text-muted)">Tür:</span> <b style="color:${t.cins==='KESİNTİ'?'#ef4444':'#3b82f6'}">${t.cins}</b></div>
+        <div><span style="color:var(--text-muted)">Tarih:</span> ${t.tarih}</div>
+        <div><span style="color:var(--text-muted)">Proje:</span> ${proje}</div>
+        <div><span style="color:var(--text-muted)">Konum:</span> ${t.konum||'—'}</div>
+        <div><span style="color:var(--text-muted)">Taşeron:</span> ${taseron}</div>
+        <div><span style="color:var(--text-muted)">İşveren:</span> ${isveren}</div>
+      </div>
+      ${t.aciklama?`<div style="background:var(--bg);padding:10px;border-radius:6px;font-size:12px;color:var(--text-dim);margin-bottom:14px">${t.aciklama}</div>`:''}
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:left">Grup</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:left">Tanım</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:center">Miktar</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:right">B.Fiyat</th>
+          <th style="padding:8px 10px;border:1px solid var(--border);text-align:right">Toplam</th>
+        </tr></thead>
+        <tbody style="color:var(--text-dim)">${kalemSatirlar}</tbody>
+      </table>
+      <div style="text-align:right;font-size:15px;font-weight:700;margin-top:12px;color:var(--accent-blue);font-family:var(--mono)">GENEL TOPLAM: ${formatTL(t.toplam)}</div>
+      ${fotoHTML}
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">Kapat</button>
+        <button class="btn btn-primary" onclick="arsivdenPdfAl(${t.id});this.closest('.modal-overlay').remove()">⬇ PDF İndir</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e=>{if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+}
+
+function arsivExcelIndir() {
+  const liste = getFiltrelenmisArsiv();
+  if (liste.length === 0) {
+      toast('İndirilecek kayıt bulunamadı.', 'error');
+      return;
+  }
+  
+  const zm = t => { const z=t.zaman_muhru||''; return z.length===12?`${z.slice(6,8)}.${z.slice(4,6)}.${z.slice(0,4)} ${z.slice(8,10)}:${z.slice(10,12)}`:''};
+  const satirlar=[['Evrak No','Zaman Mührü','Tür','Proje','Taşeron','İşveren','Konum','Tarih','Toplam TL','Açıklama']];
+  liste.forEach(t=>satirlar.push([
+    t.evrak_no||'', zm(t), t.cins||'',
+    db.projeler.find(p=>p.id==t.proje_id)?.adi||'',
+    db.firmalar.find(f=>f.id==t.taseron_id)?.adi||'',
+    db.firmalar.find(f=>f.id==t.isveren_id)?.adi||'',
+    t.konum||'', t.tarih||'', (t.toplam||0).toFixed(2), t.aciklama||''
+  ]));
+  const csv=satirlar.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`Tutanak_Arsivi_${zamanMuhrU()}.csv`; a.click();
+  toast(`${liste.length} kayıt Excel'e aktarıldı.`);
+}
+
+// ============================================================
+// TOPLU PDF İNDİR (Filtrelenmiş kayıtların tümünü birleştirir)
+// ============================================================
+async function topluPdfIndir() {
+    const liste = getFiltrelenmisArsiv();
+    
+    if (liste.length === 0) {
+        toast('İndirilecek kayıt bulunamadı! Önce filtreleri kontrol edin.', 'error');
+        return;
+    }
+    
+    toast(`Toplu PDF hazırlanıyor (${liste.length} adet). Lütfen sekmeyi kapatmayın...`);
+    
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    
+    // html2canvas kütüphanesini yükle
+    await new Promise((res, rej) => {
+        if (window.html2canvas) { res(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = res; s.onerror = rej; document.head.appendChild(s);
+    });
+
+    // Her bir tutanağı sırayla render et
+    for (let i = 0; i < liste.length; i++) {
+        const t = liste[i];
+        
+        // Fotoğrafları DB'den çek
+        const fotolar = await fotolariGetir(t.id);
+        const data = { ...t, foto1:fotolar[1]||null, foto2:fotolar[2]||null, foto3:fotolar[3]||null, foto4:fotolar[4]||null };
+        
+        const htmlIcerigi = buildPdfHtml(data);
+        const container = document.createElement('div');
+        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+        container.innerHTML = htmlIcerigi;
+        document.body.appendChild(container);
+        
+        const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        document.body.removeChild(container);
+        
+        const imgData = canvas.toDataURL('image/png');
+        let fw = pdfW, fh = (canvas.height * fw) / canvas.width, xOff = 0;
+        if (fh > pdfH) { const r = pdfH / fh; fh = pdfH; fw = fw * r; xOff = (pdfW - fw) / 2; }
+        
+        // İlk sayfa hariç yeni sayfa ekle
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', xOff, 0, fw, fh);
+    }
+    
+    pdf.save(`Toplu_Tutanak_Arsivi_${zamanMuhrU()}.pdf`);
+    toast(`✅ ${liste.length} adet tutanak tek bir PDF'te birleştirildi.`);
+}
+
+
+// Tekil PDF İndirme Fonksiyonu
+async function arsivdenPdfAl(id) {
+  const t = db.tutanaklar.find(x=>x.id===id);
+  if (!t) return;
+  toast('PDF hazırlanıyor...');
+  const fotolar = await fotolariGetir(id);
+  const data = { ...t, foto1:fotolar[1]||null, foto2:fotolar[2]||null, foto3:fotolar[3]||null, foto4:fotolar[4]||null };
+  const htmlIcerigi = buildPdfHtml(data);
+  const container = document.createElement('div');
+  container.style.cssText='position:absolute;left:-9999px;top:0;width:800px;background:#fff;';
+  container.innerHTML=htmlIcerigi; document.body.appendChild(container);
+  await new Promise((res,rej)=>{
+    if(window.html2canvas){res();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=res;s.onerror=rej;document.head.appendChild(s);
+  });
+  const canvas=await html2canvas(container,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
+  document.body.removeChild(container);
+  const imgData=canvas.toDataURL('image/png');
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF('p','mm','a4');
+  const pdfW=pdf.internal.pageSize.getWidth(), pdfH=pdf.internal.pageSize.getHeight();
+  let fw=pdfW, fh=(canvas.height*fw)/canvas.width, xOff=0;
+  if(fh>pdfH){const r=pdfH/fh;fh=pdfH;fw=fw*r;xOff=(pdfW-fw)/2;}
+  pdf.addImage(imgData,'PNG',xOff,0,fw,fh);
+  pdf.save(`tutanak_${t.evrak_no||id}.pdf`);
+  toast('PDF indirildi.');
+}
+
+function arsivTemizle() {
+  if(!confirm('Tüm arşiv (tutanaklar + fotoğraflar) silinecek. Emin misiniz?')) return;
+  idbAc().then(db2=>{
+    const tx=db2.transaction([STORE_TUT,STORE_FOTO],'readwrite');
+    tx.objectStore(STORE_TUT).clear();
+    tx.objectStore(STORE_FOTO).clear();
+    tx.oncomplete=()=>{
+      db.tutanaklar=[];
+      updateNavCount(); renderArsiv();
+      toast('Arşiv temizlendi.');
+    };
+  });
+}
+
+// ============================================================
+// FİRMALAR
+// ============================================================
+let editFirmaId = null;
+
+function firmaModalAc(id) {
+  editFirmaId=id||null;
+  document.getElementById('firma-modal-title').textContent=id?'Firma Düzenle':'Firma Ekle';
+  if(id){
+    const f=db.firmalar.find(x=>x.id===id);
+    document.getElementById('m-firma-adi').value=f.adi;
+    document.getElementById('m-firma-tur').value=f.tur;
+    document.getElementById('m-firma-vergi').value=f.vergi||'';
+    document.getElementById('m-firma-yetkili').value=f.yetkili||'';
+    document.getElementById('m-firma-tel').value=f.tel||'';
+  } else {
+    ['m-firma-adi','m-firma-vergi','m-firma-yetkili','m-firma-tel'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('m-firma-tur').value='TAŞERON';
+  }
+  document.getElementById('firma-modal').style.display='flex';
+}
+
+async function firmaKaydet() {
+  const adi=document.getElementById('m-firma-adi').value.trim();
+  if(!adi){toast('Firma adı zorunludur.','error');return;}
+  const firma={id:editFirmaId||Date.now(),adi,tur:document.getElementById('m-firma-tur').value,
+    vergi:document.getElementById('m-firma-vergi').value.trim(),
+    yetkili:document.getElementById('m-firma-yetkili').value.trim(),
+    tel:document.getElementById('m-firma-tel').value.trim()};
+  if(editFirmaId){const idx=db.firmalar.findIndex(f=>f.id===editFirmaId);if(idx>=0)db.firmalar[idx]=firma;}
+  else db.firmalar.push(firma);
+  await dbMetaKaydet();
+  modalKapat('firma-modal'); renderFirmalar(); selectleriDoldur();
+  toast(editFirmaId?'Firma güncellendi.':'Firma eklendi.');
+}
+
+async function firmaSil(id) {
+  if(!confirm('Bu firma silinecek?'))return;
+  db.firmalar=db.firmalar.filter(f=>f.id!==id);
+  await dbMetaKaydet(); renderFirmalar(); selectleriDoldur(); toast('Firma silindi.');
+}
+
+function renderFirmalar() {
+  const tbody=document.getElementById('firmalar-tbody');
+  if(!db.firmalar.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">🏢</div><div class="empty-text">Henüz firma eklenmedi.</div></div></td></tr>';return;}
+  tbody.innerHTML=db.firmalar.map((f,i)=>`
+    <tr>
+      <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${i+1}</td>
+      <td style="font-weight:500;color:var(--text)">${f.adi}</td>
+      <td><span class="badge badge-blue">${f.tur}</span></td>
+      <td class="font-mono" style="font-size:12px">${f.vergi||'—'}</td>
+      <td>${f.yetkili||'—'}</td>
+      <td>${f.tel||'—'}</td>
+      <td><div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="firmaModalAc(${f.id})">✏</button>
+        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--accent-red)" onclick="firmaSil(${f.id})">✕</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// PROJELER
+// ============================================================
+let editProjeId = null;
+
+function projeModalAc(id) {
+  editProjeId=id||null;
+  document.getElementById('proje-modal-title').textContent=id?'Proje Düzenle':'Proje Ekle';
+  if(id){
+    const p=db.projeler.find(x=>x.id===id);
+    document.getElementById('m-proje-adi').value=p.adi;
+    document.getElementById('m-proje-lokasyon').value=p.lokasyon||'';
+    document.getElementById('m-proje-durum').value=p.durum;
+  } else {
+    document.getElementById('m-proje-adi').value='';
+    document.getElementById('m-proje-lokasyon').value='';
+    document.getElementById('m-proje-durum').value='AKTİF';
+  }
+  document.getElementById('proje-modal').style.display='flex';
+}
+
+async function projeKaydet() {
+  const adi=document.getElementById('m-proje-adi').value.trim();
+  if(!adi){toast('Proje adı zorunludur.','error');return;}
+  const proje={id:editProjeId||Date.now(),adi,
+    lokasyon:document.getElementById('m-proje-lokasyon').value.trim(),
+    durum:document.getElementById('m-proje-durum').value};
+  if(editProjeId){const idx=db.projeler.findIndex(p=>p.id===editProjeId);if(idx>=0)db.projeler[idx]=proje;}
+  else db.projeler.push(proje);
+  await dbMetaKaydet(); modalKapat('proje-modal'); renderProjeler(); selectleriDoldur();
+  toast(editProjeId?'Proje güncellendi.':'Proje eklendi.');
+}
+
+async function projeSil(id) {
+  if(!confirm('Bu proje silinecek?'))return;
+  db.projeler=db.projeler.filter(p=>p.id!==id);
+  await dbMetaKaydet(); renderProjeler(); selectleriDoldur(); toast('Proje silindi.');
+}
+
+function renderProjeler() {
+  const tbody=document.getElementById('projeler-tbody');
+  if(!db.projeler.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty"><div class="empty-icon">🏗️</div><div class="empty-text">Henüz proje eklenmedi.</div></div></td></tr>';return;}
+  const dr={AKTİF:'badge-green',TAMAMLANDI:'badge-blue',BEKLEMEDE:'badge-yellow'};
+  tbody.innerHTML=db.projeler.map((p,i)=>`
+    <tr>
+      <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${i+1}</td>
+      <td style="font-weight:500;color:var(--text)">${p.adi}</td>
+      <td>${p.lokasyon||'—'}</td>
+      <td><span class="badge ${dr[p.durum]||'badge-blue'}">${p.durum}</span></td>
+      <td><div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="projeModalAc(${p.id})">✏</button>
+        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--accent-red)" onclick="projeSil(${p.id})">✕</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// AYARLAR
+// ============================================================
+function ayarlariYukle() {
+  document.getElementById('s-sirket').value=db.ayarlar.sirket||'';
+  document.getElementById('s-evrakno-prefix').value=db.ayarlar.evrakNoPrefix||'SNT';
+  if (db.ayarlar.logo) {
+    document.getElementById('logo-preview-img').src = db.ayarlar.logo;
+    document.getElementById('logo-preview-wrap').style.display = 'block';
+  } else {
+    document.getElementById('logo-preview-wrap').style.display = 'none';
+  }
+  idbBoyutGoster();
+}
+
+function logoYukle(event) {
+  const file = event.target.files[0]; if (!file) return;
+  if (file.size > 2*1024*1024) { toast('Logo 2MB\'dan küçük olmalı.','error'); return; }
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    db.ayarlar.logo = e.target.result;
+    document.getElementById('logo-preview-img').src = e.target.result;
+    document.getElementById('logo-preview-wrap').style.display = 'block';
+    await dbMetaKaydet();
+    updatePreview();
+    toast('Logo kaydedildi.');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function logoSil() {
+  db.ayarlar.logo = '';
+  document.getElementById('logo-preview-img').src = '';
+  document.getElementById('logo-preview-wrap').style.display = 'none';
+  document.getElementById('s-logo-dosya').value = '';
+  await dbMetaKaydet();
+  updatePreview();
+  toast('Logo kaldırıldı.');
+}
+
+async function idbBoyutGoster() {
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      const kullanilan = (est.usage/1024/1024).toFixed(1);
+      const kota = est.quota ? (est.quota/1024/1024/1024).toFixed(1)+'GB' : '—';
+      const el = document.getElementById('idb-boyut');
+      if(el) el.textContent = `Kullanılan: ~${kullanilan} MB / Kota: ${kota}`;
+    }
+  } catch(e){}
+}
+
+async function ayarlariKaydet() {
+  db.ayarlar.sirket=document.getElementById('s-sirket').value;
+  db.ayarlar.evrakNoPrefix=document.getElementById('s-evrakno-prefix').value||'SNT';
+  
+  // Ana formda üzerinde çalışılan tutanak henüz arşive kaydedilmemişse prefixi canlı güncelle
+  if(!db.tutanaklar.find(t=>t.evrak_no === activeEvrakNo)){
+      activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+  }
+  
+  await dbMetaKaydet();
+  updatePreview();
+}
+
+async function veriIndir() {
+  const tumFotolar = await idbGetAll(STORE_FOTO);
+  const yedek = { ...db, fotolar: tumFotolar, yedek_tarihi: new Date().toISOString(), versiyon: 2 };
+  const blob=new Blob([JSON.stringify(yedek,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`santiye_yedek_${zamanMuhrU()}.json`; a.click();
+  toast('Tam yedek (fotoğraflar dahil) indirildi.');
+}
+
+async function veriYukle(event) {
+  const file=event.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    try{
+      const parsed=JSON.parse(e.target.result);
+      if(!parsed.firmalar||!parsed.projeler) throw new Error('Geçersiz format');
+      db.firmalar=parsed.firmalar||[];
+      db.projeler=parsed.projeler||[];
+      db.ayarlar=parsed.ayarlar||{sirket:'',logo:'',evrakNoPrefix:'SNT'};
+      await dbMetaKaydet();
+      const tx=(await idbAc()).transaction(STORE_TUT,'readwrite');
+      tx.objectStore(STORE_TUT).clear();
+      (parsed.tutanaklar||[]).forEach(t=>tx.objectStore(STORE_TUT).put(t));
+      if(parsed.fotolar?.length){
+        const tx2=(await idbAc()).transaction(STORE_FOTO,'readwrite');
+        tx2.objectStore(STORE_FOTO).clear();
+        parsed.fotolar.forEach(f=>tx2.objectStore(STORE_FOTO).put(f));
+      }
+      db.tutanaklar=parsed.tutanaklar||[];
+      db.tutanaklar.sort((a,b)=>b.id-a.id);
+      
+      activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+      
+      selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv(); ayarlariYukle();
+      updatePreview();
+      
+      toast(`✅ Yedek yüklendi: ${db.tutanaklar.length} tutanak, ${db.firmalar.length} firma.`);
+    }catch(err){toast('Yedek dosyası okunamadı: '+err.message,'error');}
+  };
+  reader.readAsText(file);
+}
+
+async function tumVeriyiSil() {
+  if(!confirm('TÜM VERİ silinecek (tutanaklar, fotoğraflar, firmalar, projeler). Emin misiniz?'))return;
+  const db2=await idbAc();
+  const tx=db2.transaction([STORE_META,STORE_TUT,STORE_FOTO],'readwrite');
+  [STORE_META,STORE_TUT,STORE_FOTO].forEach(s=>tx.objectStore(s).clear());
+  tx.oncomplete=async()=>{
+    db={firmalar:[],projeler:[],tutanaklar:[],ayarlar:{sirket:'',logo:'',evrakNoPrefix:'SNT'}};
+    activeEvrakNo = evrakNoUret('SNT');
+    selectleriDoldur(); renderFirmalar(); renderProjeler(); renderArsiv();
+    updatePreview();
+    toast('Tüm veri sıfırlandı.','error');
+  };
+}
+
+// ============================================================
+// MODAL KAPAT
+// ============================================================
+function modalKapat(id){document.getElementById(id).style.display='none';}
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+});
+
+// ============================================================
+// FOTOĞRAFLAR
+// ============================================================
+let fotografBase64={1:null,2:null,3:null,4:null};
+
+function fotoYukle(no, event) {
+  const file=event.target.files[0]; if(!file)return;
+  if(file.size>15*1024*1024){toast('Fotoğraf 15MB\'dan büyük olamaz.','error');return;}
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    fotografBase64[no]=e.target.result;
+    document.getElementById(`foto${no}-img`).src=e.target.result;
+    document.getElementById(`foto${no}-preview`).style.display='block';
+    updatePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function fotoSil(no) {
+  fotografBase64[no]=null;
+  document.getElementById(`foto${no}-img`).src='';
+  document.getElementById(`foto${no}-preview`).style.display='none';
+  document.getElementById(`foto${no}-input`).value='';
+  updatePreview();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  await dbYukle();
+  activeEvrakNo = evrakNoUret(db.ayarlar.evrakNoPrefix);
+  document.getElementById('f-tarih').value=new Date().toISOString().split('T')[0];
+  selectleriDoldur();
+  renderKalemler();
+  updatePreview();
+}
+init();
+</script>
+</body>
+</html>
