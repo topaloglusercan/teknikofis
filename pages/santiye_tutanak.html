@@ -1014,24 +1014,47 @@ function buildPdfHtml(data) {
             ${data.foto4?`<img src="${data.foto4}" style="width:49%;height:260px;object-fit:cover;border-radius:6px;border:2px solid #e5e7eb"/>`:``}
           </div>`:''}
         </div>` : ''}
-      <div style="margin-top:50px">
-        <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:40px;color:#111827">İMZALAR</div>
-        <table style="width:100%;text-align:center;font-size:12px;table-layout:fixed">
+<div style="margin-top:40px">
+        <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:25px;color:#111827">İMZALAR</div>
+        <table style="width:100%;text-align:center;font-size:12px;table-layout:fixed;border-collapse:collapse">
           <tr>
-            <td style="width:50%;vertical-align:top;padding:0 20px">
-              <div style="border-bottom:2px solid ${renk};width:70%;margin:0 auto 10px"></div>
+            <!-- TAŞERON KISMI (1 İMZA) -->
+            <td style="width:28%;vertical-align:top;padding:0 15px;border-right:1px dashed #cbd5e1">
               <div style="font-weight:bold;color:#374151">TESLİM EDEN (TAŞERON)</div>
-              <div style="color:#6b7280;margin-top:6px;font-weight:bold">${taseron}</div>
+              <div style="color:#6b7280;margin-top:4px;margin-bottom:45px;font-weight:bold;font-size:11px;height:16px;overflow:hidden">${taseron}</div>
+              <div style="border-bottom:2px solid ${renk};width:90%;margin:0 auto 8px"></div>
+              <div style="color:#9ca3af;font-size:10px">Firma Yetkilisi</div>
             </td>
-            <td style="width:50%;vertical-align:top;padding:0 20px">
-              <div style="border-bottom:2px solid ${renk};width:70%;margin:0 auto 10px"></div>
+            
+            <!-- İŞVEREN KISMI (4 İMZA) -->
+            <td style="width:72%;vertical-align:top;padding:0 15px">
               <div style="font-weight:bold;color:#374151">TESLİM ALAN (İŞVEREN)</div>
-              <div style="color:#6b7280;margin-top:6px;font-weight:bold">${isveren}</div>
+              <div style="color:#6b7280;margin-top:4px;margin-bottom:45px;font-weight:bold;font-size:11px;height:16px;overflow:hidden">${isveren}</div>
+              
+              <table style="width:100%;text-align:center;font-size:10px;table-layout:fixed">
+                <tr>
+                  <td style="padding:0 5px">
+                    <div style="border-bottom:2px solid ${renk};width:100%;margin:0 auto 8px"></div>
+                    <div style="color:#9ca3af">Saha Mühendisi</div>
+                  </td>
+                  <td style="padding:0 5px">
+                    <div style="border-bottom:2px solid ${renk};width:100%;margin:0 auto 8px"></div>
+                    <div style="color:#9ca3af">Teknik Ofis</div>
+                  </td>
+                  <td style="padding:0 5px">
+                    <div style="border-bottom:2px solid ${renk};width:100%;margin:0 auto 8px"></div>
+                    <div style="color:#9ca3af">Şantiye Şefi</div>
+                  </td>
+                  <td style="padding:0 5px">
+                    <div style="border-bottom:2px solid ${renk};width:100%;margin:0 auto 8px"></div>
+                    <div style="color:#9ca3af">Proje Müdürü</div>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
         </table>
-      </div>
-    </div>`;
+      </div>;
 }
 
 // ============================================================
