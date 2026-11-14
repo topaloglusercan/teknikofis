@@ -102,14 +102,13 @@ def generate_empty_template(df_items, proje_adi):
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
     header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
     label_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    input_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid") # Uyarıcı Açık Sarı
+    input_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
     
     header_font = Font(bold=True, color="FFFFFF")
     bold_font = Font(bold=True)
     center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
     
-    # Veri Doğrulama (Data Validation) Kuralları
     dv_tarih = DataValidation(type="date", operator="greaterThanOrEqual", formula1="44000", allow_blank=True)
     dv_tarih.errorTitle = 'Geçersiz Format'
     dv_tarih.error = 'Lütfen hücreye sadece geçerli bir tarih giriniz (Örn: 01.01.2026).'
@@ -120,7 +119,6 @@ def generate_empty_template(df_items, proje_adi):
     dv_fiyat.error = 'Lütfen bu hücreye sadece rakam / fiyat giriniz. Metin girmek yasaktır.'
     ws.add_data_validation(dv_fiyat)
 
-    # 1-2. Satırlar: Proje Adı
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=8)
     p_name = proje_adi if proje_adi else "PROJE ADI GİRİNİZ"
     proje_hucre = ws.cell(row=1, column=1, value=f"PROJE ADI: {p_name.upper()}\nALT YÜKLENİCİ FİYAT TEKLİF FORMU (Lütfen sadece sarı alanları doldurunuz)")
@@ -128,16 +126,13 @@ def generate_empty_template(df_items, proje_adi):
     for r in range(1, 3):
         for c in range(1, 9): ws.cell(row=r, column=c).border = thin_border
     
-    # 3. Satır: Taşeron Bilgi Giriş Alanı (İzole ve Korumalı)
     ws.row_dimensions[3].height = 25
     
-    # Firma Adı
     ws.cell(row=3, column=1, value="FİRMA ADI:").font = bold_font
     ws.cell(row=3, column=1).fill = label_fill; ws.cell(row=3, column=1).border = thin_border; ws.cell(row=3, column=1).alignment = left_align
     ws.merge_cells(start_row=3, start_column=2, end_row=3, end_column=3)
     ws.cell(row=3, column=2).fill = input_fill; ws.cell(row=3, column=2).border = thin_border; ws.cell(row=3, column=3).border = thin_border
     
-    # Teklif Tarihi
     ws.cell(row=3, column=4, value="TEKLİF TARİHİ:").font = bold_font
     ws.cell(row=3, column=4).fill = label_fill; ws.cell(row=3, column=4).border = thin_border; ws.cell(row=3, column=4).alignment = center_align
     ws.merge_cells(start_row=3, start_column=5, end_row=3, end_column=6)
@@ -146,14 +141,12 @@ def generate_empty_template(df_items, proje_adi):
     ws.cell(row=3, column=6).border = thin_border
     dv_tarih.add('E3:F3')
     
-    # Geçerlilik Tarihi
     ws.cell(row=3, column=7, value="GEÇERLİLİK TRH:").font = bold_font
     ws.cell(row=3, column=7).fill = label_fill; ws.cell(row=3, column=7).border = thin_border; ws.cell(row=3, column=7).alignment = center_align
     c_gt = ws.cell(row=3, column=8)
     c_gt.fill = input_fill; c_gt.border = thin_border; c_gt.alignment = center_align; c_gt.number_format = 'DD.MM.YYYY'
     dv_tarih.add('H3')
 
-    # 4. Satır: Sütun Başlıkları
     headers = ["İş Grubu", "İmalat Adı", "Açıklama", "Özellikler", "Birim", "Metraj", "Birim Fiyat", "Toplam Tutar"]
     for i, h in enumerate(headers, 1):
         c = ws.cell(row=4, column=i, value=h)
@@ -168,7 +161,6 @@ def generate_empty_template(df_items, proje_adi):
                 c = ws.cell(row=current_row, column=i, value=str(val) if pd.notna(val) else "")
                 c.border = thin_border; c.alignment = center_align
             
-            # Birim Fiyat (Sarı Dolgu ve Sayısal Doğrulama)
             c_bf = ws.cell(row=current_row, column=7, value="")
             c_bf.fill = input_fill; c_bf.border = thin_border; c_bf.number_format = '#,##0.00'
             dv_fiyat.add(f'G{current_row}')
@@ -340,19 +332,25 @@ def build_comparison_matrix():
     if df_kalemler.empty or not st.session_state.firmalar: return pd.DataFrame()
     
     df_main = df_kalemler.copy()
-    df_main['Metraj'] = df_main['Metraj'].apply(safe_float)
+    if 'Metraj' in df_main.columns:
+        df_main['Metraj'] = df_main['Metraj'].apply(safe_float)
+    else:
+        df_main['Metraj'] = 0.0
     
     for firma in st.session_state.firmalar.keys():
         if firma in st.session_state.teklifler:
             df_firma = st.session_state.teklifler[firma]
+            
             if "İmalat Adı" in df_firma.columns and "Birim Fiyat" in df_firma.columns:
-                # HATA DÜZELTMESİ: Boş "İmalat Adı" satırlarını filtrele
                 df_firma_clean = df_firma.dropna(subset=["İmalat Adı"])
-                
                 fiyat_mapping = dict(zip(df_firma_clean["İmalat Adı"], df_firma_clean["Birim Fiyat"].apply(safe_float)))
-                bf_col = f"{firma} - B.Fiyat"; top_col = f"{firma} - Toplam"
+                
+                bf_col = f"{firma} - B.Fiyat"
+                top_col = f"{firma} - Toplam"
+                
                 df_main[bf_col] = df_main["İmalat Adı"].map(fiyat_mapping).fillna(0.0)
                 df_main[top_col] = df_main["Metraj"] * df_main[bf_col]
+                
     return df_main
 
 # ==========================================
