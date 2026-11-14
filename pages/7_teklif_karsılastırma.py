@@ -346,13 +346,13 @@ def build_comparison_matrix():
         if firma in st.session_state.teklifler:
             df_firma = st.session_state.teklifler[firma]
             if "İmalat Adı" in df_firma.columns and "Birim Fiyat" in df_firma.columns:
-                # HATA DÜZELTMESİ: Boş "İmalat Adı" satırlarını filtrele[cite: 2]
-                df_firma_clean = df_firma.dropna(subset=["İmalat Adı"])[cite: 2]
+                # HATA DÜZELTMESİ: Boş "İmalat Adı" satırlarını filtrele
+                df_firma_clean = df_firma.dropna(subset=["İmalat Adı"])
                 
-                fiyat_mapping = dict(zip(df_firma_clean["İmalat Adı"], df_firma_clean["Birim Fiyat"].apply(safe_float)))[cite: 2]
-                bf_col = f"{firma} - B.Fiyat"; top_col = f"{firma} - Toplam"[cite: 2]
-                df_main[bf_col] = df_main["İmalat Adı"].map(fiyat_mapping).fillna(0.0)[cite: 2]
-                df_main[top_col] = df_main["Metraj"] * df_main[bf_col][cite: 2]
+                fiyat_mapping = dict(zip(df_firma_clean["İmalat Adı"], df_firma_clean["Birim Fiyat"].apply(safe_float)))
+                bf_col = f"{firma} - B.Fiyat"; top_col = f"{firma} - Toplam"
+                df_main[bf_col] = df_main["İmalat Adı"].map(fiyat_mapping).fillna(0.0)
+                df_main[top_col] = df_main["Metraj"] * df_main[bf_col]
     return df_main
 
 # ==========================================
