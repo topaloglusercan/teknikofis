@@ -346,10 +346,12 @@ def build_comparison_matrix():
         if firma in st.session_state.teklifler:
             df_firma = st.session_state.teklifler[firma]
             if "İmalat Adı" in df_firma.columns and "Birim Fiyat" in df_firma.columns:
-                fiyat_mapping = dict(zip(df_firma["İmalat Adı"], df_firma["Birim Fiyat"].apply(safe_float)))
-                bf_col = f"{firma} - B.Fiyat"; top_col = f"{firma} - Toplam"
-                df_main[bf_col] = df_main["İmalat Adı"].map(fiyat_mapping).fillna(0.0)
-                df_main[top_col] = df_main["Metraj"] * df_main[bf_col]
+            # Boş satırları filtreleyerek tekrarlı NaN/None eşleştirme hatasını önle
+    df_firma_clean = df_firma.dropna(subset=["İmalat Adı"])
+    
+    fiyat_mapping = dict(zip(df_firma_clean["İmalat Adı"], df_firma_clean["Birim Fiyat"].apply(safe_float)))
+    bf_col = f"{firma} - B.Fiyat"; top_col = f"{firma} - Toplam"
+    df_main[bf_col] = df_main["İmalat Adı"].map(fiyat_mapping).fillna(0.0)
     return df_main
 
 # ==========================================
