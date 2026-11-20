@@ -154,12 +154,12 @@ def wbs_sirala(df_to_sort):
 
 def varsayilan_veri_olustur():
     data = [
-        {"WBS": "1", "Ad": "DUVAR KAPLAMA İŞLERİ", "Yerel_%": 100.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "1.1", "Ad": "İZOLASYON İŞLERİ (ISI,SES VE SU)", "Yerel_%": 13.5, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "1.2", "Ad": "BRÜT YÜZEY TAMİR, KARA SIVA VE ALÇI SIVA İŞLERİ", "Yerel_%": 48.9, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "A.1", "Ad": "SERAMİK KAPLAMA İŞLERİ", "Yerel_%": 14.5, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "B.1", "Ad": "AHŞAP KAPLAMA İŞLERİ", "Yerel_%": 9.4, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
-        {"WBS": "C.1", "Ad": "BOYA İŞLERİ", "Yerel_%": 13.7, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "DUV", "Ad": "DUVAR KAPLAMA İŞLERİ", "Yerel_%": 100.0, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "DUV.1", "Ad": "İZOLASYON İŞLERİ (ISI,SES VE SU)", "Yerel_%": 13.5, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "DUV.2", "Ad": "BRÜT YÜZEY TAMİR, KARA SIVA VE ALÇI SIVA İŞLERİ", "Yerel_%": 48.9, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "DUV.3", "Ad": "SERAMİK KAPLAMA İŞLERİ", "Yerel_%": 14.5, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "DUV.4", "Ad": "AHŞAP KAPLAMA İŞLERİ", "Yerel_%": 9.4, "Kilit": True, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
+        {"WBS": "DUV.5", "Ad": "BOYA İŞLERİ", "Yerel_%": 13.7, "Kilit": False, "İlerleme_%": 0.0, "Grup 1": "-", "Grup 2": "-", "Grup 3": "-"},
     ]
     return veri_cercevesini_normalize_et(pd.DataFrame(data))
 
@@ -212,7 +212,7 @@ def ebeveyn_haritasi_olustur(df):
         return {}
     df_sorted = wbs_sirala(df)
     parent_map = {}
-    stack = []  # [(depth, wbs)]
+    stack = []
     for wbs in df_sorted["WBS"].astype(str):
         depth = _wbs_depth(wbs)
         while stack and stack[-1][0] >= depth:
@@ -343,7 +343,6 @@ def sonraki_wbs_uret(parent_wbs, current_df):
 def wbs_alt_agac_yeniden_numarala_haritasi(dataframe, eski_kok, yeni_kok):
     """
     Dinamik ağaç yapısını koruyarak eski_kok ve altındaki TÜM çocukları
-    (farklı önekli A.1, B.1, C.1 gibi alt kalemler dahil)
     yeni_kok, yeni_kok.1, yeni_kok.1.1 şeklinde özyinelemeli olarak eşler.
     """
     eski_str = str(eski_kok)
@@ -380,8 +379,6 @@ def wbs_degistir(eski_kok, yeni_kok, dataframe):
 def wbs_degistir_guvenli(eski_kok, yeni_kok, dataframe):
     """
     WBS yeniden adlandırma öncesi boşluk, tekillik ve alt-ağaç çakışma kontrolü yapar.
-    Örn: '1' -> 'DUV' yapıldığında altındaki '1.1', '1.2', 'A.1', 'B.1', 'B.1.1', 'C.1'
-    otomatik olarak 'DUV.1', 'DUV.2', 'DUV.3', 'DUV.4', 'DUV.4.1', 'DUV.5' olur.
     Dönüş: (basarili: bool, yeni_df_veya_hata_mesaji, yeni_kod_haritasi: dict)
     """
     eski_str = temizle_metin(eski_kok, "")
@@ -413,8 +410,6 @@ def wbs_degistir_guvenli(eski_kok, yeni_kok, dataframe):
 def akilli_dengele(old_df, new_df):
     """
     Her dinamik ebeveyn grubunda Yerel_% toplamını 100.0000% olacak şekilde dengeler.
-    Değiştirilen satırları otomatik kilitler; kilitsiz satırlara kalan payı oransal dağıtır
-    ve yuvarlama farkını son kilitsiz satıra yansıtarak tam 100.0% toplamını korur.
     """
     if new_df is None or new_df.empty:
         return pd.DataFrame(columns=BASE_COLUMNS) if new_df is None else new_df.copy()
@@ -494,13 +489,11 @@ def wbs_hedefe_tasi_coklu_df(df, kaynak_wbs_listesi, hedef_parent_wbs):
         k_str = str(k_wbs)
         if k_str in kokler or k_str == hedef_str or k_str not in parent_map:
             continue
-        # Hedef, k_str'nin alt çocuğuysa taşımayı engelle
         alt_set = set(alt_agac_wbsleri(df_temp, k_str, parent_map))
         if hedef_str in alt_set:
             continue
         adaylar.append(k_str)
 
-    # Üst kalemi zaten taşınacak olan alt kalemleri ele
     aday_set = set(adaylar)
     gecerli_kaynaklar = []
     for k_str in adaylar:
@@ -624,7 +617,6 @@ def wbs_sil_df(df, silinecek_wbs_listesi):
     """
     Seçili WBS kalemlerini ve dinamik alt kırılımlarını siler.
     Tablonun tamamen boş kalmasını engeller.
-    Dönüş: (basarili: bool, sonuc_df_veya_hata)
     """
     if df.empty or not silinecek_wbs_listesi:
         return False, "Silinecek kalem seçilmedi."
@@ -667,7 +659,6 @@ def hesapla_pursantaj(raw_df, proje_bedeli):
     Ham WBS tablosundan tüm hiyerarşi, genel pay, bütçe, hakediş,
     Türkçe para görünüm sütunları, yaprak/ana-başlık ayrımı ve
     miraslı etkin grup sütunlarını hesaplar.
-    Dönüş: (hesaplanmis_df, senkronize_baz_df)
     """
     base_df = veri_cercevesini_normalize_et(raw_df)
     if base_df.empty:
@@ -734,7 +725,6 @@ def hesapla_pursantaj(raw_df, proje_bedeli):
                 df.at[idx, "İlerleme_%"] = calculated_progress
                 base_df.at[idx, "İlerleme_%"] = calculated_progress
 
-    # Türkçe para formatı sütunları ('1.000.000,00 ₺')
     df["Bütçe (TR)"] = df["Bütçe (TL)"].apply(para_bicimlendir_tr)
     df["Hakediş (TR)"] = df["Hakediş (TL)"].apply(para_bicimlendir_tr)
 
@@ -801,11 +791,9 @@ def pivot_tablo_olustur(computed_df, grup_col):
 
 def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
     """
-    Master tablo (st.data_editor) değişikliklerini güvenli şekilde işler:
-    - WBS değiştirildiğinde o kalem ve altındaki TÜM çocuklar (örn. '1' -> 'DUV'
-      yapıldığında 'DUV.1', 'DUV.1.1'...) otomatik yeniden numaralandırılır.
-    - Çocuğu olan (Is_Leaf == False) kalemlere manuel İlerleme_% girişini KESİNLİKLE engeller,
-      ancak aynı düzenlemedeki diğer geçerli değişiklikleri kaybetmeden uygular.
+    Planlama & Master tablo değişikliklerini güvenli şekilde işler:
+    - WBS değiştirildiğinde alt ağaç otomatik yeniden numaralandırılır.
+    - İlerleme_% sütunu varsa bile ana başlıklara manuel ilerleme girişini engeller.
     """
     sonuc = {
         "df": ana_df.copy(),
@@ -821,7 +809,6 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
 
     yeni_ana_df = ana_df.copy()
 
-    # 1. Önce WBS değişikliği kontrolü (alt ağaç otomatik yeniden numaralama dahil)
     for i in range(len(gosterilecek_df)):
         eski_w = temizle_metin(gosterilecek_df.iloc[i]["WBS"], "")
         yeni_w = temizle_metin(edited_df.iloc[i]["WBS"], "")
@@ -836,7 +823,6 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
             sonuc["wbs_yeniden_esleme"] = yeni_harita
             return sonuc
 
-    # 2. Diğer sütun değişiklikleri
     for i in range(len(gosterilecek_df)):
         eski_row = gosterilecek_df.iloc[i]
         yeni_row = edited_df.iloc[i]
@@ -857,17 +843,19 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
             sonuc["degisim_var"] = True
 
         for g_col in GRUP_COLUMNS:
-            eski_g = temizle_grup_degeri(eski_row[g_col])
-            yeni_g = temizle_grup_degeri(yeni_row[g_col])
-            if eski_g != yeni_g:
-                yeni_ana_df.loc[hedef_mask, g_col] = yeni_g
-                sonuc["degisim_var"] = True
+            if g_col in edited_df.columns:
+                eski_g = temizle_grup_degeri(eski_row[g_col])
+                yeni_g = temizle_grup_degeri(yeni_row[g_col])
+                if eski_g != yeni_g:
+                    yeni_ana_df.loc[hedef_mask, g_col] = yeni_g
+                    sonuc["degisim_var"] = True
 
-        eski_yerel = guvenli_yuzde(eski_row["Yerel_%"])
-        yeni_yerel = guvenli_yuzde(yeni_row["Yerel_%"])
-        if not np.isclose(eski_yerel, yeni_yerel, atol=0.005):
-            yeni_ana_df.loc[hedef_mask, "Yerel_%"] = yeni_yerel
-            sonuc["degisim_var"] = True
+        if "Yerel_%" in edited_df.columns:
+            eski_yerel = guvenli_yuzde(eski_row["Yerel_%"])
+            yeni_yerel = guvenli_yuzde(yeni_row["Yerel_%"])
+            if not np.isclose(eski_yerel, yeni_yerel, atol=0.005):
+                yeni_ana_df.loc[hedef_mask, "Yerel_%"] = yeni_yerel
+                sonuc["degisim_var"] = True
 
         if "İlerleme_%" in edited_df.columns:
             eski_il = guvenli_yuzde(eski_row["İlerleme_%"])
@@ -933,8 +921,8 @@ def dosya_yukle_df(imp_df):
 # --- 6. EXCEL İNDİRME FONKSİYONLARI ---
 def excel_sablon_olustur():
     df_sablon = pd.DataFrame({
-        "WBS": ["A", "A.1", "A.1.1", "A.1.2", "A.2"],
-        "Ad": ["A Blok", "Üst Yapı", "Kaba İnşaat", "İnce İşler", "Alt Yapı"],
+        "WBS": ["DUV", "DUV.1", "DUV.1.1", "DUV.1.2", "DUV.2"],
+        "Ad": ["Duvar İşleri", "Üst Yapı", "Kaba İnşaat", "İnce İşler", "Alt Yapı"],
     })
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -1150,7 +1138,7 @@ def render_app():
     ])
 
     # =========================================================================
-    # SEKME 1: PLANLAMA VE MASTER TABLO
+    # SEKME 1: PLANLAMA VE MASTER TABLO (SADECE WBS, AĞIRLIK, BÜTÇE VE GRUPLAR)
     # =========================================================================
     with tab1:
         col_sol, col_sag = st.columns([3.5, 1.2])
@@ -1174,11 +1162,6 @@ def render_app():
                     default=mevcut_seviyeler,
                     format_func=lambda x: f"Seviye {x + 1}",
                 )
-            sadece_yaprak_goster = st.toggle(
-                "🎯 Sadece İlerleme Girilebilir (Çocuğu Olmayan) Aktiviteleri Göster",
-                value=False,
-                help="Açıkken yalnızca alt kırılımı olmayan aktiviteler listelenir; ana başlıklara yanlışlıkla ilerleme girilmesi tamamen önlenir.",
-            )
             st.markdown("</div>", unsafe_allow_html=True)
 
             gosterilecek_df = df.copy()
@@ -1195,15 +1178,13 @@ def render_app():
                 gosterilecek_df = gosterilecek_df[gosterilecek_df["Etkin_Grup 3"] == filtre_g3]
             if secilen_seviyeler:
                 gosterilecek_df = gosterilecek_df[gosterilecek_df["Gorsel_Derinlik"].isin(secilen_seviyeler)]
-            if sadece_yaprak_goster:
-                gosterilecek_df = gosterilecek_df[gosterilecek_df["Is_Leaf"]]
 
             gosterilecek_df = gosterilecek_df.reset_index(drop=True)
 
+            # Planlama tablosu: sadece WBS, hiyerarşi, ağırlık, bütçe ve gruplar (ilerleme ve hakediş yok)
             edit_cols = [
                 "WBS", "Ağaç Görünümü", "Kalem Tipi", "Ad", "Kilit",
-                "Yerel_%", "İlerleme_%", "Bütçe (TR)", "Hakediş (TR)",
-                "Grup 1", "Grup 2", "Grup 3",
+                "Yerel_%", "Bütçe (TR)", "Grup 1", "Grup 2", "Grup 3",
             ]
 
             edited_df = st.data_editor(
@@ -1219,9 +1200,7 @@ def render_app():
                     "Ad": st.column_config.TextColumn("✏️ Kalem Adı"),
                     "Kilit": st.column_config.CheckboxColumn("🔒 Kilit", width="small"),
                     "Yerel_%": st.column_config.NumberColumn("Ağırlık (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
-                    "İlerleme_%": st.column_config.NumberColumn("✏️ İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
                     "Bütçe (TR)": st.column_config.TextColumn("Bütçe (₺)", disabled=True, width="small"),
-                    "Hakediş (TR)": st.column_config.TextColumn("Hakediş (₺)", disabled=True, width="small"),
                     "Grup 1": st.column_config.TextColumn("Grup 1", width="small"),
                     "Grup 2": st.column_config.TextColumn("Grup 2", width="small"),
                     "Grup 3": st.column_config.TextColumn("Grup 3", width="small"),
@@ -1230,8 +1209,8 @@ def render_app():
             )
 
             st.caption(
-                "ℹ️ Bir üst başlığın WBS kodunu değiştirdiğinizde (örn. `1` → `DUV`), alt kırılımları otomatik olarak `DUV.1`, `DUV.1.1` şeklinde güncellenir. "
-                "Yalnızca **✅ Aktivite** (çocuğu olmayan) satırlarına ilerleme girilebilir."
+                "ℹ️ Bir üst başlığın WBS kodunu değiştirdiğinizde (örn. `DUV` → `KAP`), alt kırılımları otomatik olarak `KAP.1`, `KAP.1.1` şeklinde güncellenir. "
+                "İlerleme yüzdeleri ve hakediş takibi **✅ İlerleme Girişi (Alt Aktiviteler)** sekmesinden yapılır."
             )
 
             sonuc = editor_degisikliklerini_uygula(st.session_state.df, gosterilecek_df, edited_df)
@@ -1239,15 +1218,6 @@ def render_app():
             if sonuc["hata"]:
                 st.error(sonuc["hata"])
                 st.stop()
-
-            if sonuc["engellenen_ebeveynler"]:
-                kodlar = ", ".join(sonuc["engellenen_ebeveynler"])
-                st.session_state.uyari_mesaji = (
-                    f"⚠️ Alt kırılımı bulunan ana başlıklara ({kodlar}) manuel ilerleme girilemez! "
-                    "Bu satırların ilerlemesi alt aktivitelerden otomatik hesaplanır. "
-                    "Diğer geçerli değişiklikleriniz (varsa) korundu."
-                )
-                st.session_state.editor_version += 1
 
             if sonuc["degisim_var"]:
                 st.session_state.df = sonuc["df"]
@@ -1260,8 +1230,6 @@ def render_app():
                         harita.get(x, x) for x in st.session_state.kesilen_wbs_listesi
                     ]
                     st.session_state.editor_version += 1
-                st.rerun()
-            elif sonuc["engellenen_ebeveynler"]:
                 st.rerun()
 
         with col_sag:
@@ -1296,7 +1264,7 @@ def render_app():
                 secili_is_leaf = bool(secili_row["Is_Leaf"])
                 st.markdown(f"""
                 <div class="selected-card">
-                    <div class="sc-title">SEÇİLİ ÖĞE ({'ALT AKTİVİTE' if secili_is_leaf else 'ANA BAŞLIK - OTOMATİK'})</div>
+                    <div class="sc-title">SEÇİLİ ÖĞE ({'ALT AKTİVİTE' if secili_is_leaf else 'ANA BAŞLIK'})</div>
                     <div class="sc-name">{secili_row['Ad']}</div>
                     <div class="sc-wbs">WBS: {secili_row['WBS']}</div>
                     <div class="sc-metrics">
@@ -1311,28 +1279,6 @@ def render_app():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-                st.markdown("#### 📈 İlerleme Yüzdesi")
-                yeni_tekil_ilerleme = st.number_input(
-                    "İlerleme (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(secili_row["İlerleme_%"]),
-                    step=1.0,
-                    disabled=not secili_is_leaf,
-                    key=f"tekil_ilerleme_{ilk_secili_wbs}_{st.session_state.editor_version}",
-                )
-                if not secili_is_leaf:
-                    st.caption("🔒 Bu aktivitenin alt kırılımları olduğu için ilerleme girişi devre dışıdır.")
-                else:
-                    if st.button("💾 İlerlemeyi Kaydet", use_container_width=True):
-                        guncel_df, degisti, _ = yaprak_ilerleme_guncelle(
-                            st.session_state.df, df, {ilk_secili_wbs: yeni_tekil_ilerleme}
-                        )
-                        if degisti:
-                            st.session_state.df = guncel_df
-                            st.session_state.editor_version += 1
-                            st.rerun()
             else:
                 toplam_secili_butce = float(df[df["WBS"].isin(secili_wbsler)]["Bütçe (TL)"].sum())
                 toplam_secili_pay = float(df[df["WBS"].isin(secili_wbsler)]["Genel_%"].sum())
@@ -1463,12 +1409,12 @@ def render_app():
     with tab2:
         st.markdown("### ✅ Hızlı İlerleme Girişi (Sadece Çocuğu Olmayan Aktiviteler)")
         st.caption(
-            "Bu tabloda yalnızca ilerleme girilebilen alt aktiviteler aktiftir. "
+            "Bu bölüm yalnızca ilerleme yüzdelerinin girilmesi içindir. "
             "Alt kırılımı bulunan ana başlıklar aşağıda salt okunur özet olarak otomatik hesaplanır."
         )
 
         yaprak_giris_df = df[df["Is_Leaf"]][
-            ["WBS", "Ağaç Görünümü", "Ad", "Genel_%", "Bütçe (TR)", "İlerleme_%", "Hakediş (TR)", "Etkin_Grup 1"]
+            ["WBS", "Ağaç Görünümü", "Ad", "Genel_%", "Bütçe (TR)", "İlerleme_%", "Hakediş (TR)"]
         ].reset_index(drop=True)
 
         duzenlenen_yaprak = st.data_editor(
@@ -1485,7 +1431,6 @@ def render_app():
                 "Bütçe (TR)": st.column_config.TextColumn("Bütçe (₺)", disabled=True, width="small"),
                 "İlerleme_%": st.column_config.NumberColumn("✏️ İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
                 "Hakediş (TR)": st.column_config.TextColumn("Hakediş (₺)", disabled=True, width="small"),
-                "Etkin_Grup 1": st.column_config.TextColumn("Grup 1", disabled=True, width="small"),
             },
             key=f"leaf_progress_editor_{st.session_state.editor_version}",
         )
@@ -1533,9 +1478,9 @@ def render_app():
             )
         with p_col2:
             pivot_data, ezilen_gruplar = pivot_tablo_olustur(df, grup_secim)
-            pivot_gosterim = pivot_data[[grup_col_name for grup_col_name in [
+            pivot_gosterim = pivot_data[[
                 grup_secim, "Kalem_Sayisi", "Bütçe (TR)", "Hakediş (TR)", "Gerçekleşme (%)"
-            ]]].copy()
+            ]].copy()
             st.dataframe(
                 pivot_gosterim,
                 use_container_width=True,
