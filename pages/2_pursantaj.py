@@ -7,7 +7,7 @@ import streamlit as st
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
-# --- 1. SABİTLER VE TEMEL TEMİZLİK YARDIMCILARI ---
+# --- 1. SABİTLER VE TEMEL TEMİZLİK / TÜRKÇE FORMAT YARDIMCILARI ---
 BASE_COLUMNS = ["WBS", "Ad", "Yerel_%", "Kilit", "İlerleme_%", "Grup 1", "Grup 2", "Grup 3"]
 GRUP_COLUMNS = ["Grup 1", "Grup 2", "Grup 3"]
 
@@ -65,7 +65,6 @@ def bedel_metni_cozumle(metin):
     nokta_sayisi = sadece_rakam_ve_ayirici.count(".")
 
     if virgul_sayisi > 0 and nokta_sayisi > 0:
-        # Son görünen ayırıcı ondalık ayırıcısıdır
         if sadece_rakam_ve_ayirici.rfind(",") > sadece_rakam_ve_ayirici.rfind("."):
             temiz = sadece_rakam_ve_ayirici.replace(".", "").replace(",", ".")
         else:
@@ -99,8 +98,30 @@ def bedel_metni_cozumle(metin):
 
 
 def bedel_bicimlendir(deger):
-    """Float değeri Türkçe para formatına ('1.000.000,00') çevirir."""
-    return f"{float(deger):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    """Float değeri Türkçe sayı formatına ('1.000.000,00') çevirir."""
+    try:
+        val = float(deger)
+        if not np.isfinite(val):
+            val = 0.0
+    except (TypeError, ValueError):
+        val = 0.0
+    return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def para_bicimlendir_tr(deger):
+    """Float değeri Türkçe para formatına ('1.000.000,00 ₺') çevirir."""
+    return f"{bedel_bicimlendir(deger)} ₺"
+
+
+def yuzde_bicimlendir_tr(deger):
+    """Float değeri Türkçe yüzde formatına ('%13,50') çevirir."""
+    try:
+        val = float(deger)
+        if not np.isfinite(val):
+            val = 0.0
+    except (TypeError, ValueError):
+        val = 0.0
+    return f"%{val:.2f}".replace(".", ",")
 
 
 # --- 2. VERİ MODELİ VE ALFANÜMERİK SIRALAMA ---
@@ -176,7 +197,7 @@ def veri_cercevesini_normalize_et(df_raw):
     return wbs_sirala(df_norm[BASE_COLUMNS])
 
 
-# --- 3. DİNAMİK EBEVEYN BULUCU (O(N) YIĞIN ALGORİTMASI) ---
+# --- 3. DİNAMİK EBEVEYN VE ALT AĞAÇ HARİTALARI (O(N)) ---
 def _wbs_depth(wbs_str):
     return len(str(wbs_str).strip().split(".")) - 1
 
@@ -199,6 +220,38 @@ def ebeveyn_haritasi_olustur(df):
         parent_map[wbs] = stack[-1][1] if stack else "KÖK"
         stack.append((depth, wbs))
     return parent_map
+
+
+def cocuk_haritasi_olustur(df, parent_map=None):
+    """Sıralı tablo düzeninde her ebeveynin doğrudan çocuklarını listeler."""
+    df_sorted = wbs_sirala(df)
+    if parent_map is None:
+        parent_map = ebeveyn_haritasi_olustur(df_sorted)
+    children_map = {}
+    for wbs in df_sorted["WBS"].astype(str):
+        p = parent_map.get(wbs, "KÖK")
+        children_map.setdefault(p, []).append(wbs)
+    return children_map
+
+
+def alt_agac_wbsleri(df, kok_wbs, parent_map=None):
+    """Dinamik hiyerarşiye göre kok_wbs ve tüm alt çocuklarını sıralı liste olarak döndürür."""
+    kok_str = str(kok_wbs)
+    children_map = cocuk_haritasi_olustur(df, parent_map)
+    sonuc = []
+    ziyaret = set()
+
+    def _gez(w):
+        if w in ziyaret:
+            return
+        ziyaret.add(w)
+        sonuc.append(w)
+        for c in children_map.get(w, []):
+            _gez(c)
+
+    if kok_str in set(df["WBS"].astype(str).tolist()):
+        _gez(kok_str)
+    return sonuc
 
 
 def get_dynamic_parent(df, target_wbs):
@@ -252,7 +305,7 @@ def etkin_grup_haritasi_olustur(df, grup_col, parent_map):
     return etkin_harita
 
 
-# --- 4. ALFANÜMERİK WBS İŞLEMLERİ (SAF FONKSİYONLAR) ---
+# --- 4. ALFANÜMERİK WBS İŞLEMLERİ (DİNAMİK ALT AĞAÇ DESTEKLİ) ---
 def parent_bul(wbs):
     return str(wbs).rsplit(".", 1)[0] if "." in str(wbs) else "KÖK"
 
@@ -287,43 +340,74 @@ def sonraki_wbs_uret(parent_wbs, current_df):
         return f"{prefix}{aday_num}"
 
 
-def wbs_degistir(eski_kok, yeni_kok, dataframe):
-    df_copy = dataframe.copy()
+def wbs_alt_agac_yeniden_numarala_haritasi(dataframe, eski_kok, yeni_kok):
+    """
+    Dinamik ağaç yapısını koruyarak eski_kok ve altındaki TÜM çocukları
+    (farklı önekli A.1, B.1, C.1 gibi alt kalemler dahil)
+    yeni_kok, yeni_kok.1, yeni_kok.1.1 şeklinde özyinelemeli olarak eşler.
+    """
     eski_str = str(eski_kok)
     yeni_str = str(yeni_kok)
-    mask = (df_copy["WBS"].astype(str) == eski_str) | (df_copy["WBS"].astype(str).str.startswith(eski_str + "."))
-    df_copy.loc[mask, "WBS"] = df_copy.loc[mask, "WBS"].astype(str).apply(
-        lambda x: yeni_str + x[len(eski_str):]
-    )
+    parent_map = ebeveyn_haritasi_olustur(dataframe)
+    children_map = cocuk_haritasi_olustur(dataframe, parent_map)
+
+    yeni_harita = {}
+    ziyaret = set()
+
+    def _ata(eski_w, yeni_w):
+        if eski_w in ziyaret:
+            return
+        ziyaret.add(eski_w)
+        yeni_harita[eski_w] = yeni_w
+        for idx_c, cocuk_w in enumerate(children_map.get(eski_w, []), start=1):
+            _ata(cocuk_w, f"{yeni_w}.{idx_c}")
+
+    if eski_str in set(dataframe["WBS"].astype(str).tolist()):
+        _ata(eski_str, yeni_str)
+    return yeni_harita
+
+
+def wbs_degistir(eski_kok, yeni_kok, dataframe):
+    """Dinamik alt ağaçtaki tüm kalemleri yeni_kok temelinde yeniden numaralandırır."""
+    df_copy = dataframe.copy()
+    yeni_harita = wbs_alt_agac_yeniden_numarala_haritasi(df_copy, eski_kok, yeni_kok)
+    if not yeni_harita:
+        return df_copy
+    df_copy["WBS"] = df_copy["WBS"].astype(str).apply(lambda x: yeni_harita.get(x, x))
     return df_copy
 
 
 def wbs_degistir_guvenli(eski_kok, yeni_kok, dataframe):
     """
     WBS yeniden adlandırma öncesi boşluk, tekillik ve alt-ağaç çakışma kontrolü yapar.
-    Dönüş: (basarili: bool, yeni_df_veya_hata_mesaji)
+    Örn: '1' -> 'DUV' yapıldığında altındaki '1.1', '1.2', 'A.1', 'B.1', 'B.1.1', 'C.1'
+    otomatik olarak 'DUV.1', 'DUV.2', 'DUV.3', 'DUV.4', 'DUV.4.1', 'DUV.5' olur.
+    Dönüş: (basarili: bool, yeni_df_veya_hata_mesaji, yeni_kod_haritasi: dict)
     """
     eski_str = temizle_metin(eski_kok, "")
     yeni_str = temizle_metin(yeni_kok, "")
     if not yeni_str:
-        return False, "❌ Hata: WBS kodu boş olamaz!"
+        return False, "❌ Hata: WBS kodu boş olamaz!", {}
     if yeni_str == eski_str:
-        return True, dataframe.copy()
+        return True, dataframe.copy(), {}
+
+    yeni_harita = wbs_alt_agac_yeniden_numarala_haritasi(dataframe, eski_str, yeni_str)
+    if not yeni_harita:
+        return False, f"❌ Hata: '{eski_str}' numaralı WBS kodu bulunamadı!", {}
 
     wbs_series = dataframe["WBS"].astype(str)
-    tasinan_mask = (wbs_series == eski_str) | wbs_series.str.startswith(eski_str + ".")
-    if not tasinan_mask.any():
-        return False, f"❌ Hata: '{eski_str}' numaralı WBS kodu bulunamadı!"
+    tasinan_set = set(yeni_harita.keys())
+    diger_wbsler = set(wbs_series[~wbs_series.isin(tasinan_set)].tolist())
+    yeni_degerler = set(yeni_harita.values())
 
-    diger_wbsler = set(wbs_series[~tasinan_mask].tolist())
-    yeni_wbsler = [yeni_str + x[len(eski_str):] for x in wbs_series[tasinan_mask].tolist()]
-    cakisanlar = diger_wbsler.intersection(yeni_wbsler)
+    cakisanlar = diger_wbsler.intersection(yeni_degerler)
     if cakisanlar:
         ornek = sorted(cakisanlar)[0]
-        return False, f"❌ Hata: '{ornek}' numaralı WBS kodu zaten kullanılıyor!"
+        return False, f"❌ Hata: '{ornek}' numaralı WBS kodu zaten kullanılıyor!", {}
 
-    guncel = wbs_degistir(eski_str, yeni_str, dataframe)
-    return True, wbs_sirala(guncel)
+    guncel = dataframe.copy()
+    guncel["WBS"] = guncel["WBS"].astype(str).apply(lambda x: yeni_harita.get(x, x))
+    return True, wbs_sirala(guncel), yeni_harita
 
 
 def akilli_dengele(old_df, new_df):
@@ -388,7 +472,6 @@ def akilli_dengele(old_df, new_df):
                 esit_pay = round(remaining / len(unlocked_indices), 4)
                 yeni_degerler = [esit_pay for _ in unlocked_indices]
 
-            # Yuvarlama kaymasını son kilitsiz satıra ekle (tam 100% koruma)
             if len(yeni_degerler) > 0:
                 fark = round(remaining - sum(yeni_degerler), 4)
                 yeni_degerler[-1] = round(max(0.0, yeni_degerler[-1] + fark), 4)
@@ -406,21 +489,18 @@ def wbs_hedefe_tasi_coklu_df(df, kaynak_wbs_listesi, hedef_parent_wbs):
     kokler = {w for w, p in parent_map.items() if p == "KÖK"}
     hedef_str = str(hedef_parent_wbs)
 
-    # Geçerli kaynakları topla
     adaylar = []
     for k_wbs in kaynak_wbs_listesi:
         k_str = str(k_wbs)
-        if k_str in kokler:
+        if k_str in kokler or k_str == hedef_str or k_str not in parent_map:
             continue
-        if k_str == hedef_str:
-            continue
-        if hedef_str.startswith(k_str + "."):
-            continue
-        if k_str not in parent_map:
+        # Hedef, k_str'nin alt çocuğuysa taşımayı engelle
+        alt_set = set(alt_agac_wbsleri(df_temp, k_str, parent_map))
+        if hedef_str in alt_set:
             continue
         adaylar.append(k_str)
 
-    # Üst kalemi zaten taşınacak olan alt kalemleri ele (çift taşıma hatasını önler)
+    # Üst kalemi zaten taşınacak olan alt kalemleri ele
     aday_set = set(adaylar)
     gecerli_kaynaklar = []
     for k_str in adaylar:
@@ -437,12 +517,10 @@ def wbs_hedefe_tasi_coklu_df(df, kaynak_wbs_listesi, hedef_parent_wbs):
     if not gecerli_kaynaklar:
         return df_temp
 
-    maskeler = [
-        (df_temp["WBS"].astype(str) == k) | (df_temp["WBS"].astype(str).str.startswith(k + "."))
-        for k in gecerli_kaynaklar
-    ]
-    tam_maske = pd.concat(maskeler, axis=1).any(axis=1)
-    df_temp.loc[tam_maske, "Kilit"] = False
+    tasinan_tum = set()
+    for k in gecerli_kaynaklar:
+        tasinan_tum.update(alt_agac_wbsleri(df_temp, k, parent_map))
+    df_temp.loc[df_temp["WBS"].astype(str).isin(tasinan_tum), "Kilit"] = False
 
     for k_wbs in gecerli_kaynaklar:
         yeni_wbs = sonraki_wbs_uret(hedef_str, df_temp)
@@ -519,19 +597,20 @@ def wbs_tasi_df(df, kaynak_wbs, yon):
 
 def wbs_agaci_kopyala_df(df, kaynak_wbs, kopya_sayisi):
     kaynak_str = str(kaynak_wbs)
-    mask = (df["WBS"].astype(str) == kaynak_str) | (df["WBS"].astype(str).str.startswith(kaynak_str + "."))
-    kaynak_agac = df[mask].copy()
-    if kaynak_agac.empty or kopya_sayisi < 1:
+    parent_map = ebeveyn_haritasi_olustur(df)
+    alt_wbsler = alt_agac_wbsleri(df, kaynak_str, parent_map)
+    if not alt_wbsler or kopya_sayisi < 1:
         return df.copy()
 
-    parent = get_dynamic_parent(df, kaynak_str)
+    kaynak_agac = df[df["WBS"].astype(str).isin(alt_wbsler)].copy()
+    parent = parent_map.get(kaynak_str, "KÖK")
     df_temp = df.copy()
+
     for i in range(int(kopya_sayisi)):
         yeni_kok_wbs = sonraki_wbs_uret(parent, df_temp)
+        yeni_harita = wbs_alt_agac_yeniden_numarala_haritasi(kaynak_agac, kaynak_str, yeni_kok_wbs)
         kopya_agac_i = kaynak_agac.copy()
-        kopya_agac_i["WBS"] = kopya_agac_i["WBS"].astype(str).apply(
-            lambda x: str(yeni_kok_wbs) + x[len(kaynak_str):]
-        )
+        kopya_agac_i["WBS"] = kopya_agac_i["WBS"].astype(str).map(yeni_harita)
         kopya_agac_i.loc[kopya_agac_i["WBS"] == yeni_kok_wbs, "Ad"] += f" (Kopya {i + 1})"
         kopya_agac_i["İlerleme_%"] = 0.0
         kopya_agac_i["Kilit"] = False
@@ -543,17 +622,19 @@ def wbs_agaci_kopyala_df(df, kaynak_wbs, kopya_sayisi):
 
 def wbs_sil_df(df, silinecek_wbs_listesi):
     """
-    Seçili WBS kalemlerini ve alt kırılımlarını siler.
+    Seçili WBS kalemlerini ve dinamik alt kırılımlarını siler.
     Tablonun tamamen boş kalmasını engeller.
     Dönüş: (basarili: bool, sonuc_df_veya_hata)
     """
     if df.empty or not silinecek_wbs_listesi:
         return False, "Silinecek kalem seçilmedi."
 
-    wbs_s = df["WBS"].astype(str)
-    maskeler = [(wbs_s == str(w)) | wbs_s.str.startswith(str(w) + ".") for w in silinecek_wbs_listesi]
-    sil_mask = pd.concat(maskeler, axis=1).any(axis=1)
-    kalan = df[~sil_mask].copy().reset_index(drop=True)
+    parent_map = ebeveyn_haritasi_olustur(df)
+    silinecek_tum = set()
+    for w in silinecek_wbs_listesi:
+        silinecek_tum.update(alt_agac_wbsleri(df, str(w), parent_map))
+
+    kalan = df[~df["WBS"].astype(str).isin(silinecek_tum)].copy().reset_index(drop=True)
     if kalan.empty:
         return False, "❌ Projedeki tüm kalemler silinemez; en az bir kalem kalmalıdır."
 
@@ -584,7 +665,8 @@ def gorsel_isim_olustur(row):
 def hesapla_pursantaj(raw_df, proje_bedeli):
     """
     Ham WBS tablosundan tüm hiyerarşi, genel pay, bütçe, hakediş,
-    yaprak/ana-başlık ayrımı ve miraslı etkin grup sütunlarını hesaplar.
+    Türkçe para görünüm sütunları, yaprak/ana-başlık ayrımı ve
+    miraslı etkin grup sütunlarını hesaplar.
     Dönüş: (hesaplanmis_df, senkronize_baz_df)
     """
     base_df = veri_cercevesini_normalize_et(raw_df)
@@ -593,7 +675,8 @@ def hesapla_pursantaj(raw_df, proje_bedeli):
         for col in [
             "Dyn_Parent", "Derinlik", "Gorsel_Derinlik", "Is_Leaf", "Kalem Tipi",
             "Ağaç Görünümü", "Genel_%", "Bütçe (TL)", "Hakediş (TL)",
-            "Etkin_Grup 1", "Etkin_Grup 2", "Etkin_Grup 3"
+            "Bütçe (TR)", "Hakediş (TR)",
+            "Etkin_Grup 1", "Etkin_Grup 2", "Etkin_Grup 3",
         ]:
             bos[col] = pd.Series(dtype="object")
         return bos, base_df
@@ -611,12 +694,10 @@ def hesapla_pursantaj(raw_df, proje_bedeli):
     df["Kalem Tipi"] = np.where(df["Is_Leaf"], "✅ Aktivite", "🔒 Ana Başlık (Oto)")
     df["Ağaç Görünümü"] = df.apply(gorsel_isim_olustur, axis=1)
 
-    # Etkin (miraslı) grup sütunları
     for g_col in GRUP_COLUMNS:
         etkin_map = etkin_grup_haritasi_olustur(df, g_col, parent_map)
         df[f"Etkin_{g_col}"] = df["WBS"].astype(str).map(etkin_map)
 
-    # Yukarıdan aşağıya Genel_% hesabı (gerçek ağaç derinliğine göre)
     genel_map = {}
     max_g_derinlik = int(df["Gorsel_Derinlik"].max())
     for d in range(0, max_g_derinlik + 1):
@@ -633,7 +714,6 @@ def hesapla_pursantaj(raw_df, proje_bedeli):
 
     df["Bütçe (TL)"] = ((df["Genel_%"] / 100.0) * float(proje_bedeli)).round(2)
 
-    # Aşağıdan yukarıya Hakediş ve ebeveyn İlerleme_% hesabı
     df["Hakediş (TL)"] = 0.0
     leaf_mask = df["Is_Leaf"]
     df.loc[leaf_mask, "Hakediş (TL)"] = (
@@ -654,18 +734,23 @@ def hesapla_pursantaj(raw_df, proje_bedeli):
                 df.at[idx, "İlerleme_%"] = calculated_progress
                 base_df.at[idx, "İlerleme_%"] = calculated_progress
 
+    # Türkçe para formatı sütunları ('1.000.000,00 ₺')
+    df["Bütçe (TR)"] = df["Bütçe (TL)"].apply(para_bicimlendir_tr)
+    df["Hakediş (TR)"] = df["Hakediş (TL)"].apply(para_bicimlendir_tr)
+
     return df, base_df
 
 
 def pivot_tablo_olustur(computed_df, grup_col):
     """
     Yaprak aktiviteler üzerinden etkin (miraslı) grup bazlı pivot tablo üretir.
-    - Ana başlıklara atanan gruplar altındaki grupsuz ('-') yapraklara miras kalır.
-    - Bütçe/Hakediş asla çift sayılmaz (toplam her zaman %100 yaprak bütçesine eşittir).
     Dönüş: (pivot_df, ezilen_ebeveyn_gruplari: list[str])
     """
     if computed_df is None or computed_df.empty:
-        bos = pd.DataFrame(columns=[grup_col, "Kalem_Sayisi", "Toplam_Butce", "Gerceklesen_Hakedis", "Gerçekleşme (%)"])
+        bos = pd.DataFrame(columns=[
+            grup_col, "Kalem_Sayisi", "Toplam_Butce", "Gerceklesen_Hakedis",
+            "Bütçe (TR)", "Hakediş (TR)", "Gerçekleşme (%)"
+        ])
         return bos, []
 
     etkin_col = f"Etkin_{grup_col}"
@@ -680,7 +765,10 @@ def pivot_tablo_olustur(computed_df, grup_col):
     yaprak_df[grup_col] = etkin_seri[computed_df["Is_Leaf"]].apply(temizle_grup_degeri)
 
     if yaprak_df.empty:
-        bos = pd.DataFrame(columns=[grup_col, "Kalem_Sayisi", "Toplam_Butce", "Gerceklesen_Hakedis", "Gerçekleşme (%)"])
+        bos = pd.DataFrame(columns=[
+            grup_col, "Kalem_Sayisi", "Toplam_Butce", "Gerceklesen_Hakedis",
+            "Bütçe (TR)", "Hakediş (TR)", "Gerçekleşme (%)"
+        ])
         return bos, []
 
     pivot_data = (
@@ -694,13 +782,14 @@ def pivot_tablo_olustur(computed_df, grup_col):
     )
     pivot_data["Toplam_Butce"] = pivot_data["Toplam_Butce"].round(2)
     pivot_data["Gerceklesen_Hakedis"] = pivot_data["Gerceklesen_Hakedis"].round(2)
+    pivot_data["Bütçe (TR)"] = pivot_data["Toplam_Butce"].apply(para_bicimlendir_tr)
+    pivot_data["Hakediş (TR)"] = pivot_data["Gerceklesen_Hakedis"].apply(para_bicimlendir_tr)
     pivot_data["Gerçekleşme (%)"] = np.where(
         pivot_data["Toplam_Butce"] > 0,
         np.clip((pivot_data["Gerceklesen_Hakedis"] / pivot_data["Toplam_Butce"]) * 100.0, 0.0, 100.0),
         0.0,
     ).round(2)
 
-    # Ebeveyne atanıp tüm çocukları farklı özel grup aldığı için pivotta görünmeyen grupları tespit et
     ebeveyn_gruplari = set(
         computed_df.loc[~computed_df["Is_Leaf"], grup_col].apply(temizle_grup_degeri).tolist()
     ) - {"-"}
@@ -713,11 +802,10 @@ def pivot_tablo_olustur(computed_df, grup_col):
 def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
     """
     Master tablo (st.data_editor) değişikliklerini güvenli şekilde işler:
+    - WBS değiştirildiğinde o kalem ve altındaki TÜM çocuklar (örn. '1' -> 'DUV'
+      yapıldığında 'DUV.1', 'DUV.1.1'...) otomatik yeniden numaralandırılır.
     - Çocuğu olan (Is_Leaf == False) kalemlere manuel İlerleme_% girişini KESİNLİKLE engeller,
-      ancak aynı düzenlemedeki diğer geçerli değişiklikleri (Ad, Grup 1/2/3, Yerel_%, Kilit,
-      yaprak İlerleme_%) kaybetmeden uygular.
-    - Grup değerlerindeki None/NaN/boşlukları '-' olarak normalize eder.
-    - WBS değişikliklerinde boş/mükerrer/alt-ağaç çakışmasını denetler.
+      ancak aynı düzenlemedeki diğer geçerli değişiklikleri kaybetmeden uygular.
     """
     sonuc = {
         "df": ana_df.copy(),
@@ -725,7 +813,7 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
         "wbs_degisti": False,
         "hata": None,
         "engellenen_ebeveynler": [],
-        "yeni_wbs_eslesme": None,
+        "wbs_yeniden_esleme": {},
     }
 
     if gosterilecek_df.empty or edited_df.empty:
@@ -733,19 +821,19 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
 
     yeni_ana_df = ana_df.copy()
 
-    # 1. Önce WBS değişikliği kontrolü
+    # 1. Önce WBS değişikliği kontrolü (alt ağaç otomatik yeniden numaralama dahil)
     for i in range(len(gosterilecek_df)):
         eski_w = temizle_metin(gosterilecek_df.iloc[i]["WBS"], "")
         yeni_w = temizle_metin(edited_df.iloc[i]["WBS"], "")
         if eski_w != yeni_w:
-            basarili, res = wbs_degistir_guvenli(eski_w, yeni_w, yeni_ana_df)
+            basarili, res, yeni_harita = wbs_degistir_guvenli(eski_w, yeni_w, yeni_ana_df)
             if not basarili:
                 sonuc["hata"] = res
                 return sonuc
             sonuc["df"] = res
             sonuc["degisim_var"] = True
             sonuc["wbs_degisti"] = True
-            sonuc["yeni_wbs_eslesme"] = (eski_w, yeni_w)
+            sonuc["wbs_yeniden_esleme"] = yeni_harita
             return sonuc
 
     # 2. Diğer sütun değişiklikleri
@@ -756,21 +844,18 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
         is_leaf = bool(eski_row["Is_Leaf"])
         hedef_mask = yeni_ana_df["WBS"].astype(str) == wbs
 
-        # Ad
         eski_ad = temizle_metin(eski_row["Ad"], "İsimsiz Kalem")
         yeni_ad = temizle_metin(yeni_row["Ad"], "İsimsiz Kalem")
         if eski_ad != yeni_ad:
             yeni_ana_df.loc[hedef_mask, "Ad"] = yeni_ad
             sonuc["degisim_var"] = True
 
-        # Kilit
         eski_kilit = bool(eski_row["Kilit"])
         yeni_kilit = bool(yeni_row["Kilit"]) if pd.notna(yeni_row["Kilit"]) else False
         if eski_kilit != yeni_kilit:
             yeni_ana_df.loc[hedef_mask, "Kilit"] = yeni_kilit
             sonuc["degisim_var"] = True
 
-        # Gruplar
         for g_col in GRUP_COLUMNS:
             eski_g = temizle_grup_degeri(eski_row[g_col])
             yeni_g = temizle_grup_degeri(yeni_row[g_col])
@@ -778,14 +863,12 @@ def editor_degisikliklerini_uygula(ana_df, gosterilecek_df, edited_df):
                 yeni_ana_df.loc[hedef_mask, g_col] = yeni_g
                 sonuc["degisim_var"] = True
 
-        # Yerel_%
         eski_yerel = guvenli_yuzde(eski_row["Yerel_%"])
         yeni_yerel = guvenli_yuzde(yeni_row["Yerel_%"])
         if not np.isclose(eski_yerel, yeni_yerel, atol=0.005):
             yeni_ana_df.loc[hedef_mask, "Yerel_%"] = yeni_yerel
             sonuc["degisim_var"] = True
 
-        # İlerleme_% (SADECE yaprak / çocuğu olmayan kalemler için aktif!)
         if "İlerleme_%" in edited_df.columns:
             eski_il = guvenli_yuzde(eski_row["İlerleme_%"])
             yeni_il = guvenli_yuzde(yeni_row["İlerleme_%"])
@@ -961,7 +1044,6 @@ def render_app():
     </style>
     """, unsafe_allow_html=True)
 
-    # Oturum durumu başlangıç değerleri
     if "bedel" not in st.session_state:
         st.session_state.bedel = 1_000_000.0
     if "bedel_str" not in st.session_state:
@@ -989,13 +1071,12 @@ def render_app():
 
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.markdown(f"<div class='info-box'><div class='info-label'>Sözleşme Bedeli</div><div class='info-val'>{bedel_bicimlendir(st.session_state.bedel)} ₺</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='info-box'><div class='info-label'>Sözleşme Bedeli</div><div class='info-val'>{para_bicimlendir_tr(st.session_state.bedel)}</div></div>", unsafe_allow_html=True)
     with m2:
-        st.markdown(f"<div class='info-box'><div class='info-label'>Toplam Hakediş</div><div class='info-val'>{bedel_bicimlendir(toplam_hakedis)} ₺</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='info-box'><div class='info-label'>Toplam Hakediş</div><div class='info-val'>{para_bicimlendir_tr(toplam_hakedis)}</div></div>", unsafe_allow_html=True)
     with m3:
-        st.markdown(f"<div class='info-box'><div class='info-label'>Genel Fiziksel İlerleme</div><div class='info-val'>%{genel_ilerleme:.2f}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='info-box'><div class='info-label'>Genel Fiziksel İlerleme</div><div class='info-val'>{yuzde_bicimlendir_tr(genel_ilerleme)}</div></div>", unsafe_allow_html=True)
 
-    # Önceki turdan gelen uyarıyı bloklamadan göster
     if st.session_state.uyari_mesaji:
         st.warning(st.session_state.uyari_mesaji)
         st.session_state.uyari_mesaji = None
@@ -1121,7 +1202,7 @@ def render_app():
 
             edit_cols = [
                 "WBS", "Ağaç Görünümü", "Kalem Tipi", "Ad", "Kilit",
-                "Yerel_%", "İlerleme_%", "Bütçe (TL)", "Hakediş (TL)",
+                "Yerel_%", "İlerleme_%", "Bütçe (TR)", "Hakediş (TR)",
                 "Grup 1", "Grup 2", "Grup 3",
             ]
 
@@ -1139,8 +1220,8 @@ def render_app():
                     "Kilit": st.column_config.CheckboxColumn("🔒 Kilit", width="small"),
                     "Yerel_%": st.column_config.NumberColumn("Ağırlık (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
                     "İlerleme_%": st.column_config.NumberColumn("✏️ İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
-                    "Bütçe (TL)": st.column_config.NumberColumn("Bütçe", format="%.2f ₺", disabled=True, width="small"),
-                    "Hakediş (TL)": st.column_config.NumberColumn("Hakediş", format="%.2f ₺", disabled=True, width="small"),
+                    "Bütçe (TR)": st.column_config.TextColumn("Bütçe (₺)", disabled=True, width="small"),
+                    "Hakediş (TR)": st.column_config.TextColumn("Hakediş (₺)", disabled=True, width="small"),
                     "Grup 1": st.column_config.TextColumn("Grup 1", width="small"),
                     "Grup 2": st.column_config.TextColumn("Grup 2", width="small"),
                     "Grup 3": st.column_config.TextColumn("Grup 3", width="small"),
@@ -1149,8 +1230,8 @@ def render_app():
             )
 
             st.caption(
-                "ℹ️ **🔒 Ana Başlık (Oto)** satırlarının alt kırılımları olduğu için manuel ilerleme girilemez; "
-                "yalnızca **✅ Aktivite** (çocuğu olmayan) satırlarına ilerleme girilebilir."
+                "ℹ️ Bir üst başlığın WBS kodunu değiştirdiğinizde (örn. `1` → `DUV`), alt kırılımları otomatik olarak `DUV.1`, `DUV.1.1` şeklinde güncellenir. "
+                "Yalnızca **✅ Aktivite** (çocuğu olmayan) satırlarına ilerleme girilebilir."
             )
 
             sonuc = editor_degisikliklerini_uygula(st.session_state.df, gosterilecek_df, edited_df)
@@ -1170,10 +1251,13 @@ def render_app():
 
             if sonuc["degisim_var"]:
                 st.session_state.df = sonuc["df"]
-                if sonuc["wbs_degisti"] and sonuc["yeni_wbs_eslesme"]:
-                    eski_w, yeni_w = sonuc["yeni_wbs_eslesme"]
+                if sonuc["wbs_degisti"] and sonuc["wbs_yeniden_esleme"]:
+                    harita = sonuc["wbs_yeniden_esleme"]
                     st.session_state.secili_wbs_listesi = [
-                        yeni_w if x == eski_w else x for x in st.session_state.secili_wbs_listesi
+                        harita.get(x, x) for x in st.session_state.secili_wbs_listesi
+                    ]
+                    st.session_state.kesilen_wbs_listesi = [
+                        harita.get(x, x) for x in st.session_state.kesilen_wbs_listesi
                     ]
                     st.session_state.editor_version += 1
                 st.rerun()
@@ -1218,17 +1302,16 @@ def render_app():
                     <div class="sc-metrics">
                         <div class="sc-metric-box">
                             <div class="sc-metric-lbl">BÜTÇE</div>
-                            <div class="sc-metric-val">{bedel_bicimlendir(secili_row['Bütçe (TL)'])} ₺</div>
+                            <div class="sc-metric-val">{para_bicimlendir_tr(secili_row['Bütçe (TL)'])}</div>
                         </div>
                         <div class="sc-metric-box" style="text-align: right;">
                             <div class="sc-metric-lbl">GENEL PAY</div>
-                            <div class="sc-metric-val" style="color: #60a5fa;">%{secili_row['Genel_%']:.2f}</div>
+                            <div class="sc-metric-val" style="color: #60a5fa;">{yuzde_bicimlendir_tr(secili_row['Genel_%'])}</div>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Tekil seçim için gerçek widget seviyesinde kilitli/aktif ilerleme alanı
                 st.markdown("#### 📈 İlerleme Yüzdesi")
                 yeni_tekil_ilerleme = st.number_input(
                     "İlerleme (%)",
@@ -1261,11 +1344,11 @@ def render_app():
                     <div class="sc-metrics">
                         <div class="sc-metric-box">
                             <div class="sc-metric-lbl">TOPLAM BÜTÇE</div>
-                            <div class="sc-metric-val" style="color: #fcd34d;">{bedel_bicimlendir(toplam_secili_butce)} ₺</div>
+                            <div class="sc-metric-val" style="color: #fcd34d;">{para_bicimlendir_tr(toplam_secili_butce)}</div>
                         </div>
                         <div class="sc-metric-box" style="text-align: right;">
                             <div class="sc-metric-lbl">TOPLAM PAY</div>
-                            <div class="sc-metric-val" style="color: #fcd34d;">%{toplam_secili_pay:.2f}</div>
+                            <div class="sc-metric-val" style="color: #fcd34d;">{yuzde_bicimlendir_tr(toplam_secili_pay)}</div>
                         </div>
                     </div>
                 </div>
@@ -1385,7 +1468,7 @@ def render_app():
         )
 
         yaprak_giris_df = df[df["Is_Leaf"]][
-            ["WBS", "Ağaç Görünümü", "Ad", "Genel_%", "Bütçe (TL)", "İlerleme_%", "Hakediş (TL)", "Etkin_Grup 1"]
+            ["WBS", "Ağaç Görünümü", "Ad", "Genel_%", "Bütçe (TR)", "İlerleme_%", "Hakediş (TR)", "Etkin_Grup 1"]
         ].reset_index(drop=True)
 
         duzenlenen_yaprak = st.data_editor(
@@ -1399,9 +1482,9 @@ def render_app():
                 "Ağaç Görünümü": st.column_config.TextColumn("Hiyerarşi", disabled=True, width="medium"),
                 "Ad": st.column_config.TextColumn("Aktivite Adı", disabled=True),
                 "Genel_%": st.column_config.NumberColumn("Genel Pay (%)", format="%.2f %%", disabled=True, width="small"),
-                "Bütçe (TL)": st.column_config.NumberColumn("Bütçe", format="%.2f ₺", disabled=True, width="small"),
+                "Bütçe (TR)": st.column_config.TextColumn("Bütçe (₺)", disabled=True, width="small"),
                 "İlerleme_%": st.column_config.NumberColumn("✏️ İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0, width="small"),
-                "Hakediş (TL)": st.column_config.NumberColumn("Hakediş", format="%.2f ₺", disabled=True, width="small"),
+                "Hakediş (TR)": st.column_config.TextColumn("Hakediş (₺)", disabled=True, width="small"),
                 "Etkin_Grup 1": st.column_config.TextColumn("Grup 1", disabled=True, width="small"),
             },
             key=f"leaf_progress_editor_{st.session_state.editor_version}",
@@ -1418,7 +1501,7 @@ def render_app():
             st.rerun()
 
         ana_basliklar_df = df[~df["Is_Leaf"]][
-            ["WBS", "Ağaç Görünümü", "Genel_%", "Bütçe (TL)", "İlerleme_%", "Hakediş (TL)"]
+            ["WBS", "Ağaç Görünümü", "Genel_%", "Bütçe (TR)", "İlerleme_%", "Hakediş (TR)"]
         ].reset_index(drop=True)
         if not ana_basliklar_df.empty:
             st.markdown("#### 🔒 Ana Başlıklar (Salt Okunur — Alt Aktivitelerden Otomatik Hesaplanır)")
@@ -1430,9 +1513,9 @@ def render_app():
                     "WBS": st.column_config.TextColumn("WBS", width="small"),
                     "Ağaç Görünümü": st.column_config.TextColumn("Ana Başlık", width="medium"),
                     "Genel_%": st.column_config.NumberColumn("Genel Pay (%)", format="%.2f %%", width="small"),
-                    "Bütçe (TL)": st.column_config.NumberColumn("Bütçe", format="%.2f ₺", width="small"),
+                    "Bütçe (TR)": st.column_config.TextColumn("Bütçe (₺)", width="small"),
                     "İlerleme_%": st.column_config.ProgressColumn("Otomatik İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0),
-                    "Hakediş (TL)": st.column_config.NumberColumn("Hakediş", format="%.2f ₺", width="small"),
+                    "Hakediş (TR)": st.column_config.TextColumn("Hakediş (₺)", width="small"),
                 },
             )
 
@@ -1450,15 +1533,18 @@ def render_app():
             )
         with p_col2:
             pivot_data, ezilen_gruplar = pivot_tablo_olustur(df, grup_secim)
+            pivot_gosterim = pivot_data[[grup_col_name for grup_col_name in [
+                grup_secim, "Kalem_Sayisi", "Bütçe (TR)", "Hakediş (TR)", "Gerçekleşme (%)"
+            ]]].copy()
             st.dataframe(
-                pivot_data,
+                pivot_gosterim,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
                     grup_secim: st.column_config.TextColumn(grup_secim, width="medium"),
                     "Kalem_Sayisi": st.column_config.NumberColumn("Kalem Adedi (Aktivite)", format="%d"),
-                    "Toplam_Butce": st.column_config.NumberColumn("Bütçe (TL)", format="%.2f ₺"),
-                    "Gerceklesen_Hakedis": st.column_config.NumberColumn("Hakediş (TL)", format="%.2f ₺"),
+                    "Bütçe (TR)": st.column_config.TextColumn("Bütçe (₺)", width="medium"),
+                    "Hakediş (TR)": st.column_config.TextColumn("Hakediş (₺)", width="medium"),
                     "Gerçekleşme (%)": st.column_config.ProgressColumn(
                         "Fiziksel İlerleme (%)", format="%.2f %%", min_value=0.0, max_value=100.0
                     ),
